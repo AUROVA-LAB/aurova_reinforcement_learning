@@ -170,6 +170,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            "grasp_point_obj": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
         }
     )
     # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
@@ -225,7 +230,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                                  [-0.8,  0.8],
                                  [-0.8,  0.8]])
     
-    
+    # Translation respect to the object link frame for object grasping point observation
+    grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
+    grasp_obs_obj_quat_trans = torch.tensor([1.0, 0.0, 0.0, 0.0])
+
     # reward scales
     rew_position_tracking: float = -0.2
     rew_position_tracking_fine_grained : float= 0.1
@@ -249,6 +257,9 @@ def update_cfg(cfg, num_envs, device):
     '''
     cfg.obj_pos_trans = cfg.obj_pos_trans.repeat(num_envs, 1).to(device)
     cfg.obj_quat_trans = cfg.obj_quat_trans.repeat(num_envs, 1).to(device)
+
+    cfg.grasp_obs_obj_pos_trans = cfg.grasp_obs_obj_pos_trans.repeat(num_envs, 1).to(device)
+    cfg.grasp_obs_obj_quat_trans = cfg.grasp_obs_obj_quat_trans.repeat(num_envs, 1).to(device)
 
     return cfg
 

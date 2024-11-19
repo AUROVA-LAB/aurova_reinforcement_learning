@@ -286,12 +286,19 @@ class BimanualDirect(DirectRLEnv):
         ee_pose_w_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 0:7]
         ee_pose_w_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
         
+        # Obtains the pose of the object
+        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
+        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
+                                                     t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
+
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
         
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((self.obj_cmd[:, :3], ee_pose_w_1[:, :3], ee_pose_w_2[:, :3])), 
-                                                orientations = torch.cat((self.obj_cmd[:, 3:], ee_pose_w_1[:, 3:], ee_pose_w_2[:, 3:])), 
+        self.scene.extras["markers"].visualize(translations = torch.cat((self.obj_cmd[:, :3], ee_pose_w_1[:, :3], 
+                                                                         ee_pose_w_2[:, :3], grasp_point_obj_pos)), 
+                                                orientations = torch.cat((self.obj_cmd[:, 3:], ee_pose_w_1[:, 3:], 
+                                                                          ee_pose_w_2[:, 3:], grasp_point_obj_quat)), 
                                                 marker_indices=marker_indices)
         
 
@@ -329,7 +336,11 @@ class BimanualDirect(DirectRLEnv):
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
 
-        # TODO: sacar pose del objeto
+        # Get object pose in world reference system
+        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
+        # Apply transformation to get grasping point
+        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
+                                                     t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
@@ -338,6 +349,7 @@ class BimanualDirect(DirectRLEnv):
                 hand_joint_pos_1,
                 torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
                 hand_joint_pos_2,
+                torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
             dim = -1
         )
