@@ -293,10 +293,8 @@ def update_collisions(cfg, num_envs):
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
     )
-    print([f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]])
 
-    # print([f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for robot in cfg.links for joint in robot])
-
+    # Build contact sensors dictionary
     cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
                                 "robot2_w_object": robot2_w_object,
                                 "robot1_w_robot2": robot1_w_robot2} 
