@@ -73,6 +73,13 @@ class BimanualDirect(DirectRLEnv):
         # Obtain the ranges in which sample reset positions
         self.ee_pose_ranges = torch.tensor([[ [i + inc[0], i + inc[1]] for i, inc in zip(poses, cfg.ee_pose_incs)] for poses in cfg.ee_init_pose]).to(self.device)
 
+        # Obtain the number of contact sensors per environment
+        num_contacts = 0
+        for __ in self.cfg.contact_sensors_dict:
+            num_contacts += 1
+
+        # Variable to store contacts between prims
+        self.contacts = torch.empty(self.num_envs, num_contacts).fill_(False)
 
         # Create output directory to save images
         if self.cfg.save_imgs:
@@ -122,8 +129,6 @@ class BimanualDirect(DirectRLEnv):
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
-
-        
 
 
     # Method to preprocess the actions so they have a proper format
@@ -292,7 +297,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
-        
+
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.obj_cmd[:, :3], ee_pose_w_1[:, :3], 
                                                                          ee_pose_w_2[:, :3], grasp_point_obj_pos)), 
@@ -300,6 +305,24 @@ class BimanualDirect(DirectRLEnv):
                                                                           ee_pose_w_2[:, 3:], grasp_point_obj_quat)), 
                                                 marker_indices=marker_indices)
         
+
+    # Method to filter collisions according to the force matrix
+    def filter_collisions(self):
+        '''
+        In:
+            - None
+        
+        Out:
+            - None
+        '''
+
+        # Loop through all the contact sensors configuration for the indexes
+        for idx, (key, __) in enumerate(self.cfg.contact_sensors_dict.items()):
+
+            # Obtain the matrix -> reshape it -> sum the last two dimensions -> 
+            #    -> if the value is greater than 0, there is force so  there is contact
+            self.contacts[:, idx] = torch.abs(self.scene.sensors[key].data.force_matrix_w).view(self.num_envs, -1, 3).sum(dim = (1,2), keepdim = True).squeeze((-2, -1)) > 0.0
+
 
     # Getter for the observations for the environment --> Overrides method of DirectRLEnv
     def _get_observations(self) -> dict:
@@ -310,6 +333,9 @@ class BimanualDirect(DirectRLEnv):
         Out:
             - observations - dict: observations from the environment --> Needs to be with "policy" key. 
         '''
+
+        # Obtain boolean values for collisions
+        self.filter_collisions()
 
         # Count of the simulation steps
         self.count += 1
@@ -406,7 +432,6 @@ class BimanualDirect(DirectRLEnv):
 
         return truncated, terminated
     
-
     
     # Resets the index robot JOINT positions
     def reset_robot(self, idx, env_ids):
@@ -478,7 +503,6 @@ class BimanualDirect(DirectRLEnv):
        
         # Writes the state to the simulation
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
-
 
 
     # Resetes the simulation --> Overrides method of DirectRLEnv
