@@ -75,8 +75,9 @@ class BimanualDirect(DirectRLEnv):
 
 
         # Create output directory to save images
-        self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
-        os.makedirs(self.output_dir, exist_ok=True)
+        if self.cfg.save_imgs:
+            self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
+            os.makedirs(self.output_dir, exist_ok=True)
 
         self.count = 0
     
