@@ -93,8 +93,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # Contact between robot 1 hand and object
     object_w_hands: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/Cuboid", 
-        update_period=0.1, 
-        history_length=2, 
+        update_period=0.5, 
+        history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr =[]  # Bad declared on purpose, corrected later on
     )
@@ -112,7 +112,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # camera
     camera_cfg: CameraCfg = CameraCfg(
         prim_path="/World/envs/env_.*/front_cam",
-        update_period=0.1,
+        update_period=0.5,
         height=480,
         width=640,
         data_types=["rgb", "distance_to_image_plane"],
@@ -269,34 +269,34 @@ def update_collisions(cfg, num_envs):
     # Contact between robot 1 hand and object
     robot1_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
-        update_period=0.1, 
-        history_length=2, 
+        update_period=0.5, 
+        history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
     # Contact between robot 2 hand and object
-    robot2_w_object: ContactSensorCfg = ContactSensorCfg(
+    hand2_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_.*",
-        update_period=0.1, 
-        history_length=2, 
+        update_period=0.5, 
+        history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
 
-    # Contact between robot 2 hand and object
+    # Contact between robot 1 hand and robot 2
     robot1_w_robot2: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
-        update_period=0.1, 
-        history_length=2, 
+        update_period=0.5, 
+        history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
     )
 
     # Build contact sensors dictionary
     cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
-                                "robot2_w_object": robot2_w_object,
+                                "hand2_w_object": hand2_w_object,
                                 "robot1_w_robot2": robot1_w_robot2} 
     
 
