@@ -329,12 +329,6 @@ class BimanualDirect(DirectRLEnv):
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
 
-        for idx, __ in self.cfg.contact_sensors_dict.items():
-            print(self.scene.sensors[idx].data)
-            print("\n\n ----------- \n\n")
-        
-        raise
-
         # TODO: sacar pose del objeto
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
