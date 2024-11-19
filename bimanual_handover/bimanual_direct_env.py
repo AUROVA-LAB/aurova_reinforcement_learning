@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import torch
 from collections.abc import Sequence
+import copy
 
 from .mdp.utils import compute_rewards, save_images_grid
-from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg
+from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -86,16 +87,6 @@ class BimanualDirect(DirectRLEnv):
         NOTE: The "self.scene" variable is declared at "super().__init__(cfg, render_mode, **kwargs)" in __init__
         '''
 
-        # Correct contact sensors cfg --> Now the number of environments is known
-        self.cfg.contact_forces = ContactSensorCfg(
-            prim_path="/World/envs/env_.*/" + self.cfg.keys[self.cfg.UR5e] + "/.*_tip", 
-            update_period=0.1, 
-            history_length=6, 
-            debug_vis=True,
-            filter_prim_paths_expr =[f"/World/envs/env_{i}/Cuboid" for i in range(self.num_envs)]
-        )
-        
-
         # Add ground plane
         spawn_ground_plane(prim_path = "/World/ground", cfg = GroundPlaneCfg())
 
@@ -115,7 +106,11 @@ class BimanualDirect(DirectRLEnv):
 
         # Add sensors (cameras, contact_sensors, ...)
         self.scene.sensors["camera"] = Camera(self.cfg.camera_cfg)
-        self.scene.sensors["contact_sensors"] = ContactSensor(self.cfg.contact_forces)
+        
+        # Correct collision sensors 
+        self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
+        for idx, sensor_cfg in self.cfg.contact_sensors_dict.items():
+            self.scene.sensors[idx] = ContactSensor(sensor_cfg)
 
         # Add bodies
         self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
@@ -126,6 +121,8 @@ class BimanualDirect(DirectRLEnv):
         # Add lights
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
+
+        
 
 
     # Method to preprocess the actions so they have a proper format
@@ -175,6 +172,8 @@ class BimanualDirect(DirectRLEnv):
             - joint_pos - torch.tensor(N, n_joints(6 or 7)): joint position of the robot.
         '''
         
+        # print(self.scene.articulations[self.cfg.keys[idx]].body_names)
+
         # Obtains the jacobian of the end effector of the robot
         jacobian = self.scene.articulations[self.cfg.keys[idx]].root_physx_view.get_jacobians()[:, self.ee_jacobi_idx[idx], :, self._robot_joints_idx[idx]]
 
@@ -330,6 +329,12 @@ class BimanualDirect(DirectRLEnv):
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
 
+        for idx, __ in self.cfg.contact_sensors_dict.items():
+            print(self.scene.sensors[idx].data)
+            print("\n\n ----------- \n\n")
+        
+        raise
+
         # TODO: sacar pose del objeto
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
@@ -397,6 +402,7 @@ class BimanualDirect(DirectRLEnv):
         return truncated, terminated
     
 
+    
     # Resets the index robot JOINT positions
     def reset_robot(self, idx, env_ids):
         '''
@@ -413,14 +419,15 @@ class BimanualDirect(DirectRLEnv):
         joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel
 
         # Obtains the root (base) poses and velocities of the robot in the local frame
-        default_root_state = self.scene.articulations[self.cfg.keys[idx]].data.default_root_state
+        # default_root_state = copy.deepcopy(self.scene.articulations[self.cfg.keys[idx]].data.default_root_state)
+
 
         # Adds the position of the environment in world frame --> transforms the root position of the robot in local frame to world frame 
-        default_root_state[:, :3] += self.scene.env_origins
+        # default_root_state[:, :3] += self.scene.env_origins
 
         # Write the poses, velocities and joint positions to the environments
-        self.scene.articulations[self.cfg.keys[idx]].write_root_pose_to_sim(default_root_state[:, :7], env_ids)
-        self.scene.articulations[self.cfg.keys[idx]].write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
+        # self.scene.articulations[self.cfg.keys[idx]].write_root_pose_to_sim(default_root_state[:, :7], env_ids)
+        # self.scene.articulations[self.cfg.keys[idx]].write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
 
@@ -468,13 +475,14 @@ class BimanualDirect(DirectRLEnv):
                                          dim=-1)
         joint_pos = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
                                self.default_joint_pos[idx][:, (6+idx):]), 
-                               dim=-1)
+                               dim=-1) 
         
         # Obtains the joint velocities
         joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel
        
         # Writes the state to the simulation
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+
 
 
     # Resetes the simulation --> Overrides method of DirectRLEnv

@@ -6,7 +6,7 @@ from . import agents
 
 gym.register(
     id="Isaac-Bimanual-Direct-reach-v0",
-    entry_point="omni.isaac.lab_tasks.manager_based.classic.bimanual_handover.bimanual_direct_env:BimanualDirect",
+    entry_point="omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.bimanual_handover.bimanual_direct_env:BimanualDirect",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": BimanualDirectCfg,

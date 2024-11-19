@@ -253,7 +253,7 @@
 
 
 
-  <link name="palm_link">
+  <link name="hand_palm_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/base_link_left.obj"/>
@@ -283,7 +283,7 @@
   <!-- FINGERS -->
   <!-- RIGHT HAND due to which finger is number 0 -->
   <!-- for LEFT HAND switch the sign of the **offset_origin_y** and **finger_angle_r** parameters-->
-  <link name="link_0.0">
+  <link name="hand_link_0.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -305,11 +305,11 @@
   <joint name="joint_0.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_0.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_0.0_link"/>
     <origin rpy="0.08726646255 0 0" xyz="0 -0.0435 -0.001542"/>
   </joint>
-  <link name="link_1.0">
+  <link name="hand_link_1.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -331,11 +331,11 @@
   <joint name="joint_1.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_0.0"/>
-    <child link="link_1.0"/>
+    <parent link="hand_link_0.0_link"/>
+    <child link="hand_link_1.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_2.0">
+  <link name="hand_link_2.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -357,11 +357,11 @@
   <joint name="joint_2.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_1.0"/>
-    <child link="link_2.0"/>
+    <parent link="hand_link_1.0_link"/>
+    <child link="hand_link_2.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_3.0">
+  <link name="hand_link_3.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -383,11 +383,11 @@
   <joint name="joint_3.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_2.0"/>
-    <child link="link_3.0"/>
+    <parent link="hand_link_2.0_link"/>
+    <child link="hand_link_3.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_3.0_tip">
+  <link name="hand_link_3.0_link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -409,12 +409,12 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_3.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_3.0"/>
-    <child link="link_3.0_tip"/>
+  <joint name="joint_3.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link"/>
+    <child link="hand_link_3.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
-  <link name="link_4.0">
+  <link name="hand_link_4.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -436,11 +436,11 @@
   <joint name="joint_4.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_4.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_4.0_link"/>
     <origin rpy="0.0 0 0" xyz="0 0 0.0007"/>
   </joint>
-  <link name="link_5.0">
+  <link name="hand_link_5.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -462,11 +462,11 @@
   <joint name="joint_5.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_4.0"/>
-    <child link="link_5.0"/>
+    <parent link="hand_link_4.0_link"/>
+    <child link="hand_link_5.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_6.0">
+  <link name="hand_link_6.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -488,11 +488,11 @@
   <joint name="joint_6.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_5.0"/>
-    <child link="link_6.0"/>
+    <parent link="hand_link_5.0_link"/>
+    <child link="hand_link_6.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_7.0">
+  <link name="hand_link_7.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -513,11 +513,11 @@
   <joint name="joint_7.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_6.0"/>
-    <child link="link_7.0"/>
+    <parent link="hand_link_6.0_link"/>
+    <child link="hand_link_7.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_7.0_tip">
+  <link name="hand_link_7.0_link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -538,12 +538,12 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_7.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_7.0"/>
-    <child link="link_7.0_tip"/>
+  <joint name="joint_7.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link"/>
+    <child link="hand_link_7.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
-  <link name="link_8.0">
+  <link name="hand_link_8.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -565,11 +565,11 @@
   <joint name="joint_8.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_8.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_8.0_link"/>
     <origin rpy="-0.08726646255 0 0" xyz="0 0.0435 -0.001542"/>
   </joint>
-  <link name="link_9.0">
+  <link name="hand_link_9.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -591,11 +591,11 @@
   <joint name="joint_9.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_8.0"/>
-    <child link="link_9.0"/>
+    <parent link="hand_link_8.0_link"/>
+    <child link="hand_link_9.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_10.0">
+  <link name="hand_link_10._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -617,11 +617,11 @@
   <joint name="joint_10.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_9.0"/>
-    <child link="link_10.0"/>
+    <parent link="hand_link_9.0_link"/>
+    <child link="hand_link_10._link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_11.0">
+  <link name="hand_link_11._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -642,11 +642,11 @@
   <joint name="joint_11.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_10.0"/>
-    <child link="link_11.0"/>
+    <parent link="hand_link_10._link"/>
+    <child link="hand_link_11._link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_11.0_tip">
+  <link name="hand_link_11._link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -667,13 +667,13 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_11.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_11.0"/>
-    <child link="link_11.0_tip"/>
+  <joint name="joint_11.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link"/>
+    <child link="hand_link_11._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
   <!-- THUMB -->
-  <link name="link_12.0">
+  <link name="hand_link_12._link">
     <visual>
       <geometry>
         <!-- RIGHT -->
@@ -703,11 +703,11 @@
   <joint name="joint_12.0" type="revolute">
     <axis xyz="1 0 0"/>
     <limit effort="0.35" lower="0.263" upper="1.396" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_12.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_12._link"/>
     <origin rpy="0 -1.65806278845 1.5707963259" xyz="-0.0182 -0.019333 -0.045987"/>
   </joint>
-  <link name="link_13.0">
+  <link name="hand_link_13._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_13.0.obj"/>
@@ -731,14 +731,14 @@
   <joint name="joint_13.0" type="revolute">
     <axis xyz="0 0 -1"/>
     <limit effort="0.35" lower="-0.105" upper="1.163" velocity="6.283"/>
-    <parent link="link_12.0"/>
-    <child link="link_13.0"/>
+    <parent link="hand_link_12._link"/>
+    <child link="hand_link_13._link"/>
     <!-- LEFT -->
     <origin xyz="-0.027 -0.005 0" rpy="0 0 -1.57"/> <!-- -0.027 -0.005 -0.0399 -->
     <!-- RIGHT -->
     <!-- <origin xyz="-0.027 0.005 0.0399"/> -->
   </joint>
-  <link name="link_14.0">
+  <link name="hand_link_14._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_14.0.obj"/>
@@ -761,11 +761,11 @@
   <joint name="joint_14.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.189" upper="1.644" velocity="6.283"/>
-    <parent link="link_13.0"/>
-    <child link="link_14.0"/>
+    <parent link="hand_link_13._link"/>
+    <child link="hand_link_14._link"/>
     <origin xyz="0 0 0.0177"/>
   </joint>
-  <link name="link_15.0">
+  <link name="hand_link_15._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_15.0.obj"/>
@@ -788,11 +788,11 @@
   <joint name="joint_15.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.162" upper="1.719" velocity="6.283"/>
-    <parent link="link_14.0"/>
-    <child link="link_15.0"/>
+    <parent link="hand_link_14._link"/>
+    <child link="hand_link_15._link"/>
     <origin xyz="0 0 0.0514"/>
   </joint>
-  <link name="link_15.0_tip">
+  <link name="hand_link_15._link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -813,14 +813,14 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_15.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_15.0"/>
-    <child link="link_15.0_tip"/>
+  <joint name="joint_15.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link"/>
+    <child link="hand_link_15._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.0455"/>
   </joint>
   <joint name="palm_2_ur" type="fixed" dont_collapse="true">
     <parent link="tool_frame"/>
-    <child link="palm_link"/>
-    <origin rpy="0 0 -3.92" xyz="0.0 0 0.0911750"/>
+    <child link="hand_palm_link"/>
+    <origin rpy="0 0 5.5" xyz="0.0 0 0.1175"/>
   </joint>
 </robot>

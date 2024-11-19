@@ -7,7 +7,7 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from omni.isaac.lab_tasks.manager_based.classic.bimanual_handover.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.bimanual_handover.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 
 import omni.isaac.lab.sim as sim_utils
@@ -79,7 +79,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
     # Hand joint names
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)]
-    
+
+    links = [['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link'], 
+    ['base_link', 'shoulder_link', 'half_arm_1_link', 'half_arm_2_link', 'forearm_link', 'spherical_wrist_1_link', 'spherical_wrist_2_link', 'bracelet_link', 'end_effector_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link']]
+
     # All agent joint names
     all_joints = [[], []]
     all_joints[UR5e] = joints[UR5e] + hand_joints[UR5e]
@@ -87,12 +90,13 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
 
     # contact sensors
-    contact_forces: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + keys[UR5e] + "/.*_tip", 
+    # Contact between robot 1 hand and object
+    object_w_hands: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/Cuboid", 
         update_period=0.1, 
         history_length=2, 
         debug_vis=True,
-        filter_prim_paths_expr =[f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)]
+        filter_prim_paths_expr =[]  # Bad declared on purpose, corrected later on
     )
     # ContactSensorCfg: Configuration for the contact sensor.
     #    update_period: Update period of the sensor buffers (in seconds).
@@ -100,6 +104,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     #    debug_vis: Whether to visualize the sensor.
     #    filter_prim_paths_expr: The list of primitive paths (or expressions) to filter contacts with.
     #        It is declared as a list because it does not work using "regex" expressions
+
+    # Dictionary of contact sensors configurations --> Updated later
+    contact_sensors_dict = {"object_w_hands": object_w_hands}
 
 
     # camera
@@ -214,9 +221,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = torch.tensor([[-0.2,  0.2],
                                  [-0.2,  0.2],
                                  [-0.2,  0.2],
-                                 [-0.3,  0.3],
-                                 [-0.3,  0.3],
-                                 [-0.3,  0.3]])
+                                 [-0.8,  0.8],
+                                 [-0.8,  0.8],
+                                 [-0.8,  0.8]])
     
     
     # reward scales
@@ -242,5 +249,46 @@ def update_cfg(cfg, num_envs, device):
     '''
     cfg.obj_pos_trans = cfg.obj_pos_trans.repeat(num_envs, 1).to(device)
     cfg.obj_quat_trans = cfg.obj_quat_trans.repeat(num_envs, 1).to(device)
+
+    return cfg
+
+
+def update_collisions(cfg, num_envs):
+
+    # Contact between robot 1 hand and object
+    robot1_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
+        update_period=0.1, 
+        history_length=2, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    # Contact between robot 2 hand and object
+    robot2_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_.*",
+        update_period=0.1, 
+        history_length=2, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+
+    # Contact between robot 2 hand and object
+    robot1_w_robot2: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
+        update_period=0.1, 
+        history_length=2, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
+    )
+    print([f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]])
+
+    # print([f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for robot in cfg.links for joint in robot])
+
+    cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
+                                "robot2_w_object": robot2_w_object,
+                                "robot1_w_robot2": robot1_w_robot2} 
+    
 
     return cfg
