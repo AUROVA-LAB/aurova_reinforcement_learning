@@ -173,8 +173,6 @@ class BimanualDirect(DirectRLEnv):
             - joint_pos - torch.tensor(N, n_joints(6 or 7)): joint position of the robot.
         '''
         
-        # print(self.scene.articulations[self.cfg.keys[idx]].body_names)
-
         # Obtains the jacobian of the end effector of the robot
         jacobian = self.scene.articulations[self.cfg.keys[idx]].root_physx_view.get_jacobians()[:, self.ee_jacobi_idx[idx], :, self._robot_joints_idx[idx]]
 
@@ -422,19 +420,10 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Default joint position for the robots
-        joint_pos = self.default_joint_pos[idx]
-        joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel
+        joint_pos = self.default_joint_pos[idx][env_ids]
+        joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel[env_ids]
 
-        # Obtains the root (base) poses and velocities of the robot in the local frame
-        # default_root_state = copy.deepcopy(self.scene.articulations[self.cfg.keys[idx]].data.default_root_state)
-
-
-        # Adds the position of the environment in world frame --> transforms the root position of the robot in local frame to world frame 
-        # default_root_state[:, :3] += self.scene.env_origins
-
-        # Write the poses, velocities and joint positions to the environments
-        # self.scene.articulations[self.cfg.keys[idx]].write_root_pose_to_sim(default_root_state[:, :7], env_ids)
-        # self.scene.articulations[self.cfg.keys[idx]].write_root_velocity_to_sim(default_root_state[:, 7:], env_ids)
+        # Write the joint positions to the environments
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
 
@@ -482,10 +471,10 @@ class BimanualDirect(DirectRLEnv):
                                          dim=-1)
         joint_pos = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
                                self.default_joint_pos[idx][:, (6+idx):]), 
-                               dim=-1) 
+                               dim=-1)[env_ids] 
         
         # Obtains the joint velocities
-        joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel
+        joint_vel = self.scene.articulations[self.cfg.keys[idx]].data.default_joint_vel[env_ids]
        
         # Writes the state to the simulation
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
