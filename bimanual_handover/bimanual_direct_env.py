@@ -156,7 +156,34 @@ class BimanualDirect(DirectRLEnv):
 
         # Reassign quaternion
         actions[:, 3:7] = torch.cat((w, q), dim = 1)
-        
+
+        # Preprocess Kinova hand joints -> calculate the mean of the joints for 
+        # the index, middle, and ring fingers
+        # thumb [8, 12, 16, 20], index [7, 11, 15, 19], middle [9, 13, 17, 21], ring [10, 14, 18, 22]
+        # joints_0 [7, 9, 10], joints_1 [11, 13, 14], joints_2 [15, 17, 18], joints_3 [19, 21, 22]
+        for joint_idx in range(4):
+            
+            joint_tensor = torch.zeros((self.num_envs, 3))
+            joint_tensor[:, 0] = actions[:, 7+joint_idx*4]
+            joint_tensor[:, 1] = actions[:, 7+2+joint_idx*4]
+            joint_tensor[:, 2] = actions[:, 7+3+joint_idx*4]
+            # Save joint_idx of index, middle, and ring fingers for each env
+            # env0 -> [env0_joint_idx_index, env0_joint_idx_middle, env0_joint_idx_ring]
+            # env1 -> [env1_joint_idx_index, env1_joint_idx_middle, env1_joint_idx_ring]
+            # envn -> [envn_joint_idx_index, envn_joint_idx_middle, envn_joint_idx_ring]
+
+            # Compute the mean of joint_idx for each finger and each env
+            joint_mean = torch.mean(joint_tensor, dim=1)
+            # env0 -> [env0_joint_idx_mean]
+            # env1 -> [env1_joint_idx_mean]
+            # envn -> [envn_joint_idx_mean]
+
+            # Replace the actions of the joint_idx for each finger and env by the mean
+            actions[:, 7+joint_idx*4] = joint_mean[:]
+            actions[:, 7+2+joint_idx*4] = joint_mean[:]
+            actions[:, 7+3+joint_idx*4] = joint_mean[:]
+
+
         return actions
     
     
@@ -226,7 +253,7 @@ class BimanualDirect(DirectRLEnv):
 
         # --- GEN3 actions ---
         # Set the command for the IKDifferentialController
-        self.controller.set_command(actions[:,:7])
+        self.controller.set_command(actions[:, :7])
 
         # Obtains the poses
         ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(self.cfg.GEN3)
