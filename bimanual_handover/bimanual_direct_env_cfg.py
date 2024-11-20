@@ -235,12 +235,13 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     grasp_obs_obj_quat_trans = torch.tensor([1.0, 0.0, 0.0, 0.0])
 
     # reward scales
-    rew_position_tracking: float = -0.2
-    rew_position_tracking_fine_grained : float= 0.1
-    rew_orientation_tracking: float = -0.1
-    rew_dual_quaternion_error: float= 0.0
-    rew_action_rate: float= -0.0001
-    rew_joint_vel: float= -0.0001
+    rew_dual_quaternion_error: float= 1.0
+
+    # Position threshold for changing reach reward
+    rew_change_thres = 1
+
+    # Objective position -> origin GEN3 position with offset in X axis
+    target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
 
 
 # Function to update the variables in the configuration class
@@ -260,6 +261,8 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.grasp_obs_obj_pos_trans = cfg.grasp_obs_obj_pos_trans.repeat(num_envs, 1).to(device)
     cfg.grasp_obs_obj_quat_trans = cfg.grasp_obs_obj_quat_trans.repeat(num_envs, 1).to(device)
+
+    cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
 
     return cfg
 

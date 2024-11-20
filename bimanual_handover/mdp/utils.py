@@ -1,8 +1,8 @@
 import torch
-from omni.isaac.lab.scene import InteractiveScene, InteractiveSceneCfg
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from .rewards import dual_quaternion_error 
 
 # Class to implement sequence storage
 class TensorQueue:
@@ -29,18 +29,36 @@ class TensorQueue:
     
 
 
-# Reward computation --> TODO
-@torch.jit.script
-def compute_rewards(rew_position_tracking: float,
-                    rew_position_tracking_fine_grained: float,
-                    rew_orientation_tracking: float,
-                    rew_dual_quaternion_error: float,
-                    rew_action_rate: float,
-                    rew_joint_vel: float,
+# Reward computation
+# @torch.jit.script
+def compute_rewards(rew_dual_quaternion_error: float,
+                    ee_pose: torch.Tensor,
+                    obj_pose: torch.Tensor,
+                    rew_change_thres: float,
+                    target_pose: torch.Tensor,
                     device: str):
+    '''
+    In:
+        - rew_dual_quaternion_error - float: weighting factor for dual quaternion reward.
+        - ee_pose - torch.tensor(N, 7): end effector pose in translation(3) + rotation in quaternions(4).
+        - obj_pose - torch.tensor(N, 7): object pose in translation(3) + rotation in quaternions(4).
+        - rew_change_thres - float: position threshold that changes the reach reward to the manipulation one.
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - dq_reward - torch.tensor(N): rewards for all environments.
+    '''
+
+    # Dual quaternion distance
+    dq_distance = dual_quaternion_error(ee_pose, obj_pose, device)
+
+    idxs = dq_distance[:, 1] < rew_change_thres
+    dq_distance[idxs] = dual_quaternion_error(ee_pose, target_pose, device)[idxs]
+
+    # Return final reward
+    reward = rew_dual_quaternion_error * -dq_distance[:, 0]
     
-    
-    return torch.tensor([0.0]).to(device)
+    return reward
 
 
 # Function for image saving from IsaacLab --> Taken from source/standalone/demos/cameras.py

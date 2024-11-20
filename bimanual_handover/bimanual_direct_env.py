@@ -184,7 +184,7 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the pose of the end effector in the world frame
         ee_pose_w = self.scene.articulations[self.cfg.keys[idx]].data.body_state_w[:, self.ee_jacobi_idx[idx]+1, 0:7]
 
-        # Obtains the pose of the  base of the robot in the world frame
+        # Obtains the pose of the base of the robot in the world frame
         root_pose_w = self.scene.articulations[self.cfg.keys[idx]].data.root_state_w[:, 0:7]
         
         # Obtains the joint position
@@ -197,6 +197,34 @@ class BimanualDirect(DirectRLEnv):
         # root = T01 // ee = T02 -> substract = (T01)^-1 * T02 = T10 * T02 = T12
         
         return ee_pos_b, ee_quat_b, jacobian, joint_pos
+
+
+    # Obtains the pose of the object in the local frame
+    def _get_object_pose(self):
+        '''
+        In: 
+            - None
+
+        Out:
+            - grasp_point_obj_pos - torch.tensor(N, 3): position of the object in the GEN3 root frame.
+            - grasp_point_obj_quat - torch.tensor(N, 4): orientation of the object as a quaternion in the GEN3 root frame. 
+        '''
+
+        # Get object and pose in world reference system
+        obj_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
+
+        # Obtains the pose of the base of the GEN3 robot in the world frame
+        root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
+        
+        # Apply transformation to get grasping point in the global frame
+        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
+                                                                             t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
+
+        # Apply transformation to get the grasping point in the GEN3 root frame
+        grasp_point_obj_pos, grasp_point_obj_quat = subtract_frame_transforms(t01 = root_pose_w[:, :3], q01 = root_pose_w[:, 3:],
+                                                                              t02 = grasp_point_obj_pos, q02 = grasp_point_obj_quat)
+
+        return grasp_point_obj_pos, grasp_point_obj_quat
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -361,11 +389,8 @@ class BimanualDirect(DirectRLEnv):
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
 
-        # Get object pose in world reference system
-        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
-        # Apply transformation to get grasping point
-        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
-                                                     t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
+        
+        grasp_point_obj_pos, grasp_point_obj_quat = self._get_object_pose()
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
@@ -398,14 +423,21 @@ class BimanualDirect(DirectRLEnv):
         Out:
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''
-        
+
+        # Obtain the poses of the robot and the object
+        ee_pos_b_2, ee_quat_b_2, _, _ = self._get_ee_pose(self.cfg.GEN3)
+        grasp_point_obj_pos, grasp_point_obj_quat = self._get_object_pose()
+
+        # Build poses tensor
+        ee_pose = torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1)
+        obj_pose = torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1)
+
         # Computes reward according to the scaling values and poses (in utils)
-        return compute_rewards(self.cfg.rew_position_tracking,
-                               self.cfg.rew_position_tracking_fine_grained,
-                               self.cfg.rew_orientation_tracking,
-                               self.cfg.rew_dual_quaternion_error,
-                               self.cfg.rew_action_rate,
-                               self.cfg.rew_joint_vel,
+        return compute_rewards(self.cfg.rew_dual_quaternion_error,
+                               ee_pose,
+                               obj_pose,
+                               self.cfg.rew_change_thres,
+                               self.cfg.target_pose,
                                self.device)
     
 
