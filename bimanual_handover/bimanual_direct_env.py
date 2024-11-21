@@ -370,7 +370,7 @@ class BimanualDirect(DirectRLEnv):
         
         # Rotate that frame -45 in Z axis
         original_pos, original_quat = combine_frame_transforms(t01 = original_pose[: ,:3], q01 = original_pose[: ,3:],
-                                                               t12 = torch.zeros_like(original_pose[:, :3]), q12 = self.cfg.rot_45_z_neg_quat)
+                                                               t12 = torch.zeros_like(original_pose[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
         self.new_pose_robot2 = torch.cat((original_pos, original_quat), dim = -1)
 
 
@@ -532,9 +532,6 @@ class BimanualDirect(DirectRLEnv):
         quat = quat_from_euler_xyz(roll = ee_init_pose[:, 3],
                                     pitch = ee_init_pose[:, 4],
                                     yaw = ee_init_pose[:, 5])
-        
-        # Somehow, UR5e orientation needs a sign change
-        if idx == self.cfg.UR5e: quat *= -1
         
         # Builds the new initial pose
         ee_init_pose = torch.cat((ee_init_pose[:, :3], quat), dim = -1)

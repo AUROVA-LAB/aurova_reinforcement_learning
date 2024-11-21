@@ -215,9 +215,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
     # Rotations respecto to the end effector robot link frame for object spawning
     rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+    rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
     rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
+    rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
 
     # Aggregate rotations as quaternions
     rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
@@ -283,6 +285,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
 
     cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
+    cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
     
     return cfg
 
