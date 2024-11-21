@@ -36,6 +36,26 @@ different from one another.
 '''
 
 
+# Function to change a Euler angles to a quaternion as a tensor
+def rot2tensor(rot: Rotation) -> torch.tensor:
+    '''
+    In:
+        - rot - scipy.Rotation(3): rotation expressed in Euler angles.
+
+    Out:
+        - rot_tensor_quat - torch.tensor - (4): rotation expressed a quaternion in a tensor.
+    '''
+
+    # Transform rotation to tensor
+    rot_tensor = torch.tensor(rot.as_quat())
+    rot_tensor_quat = torch.zeros((4))
+
+    # Scipy uses the notation (x,y,z,w) whilst IsaacLab uses (w,x,y,z), so that is changed
+    rot_tensor_quat[0], rot_tensor_quat[1:] = rot_tensor[-1].clone(), rot_tensor[:3].clone()
+    
+    return rot_tensor_quat
+
+
 @configclass
 class BimanualDirectCfg(DirectRLEnvCfg):
     # env
@@ -155,22 +175,17 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     marker_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/myMarkers",
         markers={
-            "cmd_ur5e": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
             "ur5e_ee_pose": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
-            "gen3_ee_pose": sim_utils.UsdFileCfg(
+            "grasp_point_obj": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
-            "grasp_point_obj": sim_utils.UsdFileCfg(
+            "gen3_ee_pose": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -200,7 +215,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
     # Rotations respecto to the end effector robot link frame for object spawning
     rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+    rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
     rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+
+    rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
+    rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
 
     # Aggregate rotations as quaternions
     rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
@@ -232,15 +251,17 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
-    grasp_obs_obj_quat_trans = torch.tensor([1.0, 0.0, 0.0, 0.0])
+    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos)
 
     # reward scales
-    rew_position_tracking: float = -0.2
-    rew_position_tracking_fine_grained : float= 0.1
-    rew_orientation_tracking: float = -0.1
-    rew_dual_quaternion_error: float= 0.0
-    rew_action_rate: float= -0.0001
-    rew_joint_vel: float= -0.0001
+    rew_dual_quaternion_error: float= 1.0
+
+    # Position threshold for changing reach reward
+    rew_change_thres = 1
+
+    # Objective position -> origin GEN3 position with offset in X axis
+    target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
+
 
 
 # Function to update the variables in the configuration class
@@ -261,6 +282,11 @@ def update_cfg(cfg, num_envs, device):
     cfg.grasp_obs_obj_pos_trans = cfg.grasp_obs_obj_pos_trans.repeat(num_envs, 1).to(device)
     cfg.grasp_obs_obj_quat_trans = cfg.grasp_obs_obj_quat_trans.repeat(num_envs, 1).to(device)
 
+    cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
+
+    cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
+    cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
+    
     return cfg
 
 

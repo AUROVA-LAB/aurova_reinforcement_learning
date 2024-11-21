@@ -144,123 +144,30 @@ def dq_quaternion_conjugate(dq):
     return dq * conj.expand_as(dq)
 
 
-def dq_to_screw(dq):
-    """
-    Return the screw parameters that describe the rigid transformation encoded in the input dual quaternion.
-    Input shape: [*, 8]
-    Output:
-     - Plucker coordinates (l, m) for the roto-translation axis (both of shape [*, 3])
-     - Amount of rotation and translation around/along the axis (both of shape [*])
-    """
 
-    assert dq.shape[-1] == 8
-
-    dq_r, dq_d = torch.split(dq, [4, 4], dim=-1)
-    theta = q_angle(dq_r)  # shape: [b, 1]
-    theta_sq = theta.squeeze(dim=-1)
-    no_rot = torch.isclose(theta_sq, torch.zeros_like(theta_sq, device=dq.device))
-    with_rot = ~no_rot
-    dq_t = dq_translation(dq)
-
-    l = torch.zeros(*dq.shape[:-1], 3, device=dq.device)
-    m = torch.ones(*dq.shape[:-1], 3, device=dq.device)
-    d = torch.zeros(*dq.shape[:-1], device=dq.device)
-
-    l[with_rot] = dq_r[with_rot, 1:].float() / torch.sin(theta[with_rot] / 2).float()
-
-    d[with_rot] = (dq_t[with_rot] * l[with_rot]).sum(dim=-1)  # batched dot product
-    d[with_rot] = torch.norm(dq_t[with_rot])
-
-    t_l_cross = torch.cross(dq_t[with_rot].float(), l[with_rot].float(), dim=-1)
-    m[with_rot] = 0.5 * (t_l_cross.float() + torch.cross(l[with_rot].float(), t_l_cross.float() / torch.tan(theta[with_rot].float() / 2), dim=-1).float()).float()
-
-    d[no_rot] = torch.linalg.norm(dq_t[no_rot].float(), dim=-1)
-    no_trans = torch.isclose(d, torch.zeros_like(d, device=dq.device))
-    unit_transform = torch.logical_and(no_rot, no_trans)
-    only_trans = torch.logical_and(no_rot, ~no_trans)
-    l[unit_transform] = dq_t[unit_transform].float() / d[unit_transform].unsqueeze(dim=-1).float()
-    l[only_trans] = 0
-    m[no_rot] *= float("inf")
-
-    return l, m, theta.squeeze(-1), d
+# === DISTANCES =================================================================================
 
 
-def dq_rotate_vector(q_rot, vector):
-    """
-    Rotate a vector using a rotation quaternion.
-
-    Parameters:
-        q_rot (torch.Tensor): Rotation quaternion(s) of shape [..., 4].
-        vector (torch.Tensor): Vector(s) to be rotated of shape [..., 3].
-
-    Returns:
-        rotated_vector (torch.Tensor): Rotated vector(s) of shape [..., 3].
-    """
-    # Ensure the rotation quaternion has the correct shape
-    q_rot = q_rot.squeeze(-1)  # Expand dims to match the shape of vector
-    vector = vector.squeeze(-1)
-
-    # Apply quaternion rotation: q_rot * vector_quat * q_rot_conjugate
-    rotated_quat = q_mul(q_conjugate(q_rot), q_mul(vector, q_rot))
-
-    # Extract the rotated vector from the resulting quaternion
-    return rotated_quat
-
-
-
-# === LOSSES =================================================================================
-
-
-# Scale parameters
-LAMBDA_ROT = 1 / math.pi  # Rotation
-LAMBDA_TRANS = 3.5 / 1    # Traslation 
-
-def dq_distance(dq_pred, dq_real):
+def dq_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor) -> torch.Tensor:
     '''
     Calculates the screw motion parameters between dual quaternion representations of the given poses pose_pred/real.
-    This screw motion describes the "shortest" rigid transformation between dq_pred and dq_real.
-    A combination of that transformation's screw axis translation magnitude and rotation angle can be used as a metric.
-    => "Distance" between two dual quaternions: weighted sum of screw motion axis magnitude and rotation angle.
+    The difference of two dual quaternions results the pure dual quaternion if the originals represent the same frame in space.
+    => "Distance" between two dual quaternions: how different they are to the pure dual quaternion.
     '''
 
-    # # Inverse of predicted
-    # dq_pred_inv = dq_quaternion_conjugate(dq_pred)  # inverse is quat. conj. because it's normalized
-    
-    # # Quaternion difference
-    # dq_diff = dq_mul(dq_pred_inv, dq_real)
-    
-    # # Extract real and imaginary part of the difference
-    # dq_diff_rot = dq_diff[..., :4]  # Rotation part
-    # dq_diff_trans = dq_diff[..., 4:]  # Translation part
+    # Obtain the difference between two dual quaternion
+    res = dq_mul(dq_real, dq_quaternion_conjugate(dq_pred))
 
-    # # Rotate the translation part using the rotation quaternion
-    # dq_diff_trans_rotated = dq_rotate_vector(dq_diff_rot, dq_diff_trans)
+    # If the result was the pure dual quaternion, the real part of the dual part would be 1 and the rest 0s.
+    #    The norm of that modified dual quaternion is 0. --> This is not geometrically correct because ...
+    #    ... the module of the simple quaternions and the whole dual must be unitary but this method serves as a way to compute distances.
+    res[:, 0] = torch.abs(res[:, 0]) - 1
 
-    # # Obtain the norm
-    # d = torch.linalg.norm(dq_diff_trans_rotated, dim=-1)
+    # Obtain the norm of the primary and dual part
+    rotation_mod = torch.norm(res[:, 4:], dim = -1).unsqueeze(0)
+    translation_mod = torch.norm(res[:, :4], dim = -1).unsqueeze(0)
 
-    # # Reassign the rotated quaternion
-    # dq_diff[:,4:] = dq_diff_trans_rotated[:,:]
-
-    # # Split the dual quaternion to obtain both parts
-    # dq_r, dq_d = torch.split(dq_diff, [4, 4], dim=-1)
-
-    # # Obtain theta
-    # theta = q_angle(dq_r).squeeze(-1)
-
-    # # Distance
-    # distances = (LAMBDA_ROT * torch.abs(theta))  + (LAMBDA_TRANS * torch.abs(d))
-
-    dq_pred_inv = dq_quaternion_conjugate(dq_pred)
-
-    res = dq_mul(dq_real, dq_pred_inv)
-
-    res[:, 0] = torch.abs(res[:, 0])
-    res[:, 0] -= 1
-
-    rotation_mod = torch.norm(res[:, 4:])
-    translation_mod = torch.norm(res[:, :4])
-
+    # The distance is the sum of the modules
     distance = translation_mod + rotation_mod
 
-    return distance, translation_mod, rotation_mod
+    return torch.cat((distance, translation_mod, rotation_mod)).transpose(0,1)
