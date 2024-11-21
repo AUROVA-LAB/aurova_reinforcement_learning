@@ -53,7 +53,7 @@ def compute_rewards(rew_dual_quaternion_error: float,
     dq_distance = dual_quaternion_error(ee_pose, obj_pose, device)
 
     idxs = dq_distance[:, 1] < rew_change_thres
-    dq_distance[idxs] = dual_quaternion_error(ee_pose, target_pose, device)[idxs]
+    dq_distance[idxs] = dual_quaternion_error(obj_pose, target_pose, device)[idxs]
 
     # Return final reward
     reward = rew_dual_quaternion_error * -dq_distance[:, 0]
