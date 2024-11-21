@@ -452,23 +452,19 @@ class BimanualDirect(DirectRLEnv):
         
         # Obtain end effector poses for the robots
         ee_pos_b_1, ee_quat_b_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
-        ee_pos_b_2, ee_quat_b_2, _, _ = self._get_ee_pose(self.cfg.GEN3)
 
         # Obtains the joint positions for the hand
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
-
-        
-        grasp_point_obj_pos, grasp_point_obj_quat = self._get_object_pose()
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
                 torch.cat((ee_pos_b_1, ee_quat_b_1), dim = -1),
                 hand_joint_pos_1,
-                torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
+                self.new_pose_robot2, # torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
                 hand_joint_pos_2,
-                torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
+                self.new_obj_pose,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
             dim = -1
         )
@@ -636,4 +632,7 @@ class BimanualDirect(DirectRLEnv):
         
         # Updates the command of the object, i.e. the spawning position
         self.obj_cmd = torch.cat((obj_pos, obj_quat), dim = -1)
+
+        # Updates the poses of the GEN3 end effector and the object in the reset
+        self.update_new_poses()
         
