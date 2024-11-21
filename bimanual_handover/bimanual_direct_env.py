@@ -96,7 +96,7 @@ class BimanualDirect(DirectRLEnv):
         self.count = 0
     
     
-    # Method to add all the prims to the scen --> Overrides method of DirectRLEnv
+    # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
     def _setup_scene(self, ):
         '''
         NOTE: The "self.scene" variable is declared at "super().__init__(cfg, render_mode, **kwargs)" in __init__
@@ -423,6 +423,7 @@ class BimanualDirect(DirectRLEnv):
         # Obtain boolean values for collisions
         self.filter_collisions()
 
+        # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
 
         # Count of the simulation steps
