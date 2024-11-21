@@ -164,8 +164,8 @@ def dq_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor) -> torch.Tensor:
     res[:, 0] = torch.abs(res[:, 0]) - 1
 
     # Obtain the norm of the primary and dual part
-    rotation_mod = torch.norm(res[:, 4:], dim = -1).unsqueeze(0)
-    translation_mod = torch.norm(res[:, :4], dim = -1).unsqueeze(0)
+    translation_mod = torch.norm(res[:, 4:], dim = -1).unsqueeze(0)
+    rotation_mod = torch.norm(res[:, :4], dim = -1).unsqueeze(0)
 
     # The distance is the sum of the modules
     distance = translation_mod + rotation_mod
