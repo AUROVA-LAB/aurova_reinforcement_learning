@@ -213,7 +213,7 @@
       -->
     <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
   </joint>
-  <joint name="shoulder_pan_joint" type="revolute">
+  <joint name="arm_shoulder_pan_joint" type="revolute">
     <parent link="base_link_inertia"/>
     <child link="shoulder_link"/>
     <origin rpy="0 0 0" xyz="0 0 0.1625"/>
@@ -221,7 +221,7 @@
     <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="shoulder_lift_joint" type="revolute">
+  <joint name="arm_shoulder_lift_joint" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
     <origin rpy="1.570796327 0 0" xyz="0 0 0"/>
@@ -229,7 +229,7 @@
     <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="elbow_joint" type="revolute">
+  <joint name="arm_elbow_joint" type="revolute">
     <parent link="upper_arm_link"/>
     <child link="forearm_link"/>
     <origin rpy="0 0 0" xyz="-0.425 0 0"/>
@@ -237,7 +237,7 @@
     <limit effort="150.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_1_joint" type="revolute">
+  <joint name="arm_wrist_1_joint" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_1_link"/>
     <origin rpy="0 0 0" xyz="-0.3922 0 0.1333"/>
@@ -245,7 +245,7 @@
     <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_2_joint" type="revolute">
+  <joint name="arm_wrist_2_joint" type="revolute">
     <parent link="wrist_1_link"/>
     <child link="wrist_2_link"/>
     <origin rpy="1.570796327 0 0" xyz="0 -0.0997 -2.044881182297852e-11"/>
@@ -253,7 +253,7 @@
     <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_3_joint" type="continuous">
+  <joint name="arm_wrist_3_joint" type="continuous">
     <parent link="wrist_2_link"/>
     <child link="wrist_3_link"/>
     <origin rpy="1.570796326589793 3.141592653589793 3.141592653589793" xyz="0 0.0996 -2.042830148012698e-11"/>
