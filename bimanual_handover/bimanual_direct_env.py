@@ -33,11 +33,18 @@ different from one another.
 class BimanualDirect(DirectRLEnv):
     cfg: BimanualDirectCfg
 
+    # --- init function ---
     def __init__(self, cfg: BimanualDirectCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
-
+        
+        # --- Debug variables ---
         # WILL BE REMOVED: initial poses sampled in reset for both robots
         self.new_poses = [[], []]
+
+
+        # Poses for the object and GEN3 robot so they can match when performing the grasping
+        self.new_pose_robot2 = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.new_obj_pose = copy.deepcopy(self.new_pose_robot2)
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
@@ -316,21 +323,17 @@ class BimanualDirect(DirectRLEnv):
         
         # Obtains the positions of the of the robots
         ee_pose_w_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 0:7]
-        ee_pose_w_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
-        
-        # Obtains the pose of the object
-        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
-        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
-                                                     t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((self.obj_cmd[:, :3], ee_pose_w_1[:, :3], 
-                                                                         ee_pose_w_2[:, :3], grasp_point_obj_pos)), 
-                                                orientations = torch.cat((self.obj_cmd[:, 3:], ee_pose_w_1[:, 3:], 
-                                                                          ee_pose_w_2[:, 3:], grasp_point_obj_quat)), 
+        self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
+                                                                         self.new_obj_pose[:, :3],
+                                                                         self.new_pose_robot2[:, :3])), 
+                                                orientations = torch.cat((ee_pose_w_1[:, 3:], 
+                                                                          self.new_obj_pose[:, 3:],
+                                                                          self.new_pose_robot2[:,3:])), 
                                                 marker_indices=marker_indices)
         
 
@@ -352,6 +355,34 @@ class BimanualDirect(DirectRLEnv):
             self.contacts[:, idx] = torch.abs(self.scene.sensors[key].data.force_matrix_w).view(self.num_envs, -1, 3).sum(dim = (1,2), keepdim = True).squeeze((-2, -1)) > 0.0
 
 
+    # Updates the poses of the object and robots so they can match when performing the grasp
+    def update_new_poses(self):
+        '''
+        In:
+            - None
+        
+        Out:
+            - None
+        '''
+
+        # Obtain the pose of the GEN3 end effector in world frame
+        original_pose = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
+        
+        # Rotate that frame -45 in Z axis
+        original_pos, original_quat = combine_frame_transforms(t01 = original_pose[: ,:3], q01 = original_pose[: ,3:],
+                                                               t12 = torch.zeros_like(original_pose[:, :3]), q12 = self.cfg.rot_45_z_neg_quat)
+        self.new_pose_robot2 = torch.cat((original_pos, original_quat), dim = -1)
+
+
+        # Obtains the pose of the object in the world frame
+        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
+
+        # Transforms the object frame so as to generate a more suitable frame for grasping
+        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
+                                                                             t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
+        self.new_obj_pose = torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1)
+
+
     # Getter for the observations for the environment --> Overrides method of DirectRLEnv
     def _get_observations(self) -> dict:
         '''
@@ -364,6 +395,8 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtain boolean values for collisions
         self.filter_collisions()
+
+        self.update_new_poses()
 
         # Count of the simulation steps
         self.count += 1
@@ -424,18 +457,10 @@ class BimanualDirect(DirectRLEnv):
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''
 
-        # Obtain the poses of the robot and the object
-        ee_pos_b_2, ee_quat_b_2, _, _ = self._get_ee_pose(self.cfg.GEN3)
-        grasp_point_obj_pos, grasp_point_obj_quat = self._get_object_pose()
-
-        # Build poses tensor
-        ee_pose = torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1)
-        obj_pose = torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1)
-
         # Computes reward according to the scaling values and poses (in utils)
         return compute_rewards(self.cfg.rew_dual_quaternion_error,
-                               ee_pose,
-                               obj_pose,
+                               self.new_pose_robot2,
+                               self.new_obj_pose,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,
                                self.device)
@@ -537,7 +562,7 @@ class BimanualDirect(DirectRLEnv):
         self.scene.articulations[self.cfg.keys[idx]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
 
-    # Resetes the simulation --> Overrides method of DirectRLEnv
+    # Resets the simulation --> Overrides method of DirectRLEnv
     def _reset_idx(self, env_ids: Sequence[int] | None):
         '''
         In: 
