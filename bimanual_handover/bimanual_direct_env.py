@@ -173,28 +173,36 @@ class BimanualDirect(DirectRLEnv):
         # the index, middle, and ring fingers
         # thumb [8, 12, 16, 20], index [7, 11, 15, 19], middle [9, 13, 17, 21], ring [10, 14, 18, 22]
         # joints_0 [7, 9, 10], joints_1 [11, 13, 14], joints_2 [15, 17, 18], joints_3 [19, 21, 22]
-        for joint_idx in range(4):
-            
-            joint_tensor = torch.zeros((self.num_envs, 3))
-            joint_tensor[:, 0] = actions[:, 7+joint_idx*4]
-            joint_tensor[:, 1] = actions[:, 7+2+joint_idx*4]
-            joint_tensor[:, 2] = actions[:, 7+3+joint_idx*4]
-            # Save joint_idx of index, middle, and ring fingers for each env
-            # env0 -> [env0_joint_idx_index, env0_joint_idx_middle, env0_joint_idx_ring]
-            # env1 -> [env1_joint_idx_index, env1_joint_idx_middle, env1_joint_idx_ring]
-            # envn -> [envn_joint_idx_index, envn_joint_idx_middle, envn_joint_idx_ring]
-
-            # Compute the mean of joint_idx for each finger and each env
-            joint_mean = torch.mean(joint_tensor, dim=1)
-            # env0 -> [env0_joint_idx_mean]
-            # env1 -> [env1_joint_idx_mean]
-            # envn -> [envn_joint_idx_mean]
-
-            # Replace the actions of the joint_idx for each finger and env by the mean
-            actions[:, 7+joint_idx*4] = joint_mean[:]
-            actions[:, 7+2+joint_idx*4] = joint_mean[:]
-            actions[:, 7+3+joint_idx*4] = joint_mean[:]
-
+        # for joint_idx in range(4):
+        # 
+        #     joint_tensor = torch.zeros((self.num_envs, 3))
+        #     joint_tensor[:, 0] = actions[:, 7+joint_idx*4]
+        #     joint_tensor[:, 1] = actions[:, 7+2+joint_idx*4]
+        #     joint_tensor[:, 2] = actions[:, 7+3+joint_idx*4]
+        #     # Save joint_idx of index, middle, and ring fingers for each env
+        #     # env0 -> [env0_joint_idx_index, env0_joint_idx_middle, env0_joint_idx_ring]
+        #     # env1 -> [env1_joint_idx_index, env1_joint_idx_middle, env1_joint_idx_ring]
+        #     # envn -> [envn_joint_idx_index, envn_joint_idx_middle, envn_joint_idx_ring]
+        #
+        #     print(joint_tensor)
+        #     # Compute the mean of joint_idx for each finger and each env
+        #     joint_mean = torch.mean(joint_tensor, dim=1)
+        #     # env0 -> [env0_joint_idx_mean]
+        #     # env1 -> [env1_joint_idx_mean]
+        #     # envn -> [envn_joint_idx_mean]
+        #     print(joint_mean)
+        #
+        #     # Replace the actions of the joint_idx for each finger and env by the mean
+        #     actions[:, 7+joint_idx*4] = joint_mean[:]
+        #     actions[:, 7+2+joint_idx*4] = joint_mean[:]
+        #     actions[:, 7+3+joint_idx*4] = joint_mean[:]
+        
+       
+        # Perform the mean of the finger actions
+        #       - View the finger actions as a 4x4 matrix with batch.
+        #       - Perform the mean on the rows. --> [joint_0_12_4_8, joint_0_12_4_8, joint_0_12_4_8, joint_0_12_4_8] with the .
+        #       - Repeat each value 4 times inside the tensor (dimension -1) with "repeat_interleave".
+        actions[:, 7:] = torch.mean(actions[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
         return actions
     
