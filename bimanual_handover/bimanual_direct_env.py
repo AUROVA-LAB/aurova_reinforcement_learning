@@ -77,7 +77,7 @@ class BimanualDirect(DirectRLEnv):
         self.actions = copy.deepcopy(self.default_joint_pos)
 
         # Poses obtained at reset
-        self.reset_robot_poses_r = [[],[]]
+        self.reset_robot_poses_r = [torch.zeros((self.num_envs, 7)).to(self.device), torch.zeros((self.num_envs, 7)).to(self.device)] 
 
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
@@ -308,7 +308,6 @@ class BimanualDirect(DirectRLEnv):
                                        dim = -1)
         
 
-
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         '''
@@ -329,7 +328,6 @@ class BimanualDirect(DirectRLEnv):
         # --- GEN3 actions ---
         # Obtains the increments and the poses
         self.perform_increment(idx = self.cfg.GEN3, actions = actions)
-
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -589,7 +587,7 @@ class BimanualDirect(DirectRLEnv):
         ee_init_pose = torch.cat((ee_init_pose[:, :3], quat), dim = -1)
 
         # Save sampled pose
-        self.reset_robot_poses_r[idx] = ee_init_pose
+        self.reset_robot_poses_r[idx][env_ids] = ee_init_pose[env_ids]
 
         # Sets the command to the DifferentialIKController
         self.controller.set_command(ee_init_pose)
