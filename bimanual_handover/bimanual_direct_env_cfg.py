@@ -59,7 +59,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 @configclass
 class BimanualDirectCfg(DirectRLEnvCfg):
     # env
-    decimation = 2              # Number of control action updates @ sim dt per policy dt.
+    decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     steps_reset = 40            # Maximum steps in an episode
     angle_scale = pi            # Action angle scalation
@@ -243,12 +243,15 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.1,  0.1],
-                                 [-0.1,  0.1],
-                                 [-0.1,  0.1],
+    ee_pose_incs = torch.tensor([[-0.3,  0.3],
                                  [-0.3,  0.3],
                                  [-0.3,  0.3],
-                                 [-0.3,  0.3]])
+                                 [-0.6,  0.6],
+                                 [-0.6,  0.6],
+                                 [-0.6,  0.6]])
+    
+    # To which robot apply the sampling poses
+    apply_range = [True, False]
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
