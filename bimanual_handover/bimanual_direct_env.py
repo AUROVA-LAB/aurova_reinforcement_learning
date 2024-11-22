@@ -72,6 +72,9 @@ class BimanualDirect(DirectRLEnv):
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = [self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos,
                                   self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.default_joint_pos]
+        
+        # List of joint actions
+        self.actions = copy.deepcopy(self.default_joint_pos)
 
 
         # Update configuration class
@@ -149,8 +152,10 @@ class BimanualDirect(DirectRLEnv):
                     actions[4:]: rotation vector of a quaternion
 
         Out:
-            - actions - torch.Tenso: preprocessed actions.
+            - actions - torch.Tensor: preprocessed actions.
         '''
+
+        actions[:, :3] *= self.cfg.translation_scale
 
         # Scale angle and rotation vector
         actions[:, 3] *= self.cfg.angle_scale
@@ -269,6 +274,37 @@ class BimanualDirect(DirectRLEnv):
         return grasp_point_obj_pos, grasp_point_obj_quat
 
 
+    # Performs the action increment
+    def perform_increment(self, idx, actions):
+        '''
+        In: 
+            - idx - int(0,1): index of the robot.
+            - actions - torch.tensor(N, 7): the increment to be performed to the actual pose.
+
+        Out:
+            - None
+        '''
+
+        # Obtains the poses
+        ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(idx)
+
+        # Perform an increment on the robot end effector in the root frame
+        new_act_pos, new_act_quat = combine_frame_transforms(t01 = ee_pos_b, q01 = ee_quat_b,
+                                                             t12 = actions[:, 0:3], q12 = actions[:, 3:7])
+        new_actions = torch.cat((new_act_pos, new_act_quat), dim = -1)
+
+        # Set the command for the IKDifferentialController
+        self.controller.set_command(new_actions)
+
+        # Get the actions for the UR5e. Concatenates:
+        #   - the joint coordinates for the action computed by the IKDifferentialController and
+        #   - the joint coordinates for the hand.
+        self.actions[idx] = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
+                                       actions[:, 7:]), 
+                                       dim = -1)
+        
+
+
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         '''
@@ -288,7 +324,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtains the poses
         ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(self.cfg.UR5e)        
-        
+
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
@@ -296,20 +332,10 @@ class BimanualDirect(DirectRLEnv):
                                     actions[:, 7:]), 
                                     dim = -1)
 
-
         # --- GEN3 actions ---
-        # Set the command for the IKDifferentialController
-        self.controller.set_command(actions[:, :7])
+        # Obtains the increments and the poses
+        self.perform_increment(idx = self.cfg.GEN3, actions = actions)
 
-        # Obtains the poses
-        ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(self.cfg.GEN3)
-        
-        # Get the actions for the UR5e. Concatenates:
-        #   - the joint coordinates for the action computed by the IKDifferentialController and
-        #   - the joint coordinates for the hand.
-        self.actions_2 = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
-                                    actions[:, 7:]), 
-                                    dim = -1)
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -317,7 +343,7 @@ class BimanualDirect(DirectRLEnv):
         
         # Applies joint actions to the robots 
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_poses[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
-        self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.new_poses[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
+        self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
     # Transforms the coordinates of the commands from base (local) to world frames
