@@ -55,14 +55,19 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     
     return rot_tensor_quat
 
+# Rotations respecto to the end effector robot link frame for object spawning
+rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
+rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
 
 @configclass
 class BimanualDirectCfg(DirectRLEnvCfg):
     # env
-    decimation = 2              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 1.0      # Length of the episode in seconds
+    decimation = 3              # Number of control action updates @ sim dt per policy dt.
+    episode_length_s = 3.0      # Length of the episode in seconds
     steps_reset = 40            # Maximum steps in an episode
-    angle_scale = pi            # Angle scalation
+    angle_scale = pi            # Action angle scalation
+    translation_scale = torch.tensor([0.01, 0.01, 0.01]) # Action translation scalation
 
     num_actions = 7 + 16        # Number of actions per environment (overridden)
     num_observations = 12 + 14  # Number of observations per environment (overridden)
@@ -213,10 +218,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Z: En el eje longitudinal
     '''
     
-    # Rotations respecto to the end effector robot link frame for object spawning
-    rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
-    rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
-    rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+    
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
@@ -232,7 +234,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272], 
-                                      [0.2954, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873]])
+                                      [0.2954, -0.0250, 0.5662, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
@@ -242,12 +244,15 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.2,  0.2],
-                                 [-0.2,  0.2],
-                                 [-0.2,  0.2],
-                                 [-0.8,  0.8],
-                                 [-0.8,  0.8],
-                                 [-0.8,  0.8]])
+    ee_pose_incs = torch.tensor([[-0.3,  0.3],
+                                 [-0.3,  0.3],
+                                 [-0.3,  0.3],
+                                 [-0.6,  0.6],
+                                 [-0.6,  0.6],
+                                 [-0.6,  0.6]])
+    
+    # To which robot apply the sampling poses
+    apply_range = [True, False]
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
@@ -276,6 +281,9 @@ def update_cfg(cfg, num_envs, device):
     Out:
         - cfg - BimanualDirectCfg: modified configuration class
     '''
+
+    cfg.translation_scale = cfg.translation_scale.to(device)
+
     cfg.obj_pos_trans = cfg.obj_pos_trans.repeat(num_envs, 1).to(device)
     cfg.obj_quat_trans = cfg.obj_quat_trans.repeat(num_envs, 1).to(device)
 

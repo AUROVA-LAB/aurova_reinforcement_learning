@@ -77,16 +77,21 @@ class BimanualDirect(DirectRLEnv):
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = [self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos,
                                   self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.default_joint_pos]
-        
         # Default joints to open the hand
         self.open_hand_joints = torch.zeros((1, 16)).to(self.device)
         self.open_hand_joints[:, 1] = 0.263  # this value is the zero for the joint0 of the thumb
+
+        # List of joint actions
+        self.actions = copy.deepcopy(self.default_joint_pos)
+
+        # Poses obtained at reset
+        self.reset_robot_poses_r = [torch.zeros((self.num_envs, 7)).to(self.device), torch.zeros((self.num_envs, 7)).to(self.device)] 
 
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
 
         # Obtain the ranges in which sample reset positions
-        self.ee_pose_ranges = torch.tensor([[ [i + inc[0], i + inc[1]] for i, inc in zip(poses, cfg.ee_pose_incs)] for poses in cfg.ee_init_pose]).to(self.device)
+        self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
 
         # Obtain the number of contact sensors per environment
         num_contacts = 0
@@ -157,8 +162,10 @@ class BimanualDirect(DirectRLEnv):
                     actions[4:]: rotation vector of a quaternion
 
         Out:
-            - actions - torch.Tenso: preprocessed actions.
+            - actions - torch.Tensor: preprocessed actions.
         '''
+
+        actions[:, :3] *= self.cfg.translation_scale
 
         # Scale angle and rotation vector
         actions[:, 3] *= self.cfg.angle_scale
@@ -228,8 +235,8 @@ class BimanualDirect(DirectRLEnv):
             - idx - int(0,1): index of the robot.
 
         Out:
-            - ee_pos_b - torch.tensor(N, 3): position of the end effector in the base frame for each environment.
-            - ee_quat_b - torch.tensor(N, 4): orientation as a quaternions of the end effector in the base frame for each environment.
+            - ee_pos_r - torch.tensor(N, 3): position of the end effector in the base frame for each environment.
+            - ee_quat_r - torch.tensor(N, 4): orientation as a quaternions of the end effector in the base frame for each environment.
             - jacobian - torch.tensor(N, 6, n_joints (6 or 7)): jacobian of all robots' end effector. 
             - joint_pos - torch.tensor(N, n_joints(6 or 7)): joint position of the robot.
         '''
@@ -247,13 +254,44 @@ class BimanualDirect(DirectRLEnv):
         joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._robot_joints_idx[idx]]
 
         # Transforms end effector frame coordinates (in world) into root (local / base) coordinates
-        ee_pos_b, ee_quat_b = subtract_frame_transforms(
+        ee_pos_r, ee_quat_r = subtract_frame_transforms(
                 root_pose_w[:, 0:3], root_pose_w[:, 3:7], ee_pose_w[:, 0:3], ee_pose_w[:, 3:7]
             )
         # root = T01 // ee = T02 -> substract = (T01)^-1 * T02 = T10 * T02 = T12
         
-        return ee_pos_b, ee_quat_b, jacobian, joint_pos
+        return ee_pos_r, ee_quat_r, jacobian, joint_pos
 
+
+    # Performs the action increment
+    def perform_increment(self, idx, actions):
+        '''
+        In: 
+            - idx - int(0,1): index of the robot.
+            - actions - torch.tensor(N, 7): the increment to be performed to the actual pose.
+
+        Out:
+            - None
+        '''
+
+
+        # Obtains the poses
+        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose(idx)
+
+        # Perform an increment on the robot end effector in the root frame
+        new_act_pos, new_act_quat = combine_frame_transforms(t01 = self.reset_robot_poses_r[idx][:, :3], q01 = self.reset_robot_poses_r[idx][:, 3:7],
+                                                             t12 = actions[:, 0:3], q12 = actions[:, 3:7])
+        self.reset_robot_poses_r[idx] = torch.cat((new_act_pos, new_act_quat), dim = -1)
+        
+
+        # Set the command for the IKDifferentialController
+        self.controller.set_command(self.reset_robot_poses_r[idx])
+
+        # Get the actions for the UR5e. Concatenates:
+        #   - the joint coordinates for the action computed by the IKDifferentialController and
+        #   - the joint coordinates for the hand.
+        self.actions[idx] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+                                       actions[:, 7:]), 
+                                       dim = -1)
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
@@ -270,32 +308,11 @@ class BimanualDirect(DirectRLEnv):
 
         # --- UR5e actions ---
         # Set the command for the IKDifferentialController
-        self.controller.set_command(actions[:, :7])
-
-        # Obtains the poses
-        ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(self.cfg.UR5e)        
-        
-        # Get the actions for the UR5e. Concatenates:
-        #   - the joint coordinates for the action computed by the IKDifferentialController and
-        #   - the joint coordinates for the hand.
-        self.actions_1 = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
-                                    actions[:, 7:]), 
-                                    dim = -1)
-
+        self.perform_increment(idx = self.cfg.UR5e, actions = actions)
 
         # --- GEN3 actions ---
-        # Set the command for the IKDifferentialController
-        self.controller.set_command(actions[:, :7])
-
-        # Obtains the poses
-        ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(self.cfg.GEN3)
-        
-        # Get the actions for the UR5e. Concatenates:
-        #   - the joint coordinates for the action computed by the IKDifferentialController and
-        #   - the joint coordinates for the hand.
-        self.actions_2 = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
-                                    actions[:, 7:]), 
-                                    dim = -1)
+        # Obtains the increments and the poses
+        self.perform_increment(idx = self.cfg.GEN3, actions = actions)
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -303,7 +320,7 @@ class BimanualDirect(DirectRLEnv):
         
         # Applies joint actions to the robots 
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_poses[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
-        self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.new_poses[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
+        self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
     # Transforms the coordinates of the commands from base (local) to world frames
@@ -454,7 +471,7 @@ class BimanualDirect(DirectRLEnv):
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
         
         # Obtain end effector poses for the robots
-        ee_pos_b_1, ee_quat_b_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
+        ee_pos_r_1, ee_quat_r_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
 
         # Obtains the joint positions for the hand
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
@@ -463,9 +480,9 @@ class BimanualDirect(DirectRLEnv):
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
-                torch.cat((ee_pos_b_1, ee_quat_b_1), dim = -1),
+                torch.cat((ee_pos_r_1, ee_quat_r_1), dim = -1),
                 hand_joint_pos_1,
-                self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
+                self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
                 hand_joint_pos_2,
                 self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
@@ -571,19 +588,22 @@ class BimanualDirect(DirectRLEnv):
         # Builds the new initial pose
         ee_init_pose = torch.cat((ee_init_pose[:, :3], quat), dim = -1)
 
+        # Save sampled pose
+        self.reset_robot_poses_r[idx][env_ids] = ee_init_pose[env_ids]
+
         # Sets the command to the DifferentialIKController
         self.controller.set_command(ee_init_pose)
 
         # Obtains current poses for the robot
-        ee_pos_b, ee_quat_b, jacobian, joint_pos = self._get_ee_pose(idx)  
+        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose(idx)  
 
         # Obtains the joint positions to reset. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.new_poses[idx] = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
+        self.new_poses[idx] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                          self.default_joint_pos[idx][:, (6+idx):]), 
                                          dim=-1)
-        joint_pos = torch.cat((self.controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos), 
+        joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[idx][:, (6+idx):]), 
                                dim=-1)[env_ids] 
         

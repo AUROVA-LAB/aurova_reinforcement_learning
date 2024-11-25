@@ -30,7 +30,7 @@ class TensorQueue:
 
 
 # Reward computation
-# @torch.jit.script
+@torch.jit.script
 def compute_rewards(rew_dual_quaternion_error: float,
                     ee_pose: torch.Tensor,
                     obj_pose: torch.Tensor,
