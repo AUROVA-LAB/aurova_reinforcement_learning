@@ -6,6 +6,7 @@ from collections.abc import Sequence
 import copy
 
 from .mdp.utils import compute_rewards, save_images_grid
+from .mdp.rewards import dual_quaternion_error 
 from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
 
 import omni.isaac.lab.sim as sim_utils
@@ -41,10 +42,14 @@ class BimanualDirect(DirectRLEnv):
         # WILL BE REMOVED: initial poses sampled in reset for both robots
         self.new_poses = [[], []]
 
+        # Debug poses for the object and end effector of the GEN3 robot. These poses 
+        # are used to draw the markers in the simulation
+        self.debug_GEN3_ee_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.debug_grasp_point_obj_pose_w = copy.deepcopy(self.debug_GEN3_ee_pose_w)
 
         # Poses for the object and GEN3 robot so they can match when performing the grasping
-        self.new_pose_robot2 = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
-        self.new_obj_pose = copy.deepcopy(self.new_pose_robot2)
+        self.GEN3_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.grasp_point_obj_pose_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
@@ -72,7 +77,10 @@ class BimanualDirect(DirectRLEnv):
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = [self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos,
                                   self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.default_joint_pos]
-
+        
+        # Default joints to open the hand
+        self.open_hand_joints = torch.zeros((1, 16)).to(self.device)
+        self.open_hand_joints[:, 1] = 0.263  # this value is the zero for the joint0 of the thumb
 
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
@@ -204,6 +212,12 @@ class BimanualDirect(DirectRLEnv):
         #       - Repeat each value 4 times inside the tensor (dimension -1) with "repeat_interleave".
         actions[:, 7:] = torch.mean(actions[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
+
+        # Compute dual quaternion distance between Kinova's hand and object
+        dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
+        idxs_env_open_hand = dq_distance_ee_obj[:, 1] < 0.1
+        self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
+
         return actions
     
     
@@ -239,34 +253,6 @@ class BimanualDirect(DirectRLEnv):
         # root = T01 // ee = T02 -> substract = (T01)^-1 * T02 = T10 * T02 = T12
         
         return ee_pos_b, ee_quat_b, jacobian, joint_pos
-
-
-    # Obtains the pose of the object in the local frame
-    def _get_object_pose(self):
-        '''
-        In: 
-            - None
-
-        Out:
-            - grasp_point_obj_pos - torch.tensor(N, 3): position of the object in the GEN3 root frame.
-            - grasp_point_obj_quat - torch.tensor(N, 4): orientation of the object as a quaternion in the GEN3 root frame. 
-        '''
-
-        # Get object and pose in world reference system
-        obj_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
-
-        # Obtains the pose of the base of the GEN3 robot in the world frame
-        root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
-        
-        # Apply transformation to get grasping point in the global frame
-        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
-                                                                             t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
-
-        # Apply transformation to get the grasping point in the GEN3 root frame
-        grasp_point_obj_pos, grasp_point_obj_quat = subtract_frame_transforms(t01 = root_pose_w[:, :3], q01 = root_pose_w[:, 3:],
-                                                                              t02 = grasp_point_obj_pos, q02 = grasp_point_obj_quat)
-
-        return grasp_point_obj_pos, grasp_point_obj_quat
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -364,11 +350,11 @@ class BimanualDirect(DirectRLEnv):
 
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
-                                                                         self.new_obj_pose[:, :3],
-                                                                         self.new_pose_robot2[:, :3])), 
+                                                                         self.debug_GEN3_ee_pose_w[:, :3],
+                                                                         self.debug_grasp_point_obj_pose_w[:, :3])), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
-                                                                          self.new_obj_pose[:, 3:],
-                                                                          self.new_pose_robot2[:,3:])), 
+                                                                          self.debug_GEN3_ee_pose_w[:, 3:],
+                                                                          self.debug_grasp_point_obj_pose_w[:,3:])), 
                                                 marker_indices=marker_indices)
         
 
@@ -401,21 +387,38 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Obtain the pose of the GEN3 end effector in world frame
-        original_pose = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
-        
+        GEN3_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
+
         # Rotate that frame -45 in Z axis
-        original_pos, original_quat = combine_frame_transforms(t01 = original_pose[: ,:3], q01 = original_pose[: ,3:],
-                                                               t12 = torch.zeros_like(original_pose[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
-        self.new_pose_robot2 = torch.cat((original_pos, original_quat), dim = -1)
+        GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w = combine_frame_transforms(t01 = GEN3_ee_pose_w[: ,:3], q01 = GEN3_ee_pose_w[: ,3:],
+                                                               t12 = torch.zeros_like(GEN3_ee_pose_w[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
+        
+        self.debug_GEN3_ee_pose_w = torch.cat((GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w), dim = -1)
+
+        # Obtains the pose of the base of the GEN3 robot in the world frame
+        GEN3_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
+
+        # Obtain the pose of the end effector (after the rotation) in GEN3 root frame
+        GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                              t02 = GEN3_rot_ee_pos_w, q02 = GEN3_rot_ee_quat_w)
+
+        self.GEN3_rot_ee_pose_r = torch.cat((GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r), dim = -1)
 
 
         # Obtains the pose of the object in the world frame
-        obj_pos_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
+        obj_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
 
         # Transforms the object frame so as to generate a more suitable frame for grasping
-        grasp_point_obj_pos, grasp_point_obj_quat = combine_frame_transforms(t01 = obj_pos_w[:, :3], q01 = obj_pos_w[:, 3:],
+        grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
                                                                              t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
-        self.new_obj_pose = torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1)
+        
+        self.debug_grasp_point_obj_pose_w = torch.cat((grasp_point_obj_pos_w, grasp_point_obj_quat_w), dim=-1)
+
+        # Apply transformation to get the grasping point in the GEN3 root frame
+        grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                              t02 = grasp_point_obj_pos_w, q02 = grasp_point_obj_quat_w)
+
+        self.grasp_point_obj_pose_r = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
 
 
     # Getter for the observations for the environment --> Overrides method of DirectRLEnv
@@ -462,9 +465,9 @@ class BimanualDirect(DirectRLEnv):
             (
                 torch.cat((ee_pos_b_1, ee_quat_b_1), dim = -1),
                 hand_joint_pos_1,
-                self.new_pose_robot2, # torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
+                self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_b_2, ee_quat_b_2), dim = -1),
                 hand_joint_pos_2,
-                self.new_obj_pose,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
+                self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
             dim = -1
         )
@@ -491,8 +494,8 @@ class BimanualDirect(DirectRLEnv):
 
         # Computes reward according to the scaling values and poses (in utils)
         return compute_rewards(self.cfg.rew_dual_quaternion_error,
-                               self.new_pose_robot2,
-                               self.new_obj_pose,
+                               self.GEN3_rot_ee_pose_r,
+                               self.grasp_point_obj_pose_r,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,
                                self.device)
