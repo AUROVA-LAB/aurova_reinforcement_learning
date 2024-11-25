@@ -68,6 +68,7 @@ from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
 import omni.isaac.lab_tasks  # noqa: F401
 from omni.isaac.lab_tasks.utils.hydra import hydra_task_config
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
+from train_utils import AddNoiseObservation
 
 
 @hydra_task_config(args_cli.task, "sb3_cfg_entry_point")
@@ -105,6 +106,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+
+
+
+    # Add noise wrappers
+    # env = gym.wrappers.TransformObservation(env, lambda obs: obs["policy"] + 1000 * torch.rand(obs["policy"].shape).to(obs["policy"].device), env.observation_space)
+    env = AddNoiseObservation(env, noise_std=0.1)
+
+
     # wrap for video recording
     if args_cli.video:
         video_kwargs = {
@@ -153,15 +162,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         obs = env.reset()
         # agent = PPO.load("/workspace/isaaclab/source/logs/sb3/Isaac-UR5e-joint-reach-v0/2024-10-16_12-32-25/model_18960000_steps.zip", weights_only=True)
-        
-        action = torch.zeros((args_cli.num_envs, 7+16))
+                             
+        action = torch.zeros((env_cfg.scene.num_envs, 7+16))
 
         # Simulate physics
         while simulation_app.is_running():
             with torch.inference_mode():
-                # action, __ = agent.predict(obs)
-                # print(env.command_manager.get_command("ee_pose"))
-
 
                 # Step the environment
                 obs, reward, done, info = env.step(action)
