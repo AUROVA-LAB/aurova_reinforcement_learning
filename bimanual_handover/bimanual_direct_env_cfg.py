@@ -55,6 +55,10 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     
     return rot_tensor_quat
 
+# Rotations respecto to the end effector robot link frame for object spawning
+rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
+rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
 
 @configclass
 class BimanualDirectCfg(DirectRLEnvCfg):
@@ -214,10 +218,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Z: En el eje longitudinal
     '''
     
-    # Rotations respecto to the end effector robot link frame for object spawning
-    rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
-    rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
-    rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+    
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
