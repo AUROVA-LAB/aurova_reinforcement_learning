@@ -234,7 +234,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272], 
-                                      [0.2954, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873]])
+                                      [0.2954, -0.0250, 0.5662, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
