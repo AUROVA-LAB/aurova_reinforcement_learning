@@ -331,7 +331,8 @@ def update_collisions(cfg, num_envs):
     # Build contact sensors dictionary
     cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
                                 "hand2_w_object": hand2_w_object,
-                                "robot1_w_robot2": robot1_w_robot2} 
+                                "robot1_w_robot2": robot1_w_robot2}
+    cfg.contact_sensors_dict = {} 
     
 
     return cfg
