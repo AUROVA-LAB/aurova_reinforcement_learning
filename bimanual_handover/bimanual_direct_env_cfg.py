@@ -301,6 +301,7 @@ def update_cfg(cfg, num_envs, device):
 
 def update_collisions(cfg, num_envs):
 
+    '''
     # Contact between robot 1 hand and object
     robot1_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
@@ -333,6 +334,7 @@ def update_collisions(cfg, num_envs):
     cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
                                 "hand2_w_object": hand2_w_object,
                                 "robot1_w_robot2": robot1_w_robot2}
+    '''
     cfg.contact_sensors_dict = {} 
     
 
