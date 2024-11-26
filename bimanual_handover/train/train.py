@@ -70,6 +70,14 @@ from omni.isaac.lab_tasks.utils.hydra import hydra_task_config
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 from train_utils import AddNoiseObservation
 
+import wandb
+from wandb.integration.sb3 import WandbCallback
+
+# directory for logging into
+path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train"
+log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+run = wandb.init(project="handbim_aurova", name=log_dir.split("/")[-1])
+
 
 @hydra_task_config(args_cli.task, "sb3_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: dict):
@@ -88,9 +96,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.seed = agent_cfg["seed"]
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
-
-    # directory for logging into
-    log_dir = os.path.join("logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
@@ -107,12 +112,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
-
-
     # Add noise wrappers
     # env = gym.wrappers.TransformObservation(env, lambda obs: obs["policy"] + 1000 * torch.rand(obs["policy"].shape).to(obs["policy"].device), env.observation_space)
-    env = AddNoiseObservation(env, noise_std=0.1)
-
+    #env = AddNoiseObservation(env, noise_std=0.1)
 
     # wrap for video recording
     if args_cli.video:
@@ -155,7 +157,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     
     if args_cli.train:
         # train the agent
-        agent.learn(total_timesteps=n_timesteps, callback=checkpoint_callback)
+        agent.learn(total_timesteps=n_timesteps, callback=[checkpoint_callback, WandbCallback()])
         # save the final model
         agent.save(os.path.join(log_dir, "model"))
 
@@ -172,6 +174,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # Step the environment
                 obs, reward, done, info = env.step(action)
 
+
+    run.finish()  # stop uploading data to wandb
 
     env.close()
 

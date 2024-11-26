@@ -18,5 +18,5 @@ policy_kwargs: "dict(
                 )"
 vf_coef: 1.0                  # Value function coefficient for the loss calculation
 max_grad_norm: 1.0            # The maximum value for the gradient clipping
-device: "cuda:0"              # Device
+device: "cpu"              # Device
 # normalize_input: False        # Wether to normalize observations and action

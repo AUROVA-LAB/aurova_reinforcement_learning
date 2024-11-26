@@ -31,7 +31,8 @@ class TensorQueue:
 
 # Reward computation
 @torch.jit.script
-def compute_rewards(rew_dual_quaternion_error: float,
+def compute_rewards(rew_scale_hand_obj: float,
+                    rew_scale_obj_target: float,
                     ee_pose: torch.Tensor,
                     obj_pose: torch.Tensor,
                     rew_change_thres: float,
@@ -49,14 +50,21 @@ def compute_rewards(rew_dual_quaternion_error: float,
         - dq_reward - torch.tensor(N): rewards for all environments.
     '''
 
-    # Dual quaternion distance
-    dq_distance = dual_quaternion_error(ee_pose, obj_pose, device)
+    # Dual quaternion distance between GEN3 hand and object
+    hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
 
-    idxs = dq_distance[:, 1] < rew_change_thres
-    dq_distance[idxs] += dual_quaternion_error(obj_pose, target_pose, device)[idxs]
+    # Check if translation module is below the threshold
+    obj_reached = hand_obj_dist[:, 1] < rew_change_thres
+    
+    # Dual quaternion distance between object and target pose
+    obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
-    # Return final reward
-    reward = rew_dual_quaternion_error * -dq_distance[:, 0]
+    # Compute intermediate reward terms with scaling values and boolean flags
+    rew_term1 = rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) * (~obj_reached)
+    rew_term2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) * obj_reached
+
+    # Obtain final reward
+    reward = rew_term1 + rew_term2
     
     return reward
 

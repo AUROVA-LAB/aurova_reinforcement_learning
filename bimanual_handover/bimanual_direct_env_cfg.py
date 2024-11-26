@@ -70,7 +70,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     translation_scale = torch.tensor([0.01, 0.01, 0.01]) # Action translation scalation
 
     num_actions = 7 + 16        # Number of actions per environment (overridden)
-    num_observations = 12 + 14  # Number of observations per environment (overridden)
+    num_observations = 7+16+7+16+7  # Number of observations per environment (overridden)
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -244,12 +244,12 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.3,  0.3],
+    ee_pose_incs = torch.tensor([[-0.15,  0.15],
+                                 [-0.15,  0.15],
+                                 [-0.15,  0.15],
                                  [-0.3,  0.3],
                                  [-0.3,  0.3],
-                                 [-0.6,  0.6],
-                                 [-0.6,  0.6],
-                                 [-0.6,  0.6]])
+                                 [-0.3,  0.3]])
     
     # To which robot apply the sampling poses
     apply_range = [True, False]
@@ -259,10 +259,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos)
 
     # reward scales
-    rew_dual_quaternion_error: float= 1.0
+    rew_scale_hand_obj: float= 1.0
+    rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 1
+    rew_change_thres = 0.05
 
     # Objective position -> origin GEN3 position with offset in X axis
     target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])

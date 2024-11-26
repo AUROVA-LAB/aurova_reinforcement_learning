@@ -222,7 +222,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Compute dual quaternion distance between Kinova's hand and object
         dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
-        idxs_env_open_hand = dq_distance_ee_obj[:, 1] < 0.1
+        idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
         self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
         return actions
@@ -284,7 +284,8 @@ class BimanualDirect(DirectRLEnv):
         
 
         # Set the command for the IKDifferentialController
-        self.controller.set_command(self.reset_robot_poses_r[idx])
+        #self.controller.set_command(self.reset_robot_poses_r[idx])
+        self.controller.set_command(self.grasp_point_obj_pose_r)
 
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
@@ -308,7 +309,7 @@ class BimanualDirect(DirectRLEnv):
 
         # --- UR5e actions ---
         # Set the command for the IKDifferentialController
-        self.perform_increment(idx = self.cfg.UR5e, actions = actions)
+        #self.perform_increment(idx = self.cfg.UR5e, actions = actions)
 
         # --- GEN3 actions ---
         # Obtains the increments and the poses
@@ -510,7 +511,8 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Computes reward according to the scaling values and poses (in utils)
-        return compute_rewards(self.cfg.rew_dual_quaternion_error,
+        return compute_rewards(self.cfg.rew_scale_hand_obj,
+                               self.cfg.rew_scale_obj_target,
                                self.GEN3_rot_ee_pose_r,
                                self.grasp_point_obj_pose_r,
                                self.cfg.rew_change_thres,
