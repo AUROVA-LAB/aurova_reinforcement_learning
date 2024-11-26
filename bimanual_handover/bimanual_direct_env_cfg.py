@@ -65,12 +65,12 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    steps_reset = 40            # Maximum steps in an episode
+    max_steps = 120             # Maximum steps in an episode
     angle_scale = pi            # Action angle scalation
     translation_scale = torch.tensor([0.01, 0.01, 0.01]) # Action translation scalation
 
     num_actions = 7 + 16        # Number of actions per environment (overridden)
-    num_observations = 12 + 14  # Number of observations per environment (overridden)
+    num_observations = 7 + 16 + 7 + 16 + 7  # Number of observations per environment (overridden)
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -82,7 +82,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     velocity_limit = 10         # Velocity limit for robots' end effector
 
     # simulation
-    sim: SimulationCfg = SimulationCfg(dt = 1/120, render_interval = decimation)
+    sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
     # SimulationCfg: configuration for simulation physics 
     #    dt: time step of the simulation (seconds)
     #    render_interval: number of physics steps per rendering steps

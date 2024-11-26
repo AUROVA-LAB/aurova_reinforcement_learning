@@ -106,7 +106,6 @@ class BimanualDirect(DirectRLEnv):
             self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
             os.makedirs(self.output_dir, exist_ok=True)
 
-        self.count = 0
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -133,7 +132,7 @@ class BimanualDirect(DirectRLEnv):
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]] = Articulation(self.cfg.robot_cfg_2)
 
         # Add sensors (cameras, contact_sensors, ...)
-        self.scene.sensors["camera"] = Camera(self.cfg.camera_cfg)
+        # self.scene.sensors["camera"] = Camera(self.cfg.camera_cfg)
         
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -292,6 +291,7 @@ class BimanualDirect(DirectRLEnv):
         self.actions[idx] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                        actions[:, 7:]), 
                                        dim = -1)
+
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
@@ -453,9 +453,6 @@ class BimanualDirect(DirectRLEnv):
 
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
-
-        # Count of the simulation steps
-        self.count += 1
 
         # Render images every certain amount of steps
         if self.count % self.cfg.render_steps == 0 and self.cfg.render_imgs:
