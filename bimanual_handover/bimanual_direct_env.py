@@ -283,8 +283,7 @@ class BimanualDirect(DirectRLEnv):
         
 
         # Set the command for the IKDifferentialController
-        #self.controller.set_command(self.reset_robot_poses_r[idx])
-        self.controller.set_command(self.grasp_point_obj_pose_r)
+        self.controller.set_command(self.reset_robot_poses_r[idx])
 
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
