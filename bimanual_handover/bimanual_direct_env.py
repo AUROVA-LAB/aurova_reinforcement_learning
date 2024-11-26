@@ -534,7 +534,9 @@ class BimanualDirect(DirectRLEnv):
         out_of_bounds_1 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 7:], dim = -1) > self.cfg.velocity_limit 
         out_of_bounds_2 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 7:], dim = -1) > self.cfg.velocity_limit
 
-        truncated = torch.logical_or(out_of_bounds_1, out_of_bounds_2)
+        object_falling = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 2] < self.cfg.object_height_limit
+
+        truncated = torch.logical_or(torch.logical_or(out_of_bounds_1, out_of_bounds_2), object_falling)
         terminated = time_out
 
         return truncated, terminated

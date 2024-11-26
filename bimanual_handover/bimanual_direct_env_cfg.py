@@ -253,6 +253,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     
     # To which robot apply the sampling poses
     apply_range = [True, False]
+
+    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
