@@ -40,7 +40,7 @@ class BimanualDirect(DirectRLEnv):
         
         # --- Debug variables ---
         # WILL BE REMOVED: initial poses sampled in reset for both robots
-        self.new_poses = [[], []]
+        self.new_poses = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
 
         # Debug poses for the object and end effector of the GEN3 robot. These poses 
         # are used to draw the markers in the simulation
@@ -600,9 +600,9 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the joint positions to reset. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.new_poses[idx] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        self.new_poses[idx][env_ids] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                          self.default_joint_pos[idx][:, (6+idx):]), 
-                                         dim=-1)
+                                         dim=-1)[env_ids]
         joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[idx][:, (6+idx):]), 
                                dim=-1)[env_ids] 
