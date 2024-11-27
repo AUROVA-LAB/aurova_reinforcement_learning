@@ -65,7 +65,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 120             # Maximum steps in an episode
+    max_steps = 200#120             # Maximum steps in an episode
     angle_scale = pi            # Action angle scalation
     translation_scale = torch.tensor([0.01, 0.01, 0.01]) # Action translation scalation
 
