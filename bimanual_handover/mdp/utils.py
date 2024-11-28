@@ -69,6 +69,12 @@ def compute_rewards(rew_scale_hand_obj: float,
     return reward
 
 
+# Function to scale hand actions from [-1, 1] to [lower, upper]
+@torch.jit.script
+def scale(x, lower, upper):
+    return 0.5 * (x + 1.0) * (upper - lower) + lower
+
+
 # Function for image saving from IsaacLab --> Taken from source/standalone/demos/cameras.py
 def save_images_grid(
     images: list[torch.Tensor],
