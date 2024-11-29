@@ -67,7 +67,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 200#120             # Maximum steps in an episode
+    max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0            # Action angle scalation
     translation_scale = torch.tensor([0.025, 0.025, 0.025]) # Action translation scalation
 
@@ -220,7 +220,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Z: En el eje longitudinal
     '''
     
-    
+    euler = True
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)

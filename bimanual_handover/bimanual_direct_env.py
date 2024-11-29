@@ -169,15 +169,36 @@ class BimanualDirect(DirectRLEnv):
 
         # Scale actions
         actions[:, :3]  *= self.cfg.translation_scale
-        actions[:, 3:6] *= self.cfg.angle_scale
-        
         # Convert orientation to quaternions
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
-        actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
-                                                   pitch = actions[:, 4],
-                                                   yaw = actions[:, 5])
-        actions_quat[:, 7:] = actions[:, 6:]        
+        
+        if self.cfg.euler:
+            actions[:, 3:6] *= self.cfg.angle_scale
+            
+            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
+                                                    pitch = actions[:, 4],
+                                                    yaw = actions[:, 5])
+            actions_quat[:, 7:] = actions[:, 6:]   
+        else:
+            # Scale angle and rotation vector
+            actions_quat[:, 3] *= self.cfg.angle_scale
+            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
+
+            # Real part of the quaternion
+            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
+            
+            # Imaginary part of the quaternion
+            v = actions_quat[:, 4:7]
+            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
+
+            # Build the quaternion
+            q = sin_a * v
+
+            # Reassign quaternion
+            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
+
+
 
         actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
