@@ -12,7 +12,7 @@ GEN3_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
         usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/config/usd/gen3_4f.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
+            disable_gravity=True,
             max_depenetration_velocity=5.0,
         ),
         activate_contact_sensors=True,
@@ -54,7 +54,7 @@ UR5e_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
         usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/config/usd/ur5e_4f_ros2.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
+            disable_gravity=True,
             max_depenetration_velocity=5.0,
         ),
         activate_contact_sensors=True,
