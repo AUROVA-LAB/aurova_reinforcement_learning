@@ -5,9 +5,8 @@ import torch
 from collections.abc import Sequence
 import copy
 
-from .mdp.utils import compute_rewards, save_images_grid, scale
-from .mdp.rewards import dual_quaternion_error 
-from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
+from .mdp.utils import compute_rewards_joint_space, save_images_grid, scale, unscale
+from .bimanual_direct_env_joint_cfg import BimanualDirectJointCfg, update_cfg, update_collisions
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -32,15 +31,15 @@ different from one another.
 
 
 class BimanualDirect(DirectRLEnv):
-    cfg: BimanualDirectCfg
+    cfg: BimanualDirectJointCfg
 
     # --- init function ---
-    def __init__(self, cfg: BimanualDirectCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: BimanualDirectJointCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         
         self.dt = self.cfg.sim.dt * self.cfg.decimation
         
-        # Obtain joint limits
+        # Obtain GEN3 joint limits
         self.GEN3_dof_lower_limits = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.soft_joint_pos_limits[0, :, 0].to(device=self.device)
         self.GEN3_dof_upper_limits = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.soft_joint_pos_limits[0, :, 1].to(device=self.device)
 
@@ -253,13 +252,13 @@ class BimanualDirect(DirectRLEnv):
         # Compute the mean of these columns and expand over all the matrix
         self.GEN3_hand_dof_targets[:, 7:] = torch.mean(torch.index_select(self.GEN3_hand_dof_targets[:, 7:].view(-1, 4, 4), 2, torch.tensor([0, 2, 3]).to(self.device)), 2, False).repeat_interleave(4, dim = -1)
         # Replace thumb joint values by the original
-        self.GEN3_hand_dof_targets[:, [8, 16, 20]] = thumb_joint_values
+        self.GEN3_hand_dof_targets[:, [8, 12, 16, 20]] = thumb_joint_values
         # Fix joint 2 of the thumb to avoid collisions 
         self.GEN3_hand_dof_targets[:, 12] = -0.1050
         
         # Compute dual quaternion distance between Kinova's hand and object
-        dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
-        idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
+        distance_ee_obj = torch.norm(self.GEN3_rot_ee_pose_r[:, :3] - self.grasp_point_obj_pose_r[:, :3], p=2, dim=-1)
+        idxs_env_open_hand = distance_ee_obj < self.cfg.rew_change_thres
         self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
 
@@ -269,33 +268,6 @@ class BimanualDirect(DirectRLEnv):
         # Applies joint actions to the robots 
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_poses[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.GEN3_hand_dof_targets, joint_ids=self._all_joints_idx[self.cfg.GEN3])
-
-
-    # Transforms the coordinates of the commands from base (local) to world frames
-    def obtain_world_cmds(self, idx):
-        '''
-        In: 
-            - idx - int(0 or 1): index for the robot.
-
-        Out:
-            - ee_pose_w[:, 0:3] - torch.tensor(N, 3): position of the end effector of the robot in world frame.
-            - ee_pose_w[:, 3:] - torch.tensor(N,4): orientation as a quaternion of the end effector of the robot in world frame.
-            - cmd_pos_w - torch.tensor(N, 3): position of the command of the robot in world frame.
-            - cmd_quat_w- torch.tensor(N,4): orientation as a quaternion of the command of the robot in world frame.
-        '''
-
-        # Obtains the pose of the end effector in the world frame
-        ee_pose_w = self.scene.articulations[self.cfg.keys[idx]].data.body_state_w[:, self.ee_jacobi_idx[idx]+1, 0:7]
-
-        # Obtains the pose of the robot base in the world frame
-        root_pose_w = self.scene.articulations[self.cfg.keys[idx]].data.root_state_w[:, 0:7]
-
-        # Converts command pose in the base frame to the world frame
-        cmd_pos_w, cmd_quat_w = combine_frame_transforms(t01 = root_pose_w[:, :3], q01 = root_pose_w[:, 3:],
-                                                         t12 = self.obj_cmd[:, :3],    q12 = self.obj_cmd[:, 3:])
-        # root = T01 // cmd = T13 -> add = T01 * T13 = T13
-
-        return ee_pose_w[:, 0:3], ee_pose_w[:, 3:], cmd_pos_w, cmd_quat_w
 
 
     # Update the position of the markers with debug purposes
@@ -355,17 +327,17 @@ class BimanualDirect(DirectRLEnv):
         GEN3_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
 
         # Rotate that frame -45 in Z axis
-        GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w = combine_frame_transforms(t01 = GEN3_ee_pose_w[: ,:3], q01 = GEN3_ee_pose_w[: ,3:],
-                                                               t12 = torch.zeros_like(GEN3_ee_pose_w[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
+        #GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w = combine_frame_transforms(t01 = GEN3_ee_pose_w[: ,:3], q01 = GEN3_ee_pose_w[: ,3:],
+        #                                                       t12 = torch.zeros_like(GEN3_ee_pose_w[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
         
-        self.debug_GEN3_ee_pose_w = torch.cat((GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w), dim = -1)
+        self.debug_GEN3_ee_pose_w = torch.cat((GEN3_ee_pose_w[:, :3], GEN3_ee_pose_w[:, 3:]), dim = -1)
 
         # Obtains the pose of the base of the GEN3 robot in the world frame
         GEN3_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
 
-        # Obtain the pose of the end effector (after the rotation) in GEN3 root frame
+        # Obtain the pose of the end effector in GEN3 root frame
         GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
-                                                                              t02 = GEN3_rot_ee_pos_w, q02 = GEN3_rot_ee_quat_w)
+                                                                              t02 = GEN3_ee_pose_w[:, :3], q02 = GEN3_ee_pose_w[:, 3:])
 
         self.GEN3_rot_ee_pose_r = torch.cat((GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r), dim = -1)
 
@@ -415,20 +387,21 @@ class BimanualDirect(DirectRLEnv):
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
         
-        # Obtain end effector poses for the robots
-        ee_pos_r_1, ee_quat_r_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
+        
+        # Obtain joint positions for GEN3 -> unscaled to get range [-1, 1]
+        GEN3_joint_pos_unscaled = unscale(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._robot_joints_idx[self.cfg.GEN3]],
+                                          self.GEN3_dof_lower_limits[:7], self.GEN3_dof_upper_limits[:7])
 
-        # Obtains the joint positions for the hand
-        hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
-        hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+
+        # Obtains joint positions for allegro hand (GEN3) -> unscaled to get range [-1, 1]
+        GEN3_hand_joint_pos_unscaled = unscale(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]],
+                                   self.GEN3_dof_lower_limits[7:], self.GEN3_dof_upper_limits[7:])
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
-                torch.cat((ee_pos_r_1, ee_quat_r_1), dim = -1),
-                hand_joint_pos_1,
-                self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
-                hand_joint_pos_2,
+                GEN3_joint_pos_unscaled,  # GEN3 unscaled [-1,1] joint values
+                GEN3_hand_joint_pos_unscaled,  # GEN3 unscaled [-1,1] hand joint values
                 self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
             dim = -1
@@ -455,14 +428,15 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Computes reward according to the scaling values and poses (in utils)
-        return compute_rewards(self.cfg.rew_scale_hand_obj,
+        reward = compute_rewards_joint_space(self.cfg.rew_scale_hand_obj,
                                self.cfg.rew_scale_obj_target,
                                self.GEN3_rot_ee_pose_r,
                                self.grasp_point_obj_pose_r,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,
                                self.device)
-    
+
+        return reward
 
     # Verifies when to reset the environment --> Overrides method of DirecRLEnv
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
@@ -479,12 +453,13 @@ class BimanualDirect(DirectRLEnv):
         time_out = self.episode_length_buf >= self.max_episode_length - 1
 
         # Checks out of bounds in velocity
-        out_of_bounds_1 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 7:], dim = -1) > self.cfg.velocity_limit 
-        out_of_bounds_2 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 7:], dim = -1) > self.cfg.velocity_limit
+        #out_of_bounds_1 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 7:], dim = -1) > self.cfg.velocity_limit 
+        #out_of_bounds_2 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 7:], dim = -1) > self.cfg.velocity_limit
 
         object_falling = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 2] < self.cfg.object_height_limit
 
-        truncated = torch.logical_or(torch.logical_or(out_of_bounds_1, out_of_bounds_2), object_falling)
+        #truncated = torch.logical_or(torch.logical_or(out_of_bounds_1, out_of_bounds_2), object_falling)
+        truncated = object_falling
         terminated = time_out
 
         return truncated, terminated
