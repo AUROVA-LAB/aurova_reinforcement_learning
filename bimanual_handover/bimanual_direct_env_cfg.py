@@ -220,7 +220,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Z: En el eje longitudinal
     '''
     
-    euler = True
+    euler_flag = True
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)

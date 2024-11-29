@@ -173,7 +173,7 @@ class BimanualDirect(DirectRLEnv):
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
         
-        if self.cfg.euler:
+        if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
             
             actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
