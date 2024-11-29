@@ -12,9 +12,9 @@ ent_coef: 0.01                # Number of epoch when optimizing the surrogate lo
 learning_rate: !!float 3e-4
 clip_range: !!float 0.2       # Clipping parameter for the value function
 policy_kwargs: "dict(
-                  activation_fn=nn.ELU,
-                  net_arch=[32, 32],
-                  squash_output=False,
+                  activation_fn=nn.tanh,
+                  net_arch=[256, 128, 64],
+                  squash_output=True,
                 )"
 vf_coef: 1.0                  # Value function coefficient for the loss calculation
 max_grad_norm: 1.0            # The maximum value for the gradient clipping
