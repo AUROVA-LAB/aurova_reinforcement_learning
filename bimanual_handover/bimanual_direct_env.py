@@ -99,7 +99,7 @@ class BimanualDirect(DirectRLEnv):
             num_contacts += 1
 
         # Variable to store contacts between prims
-        self.contacts = torch.empty(self.num_envs, num_contacts).fill_(False)
+        self.contacts = torch.empty(self.num_envs, num_contacts).fill_(False).to(self.device)
 
         # Create output directory to save images
         if self.cfg.save_imgs:
@@ -164,67 +164,50 @@ class BimanualDirect(DirectRLEnv):
             - actions - torch.Tensor: preprocessed actions.
         '''
 
-        actions[:, :3] *= self.cfg.translation_scale
+        # Clamp actions
+        actions = torch.clamp(actions, -1, 1)
 
-        # Scale angle and rotation vector
-        actions[:, 3] *= self.cfg.angle_scale
-        actions[:, 4:7] = torch.nn.functional.normalize(actions[:, 4:7])
-
-        # Real part of the quaternion
-        w = torch.cos(actions[:, 3]/2).unsqueeze(dim = 0).T
+        # Scale actions
+        actions[:, :3]  *= self.cfg.translation_scale
+        # Convert orientation to quaternions
+        actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
+        actions_quat[:, :3] = actions[:, :3]
         
-        # Imaginary part of the quaternion
-        v = actions[:, 4:7]
-        sin_a = torch.sin(actions[:, 3] / 2).unsqueeze(dim=0).T
+        if self.cfg.euler:
+            actions[:, 3:6] *= self.cfg.angle_scale
+            
+            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
+                                                    pitch = actions[:, 4],
+                                                    yaw = actions[:, 5])
+            actions_quat[:, 7:] = actions[:, 6:]   
+        else:
+            # Scale angle and rotation vector
+            actions_quat[:, 3] *= self.cfg.angle_scale
+            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
 
-        # Build the quaternion
-        q = sin_a * v
+            # Real part of the quaternion
+            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
+            
+            # Imaginary part of the quaternion
+            v = actions_quat[:, 4:7]
+            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
 
-        # Reassign quaternion
-        actions[:, 3:7] = torch.cat((w, q), dim = 1)
+            # Build the quaternion
+            q = sin_a * v
 
-        # Preprocess Kinova hand joints -> calculate the mean of the joints for 
-        # the index, middle, and ring fingers
-        # thumb [8, 12, 16, 20], index [7, 11, 15, 19], middle [9, 13, 17, 21], ring [10, 14, 18, 22]
-        # joints_0 [7, 9, 10], joints_1 [11, 13, 14], joints_2 [15, 17, 18], joints_3 [19, 21, 22]
-        # for joint_idx in range(4):
-        # 
-        #     joint_tensor = torch.zeros((self.num_envs, 3))
-        #     joint_tensor[:, 0] = actions[:, 7+joint_idx*4]
-        #     joint_tensor[:, 1] = actions[:, 7+2+joint_idx*4]
-        #     joint_tensor[:, 2] = actions[:, 7+3+joint_idx*4]
-        #     # Save joint_idx of index, middle, and ring fingers for each env
-        #     # env0 -> [env0_joint_idx_index, env0_joint_idx_middle, env0_joint_idx_ring]
-        #     # env1 -> [env1_joint_idx_index, env1_joint_idx_middle, env1_joint_idx_ring]
-        #     # envn -> [envn_joint_idx_index, envn_joint_idx_middle, envn_joint_idx_ring]
-        #
-        #     print(joint_tensor)
-        #     # Compute the mean of joint_idx for each finger and each env
-        #     joint_mean = torch.mean(joint_tensor, dim=1)
-        #     # env0 -> [env0_joint_idx_mean]
-        #     # env1 -> [env1_joint_idx_mean]
-        #     # envn -> [envn_joint_idx_mean]
-        #     print(joint_mean)
-        #
-        #     # Replace the actions of the joint_idx for each finger and env by the mean
-        #     actions[:, 7+joint_idx*4] = joint_mean[:]
-        #     actions[:, 7+2+joint_idx*4] = joint_mean[:]
-        #     actions[:, 7+3+joint_idx*4] = joint_mean[:]
-        
-       
-        # Perform the mean of the finger actions
-        #       - View the finger actions as a 4x4 matrix with batch.
-        #       - Perform the mean on the rows. --> [joint_0_12_4_8, joint_0_12_4_8, joint_0_12_4_8, joint_0_12_4_8] with the .
-        #       - Repeat each value 4 times inside the tensor (dimension -1) with "repeat_interleave".
-        actions[:, 7:] = torch.mean(actions[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
+            # Reassign quaternion
+            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
 
+
+
+        actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
         # Compute dual quaternion distance between Kinova's hand and object
         dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
         idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
         self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
-        return actions
+        return actions_quat
     
     
     # Obtain the end effector pose of the index robot in the base frame
@@ -280,7 +263,7 @@ class BimanualDirect(DirectRLEnv):
         new_act_pos, new_act_quat = combine_frame_transforms(t01 = self.reset_robot_poses_r[idx][:, :3], q01 = self.reset_robot_poses_r[idx][:, 3:7],
                                                              t12 = actions[:, 0:3], q12 = actions[:, 3:7])
         self.reset_robot_poses_r[idx] = torch.cat((new_act_pos, new_act_quat), dim = -1)
-        
+
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(self.reset_robot_poses_r[idx])
@@ -404,20 +387,14 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Obtain the pose of the GEN3 end effector in world frame
-        GEN3_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
-
-        # Rotate that frame -45 in Z axis
-        GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w = combine_frame_transforms(t01 = GEN3_ee_pose_w[: ,:3], q01 = GEN3_ee_pose_w[: ,3:],
-                                                               t12 = torch.zeros_like(GEN3_ee_pose_w[:, :3]), q12 = self.cfg.rot_305_z_neg_quat)
-        
-        self.debug_GEN3_ee_pose_w = torch.cat((GEN3_rot_ee_pos_w, GEN3_rot_ee_quat_w), dim = -1)
+        self.debug_GEN3_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
 
         # Obtains the pose of the base of the GEN3 robot in the world frame
         GEN3_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
 
         # Obtain the pose of the end effector (after the rotation) in GEN3 root frame
         GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
-                                                                              t02 = GEN3_rot_ee_pos_w, q02 = GEN3_rot_ee_quat_w)
+                                                                              t02 = self.debug_GEN3_ee_pose_w[:, :3], q02 = self.debug_GEN3_ee_pose_w[:, 3:])
 
         self.GEN3_rot_ee_pose_r = torch.cat((GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r), dim = -1)
 
@@ -428,6 +405,9 @@ class BimanualDirect(DirectRLEnv):
         # Transforms the object frame so as to generate a more suitable frame for grasping
         grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
                                                                              t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
+        # Transforms the object frame so as to generate a more suitable frame for grasping
+        grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = grasp_point_obj_pos_w, q01 = grasp_point_obj_quat_w,
+                                                                             t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_45_z_pos_quat)
         
         self.debug_grasp_point_obj_pose_w = torch.cat((grasp_point_obj_pos_w, grasp_point_obj_quat_w), dim=-1)
 
@@ -468,7 +448,7 @@ class BimanualDirect(DirectRLEnv):
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
         
         # Obtain end effector poses for the robots
-        ee_pos_r_1, ee_quat_r_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
+        # ee_pos_r_1, ee_quat_r_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
 
         # Obtains the joint positions for the hand
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
@@ -477,7 +457,6 @@ class BimanualDirect(DirectRLEnv):
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
-                torch.cat((ee_pos_r_1, ee_quat_r_1), dim = -1),
                 hand_joint_pos_1,
                 self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
                 hand_joint_pos_2,
@@ -534,9 +513,14 @@ class BimanualDirect(DirectRLEnv):
         out_of_bounds_1 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 7:], dim = -1) > self.cfg.velocity_limit 
         out_of_bounds_2 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 7:], dim = -1) > self.cfg.velocity_limit
 
+        GEN3_falling = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 2] < self.cfg.gen3_height_limit
         object_falling = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 2] < self.cfg.object_height_limit
 
-        truncated = torch.logical_or(torch.logical_or(out_of_bounds_1, out_of_bounds_2), object_falling)
+        falling = torch.logical_or(GEN3_falling, object_falling)
+        GEN3_ground_contact = self.contacts[:, 0]
+        out_of_bounds = torch.logical_or(out_of_bounds_1, out_of_bounds_2)
+
+        truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
         terminated = time_out
 
         return truncated, terminated
