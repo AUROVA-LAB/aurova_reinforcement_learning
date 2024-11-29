@@ -11,6 +11,7 @@ n_epochs: 20                  # Number of epoch when optimizing the surrogate lo
 ent_coef: 0.01                # Number of epoch when optimizing the surrogate loss
 learning_rate: !!float 3e-4
 clip_range: !!float 0.2       # Clipping parameter for the value function
+use_sde: True                 # Mandatory if "squash_output" is activated
 policy_kwargs: "dict(
                   activation_fn=nn.Tanh,
                   net_arch=[256, 128, 64],
