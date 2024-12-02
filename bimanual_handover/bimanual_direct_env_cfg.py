@@ -24,6 +24,7 @@ from omni.isaac.lab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
 from omni.isaac.lab.sensors import CameraCfg, Camera, ContactSensorCfg, ContactSensor
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from omni.isaac.lab.markers import VisualizationMarkers, VisualizationMarkersCfg
+from omni.isaac.lab.terrains import TerrainImporterCfg
 from omni.isaac.lab.assets import RigidObject, RigidObjectCfg
 
 '''
@@ -58,6 +59,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 # Rotations respecto to the end effector robot link frame for object spawning
 rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
 rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1]))
 rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
 
 @configclass
@@ -65,12 +67,12 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 200#120             # Maximum steps in an episode
-    angle_scale = pi            # Action angle scalation
-    translation_scale = torch.tensor([0.01, 0.01, 0.01]) # Action translation scalation
+    max_steps = 200             # Maximum steps in an episode
+    angle_scale = 5*pi/180.0            # Action angle scalation
+    translation_scale = torch.tensor([0.025, 0.025, 0.025]) # Action translation scalation
 
-    num_actions = 7 + 16        # Number of actions per environment (overridden)
-    num_observations = 7 + 16 + 7 + 16 + 7  # Number of observations per environment (overridden)
+    num_actions = 6 + 16        # Number of actions per environment (overridden)
+    num_observations = 7 + 16 + 16 + 7  # Number of observations per environment (overridden)
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -218,10 +220,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Z: En el eje longitudinal
     '''
     
-    
+    euler_flag = True
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
+    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos)
 
     # Aggregate rotations as quaternions
     rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
@@ -255,6 +258,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     apply_range = [True, False]
 
     object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15
+    gen3_height_limit = 0.21
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
@@ -297,6 +301,7 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
+    cfg.rot_45_z_pos_quat = cfg.rot_45_z_pos_quat.repeat(num_envs, 1).to(device)
     
     return cfg
 
@@ -337,7 +342,14 @@ def update_collisions(cfg, num_envs):
                                 "hand2_w_object": hand2_w_object,
                                 "robot1_w_robot2": robot1_w_robot2}
     '''
-    cfg.contact_sensors_dict = {} 
+    robot2_w_ground: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
+        update_period=0.05, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
+    )
+    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground} 
     
 
     return cfg
