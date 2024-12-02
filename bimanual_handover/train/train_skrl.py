@@ -136,18 +136,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dir_string = "base_directory" if args_cli.algorithm == "SAC" else "directory"
 
     # specify directory for logging experiments
-    log_root_path = os.path.join("logs", "skrl", agent_cfg["agent"]["experiment"][dir_string])
-    log_root_path = os.path.abspath(log_root_path)
-    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+    #log_root_path = os.path.join("logs", "skrl", agent_cfg["agent"]["experiment"][dir_string])
+    #log_root_path = os.path.abspath(log_root_path)
+    #print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{algorithm}_{args_cli.ml_framework}"
-    if agent_cfg["agent"]["experiment"]["experiment_name"]:
-        log_dir += f'_{agent_cfg["agent"]["experiment"]["experiment_name"]}'
+    #log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + f"_{algorithm}_{args_cli.ml_framework}"
+    #if agent_cfg["agent"]["experiment"]["experiment_name"]:
+    #    log_dir += f'_{agent_cfg["agent"]["experiment"]["experiment_name"]}'
     # set directory into agent config
-    agent_cfg["agent"]["experiment"][dir_string] = log_root_path
-    agent_cfg["agent"]["experiment"]["experiment_name"] = log_dir
+    #agent_cfg["agent"]["experiment"][dir_string] = log_root_path
+    #agent_cfg["agent"]["experiment"]["experiment_name"] = log_dir
     # update log_dir
-    log_dir = os.path.join(log_root_path, log_dir)
+    #log_dir = os.path.join(log_root_path, log_dir)
+
+    path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train"
+    log_dir = os.path.join(path_to_train, "logs", "skrl", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
@@ -181,6 +184,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print("\n\n --- Perforimg PPO")
         # configure and instantiate the skrl runner
         # https://skrl.readthedocs.io/en/latest/api/utils/runner.html
+        agent_cfg['agent']['experiment']['directory'] = log_dir
+        agent_cfg['agent']['experiment']['experiment_name'] = log_dir.split("/")[-1]
+        agent_cfg['agent']['experiment']['wandb_kwargs'] = {"project": "bim_hand_dani_julio",
+                                                            "name": log_dir.split("/")[-1],
+                                                            "sync_tensorboard": True}
+        print(agent_cfg['agent']['experiment'])
         runner = Runner(env, agent_cfg)
 
         # # run training
