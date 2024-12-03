@@ -238,7 +238,7 @@ class BimanualDirect(DirectRLEnv):
         actions = self._preprocess_actions(actions)
 
         # Compute actions for GEN3 only -> apply increment and clamp
-        target_increment = self.GEN3_hand_dof_targets[:, :7] + self.GEN3_dof_speed_scales[:7] * self.dt * actions[:, :7]
+        target_increment = self.GEN3_hand_dof_targets[:, :7] + self.cfg.action_scale * actions[:, :7]
         self.GEN3_hand_dof_targets[:, :7] = torch.clamp(target_increment, self.GEN3_dof_lower_limits[:7], self.GEN3_dof_upper_limits[:7])
 
         # Compute actions for allegro hand -> scale action values from [-1, 1] to joint limits

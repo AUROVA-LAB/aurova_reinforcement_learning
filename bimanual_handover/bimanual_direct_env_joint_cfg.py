@@ -255,6 +255,9 @@ class BimanualDirectJointCfg(DirectRLEnvCfg):
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.1])
     grasp_obs_obj_quat_trans = torch.tensor([1.0, 0.0, 0.0, 0.0])
 
+    # action scale
+    action_scale = 0.1
+
     # reward scales
     rew_scale_hand_obj: float= 1.0
     rew_scale_obj_target: float= 1.0
