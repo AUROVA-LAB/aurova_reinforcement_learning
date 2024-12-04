@@ -75,7 +75,10 @@ class BimanualDirect(DirectRLEnv):
         self._hand_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.hand_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
         self._all_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.all_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
 
-
+        # Indexes for the GEN3 hand fingertips
+        self.GEN3_fingertips_idx = torch.tensor([self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].find_bodies(i)[0][0] for i in self.cfg.fingertip_body_names]).to(self.device)
+        self.GEN3_fingertips_pose_r = torch.zeros((self.num_envs, len(self.cfg.fingertip_body_names), 7))
+        
         # IK Controller
         controller_cfg = DifferentialIKControllerCfg(command_type = "pose", use_relative_mode = False, ik_method = "dls")
         # DifferentialIKControllerCfg: Configuration for differential inverse kinematics controller.
@@ -256,9 +259,10 @@ class BimanualDirect(DirectRLEnv):
         # Fix joint 2 of the thumb to avoid collisions 
         self.GEN3_hand_dof_targets[:, 12] = -0.1050
         
-        # Compute dual quaternion distance between Kinova's hand and object
-        distance_ee_obj = torch.norm(self.GEN3_rot_ee_pose_r[:, :3] - self.grasp_point_obj_pose_r[:, :3], p=2, dim=-1)
-        idxs_env_open_hand = distance_ee_obj < self.cfg.rew_change_thres
+        # Compute distance between Kinova's fingers and object
+        avg_distance_fingertips_obj = torch.mean(torch.norm(self.GEN3_fingertips_pose_r[:, :, :3] - self.grasp_point_obj_pose_r[:, :3].unsqueeze(dim=1).repeat(1, 4, 1),
+                                              p=2, dim=-1), dim=1)
+        idxs_env_open_hand = avg_distance_fingertips_obj < self.cfg.rew_change_thres
         self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
 
@@ -357,6 +361,31 @@ class BimanualDirect(DirectRLEnv):
 
         self.grasp_point_obj_pose_r = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
 
+        # ----------------------FINGERS--------------------------
+        # Obtain the pose of the GEN3 fingers in the world frame
+        GEN3_fingertips_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.GEN3_fingertips_idx, :7]
+
+        # Transform the pose of the fingers from world reference system to GEN3 root.
+        # thumb
+        GEN3_thumb_pos_r, GEN3_thumb_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                        t02 = GEN3_fingertips_pose_w[:, 0, :3], q02 = GEN3_fingertips_pose_w[:, 0, 3:])
+        # index
+        GEN3_index_pos_r, GEN3_index_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                        t02 = GEN3_fingertips_pose_w[:, 1, :3], q02 = GEN3_fingertips_pose_w[:, 1, 3:])
+        # middle
+        GEN3_middle_pos_r, GEN3_middle_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                        t02 = GEN3_fingertips_pose_w[:, 2, :3], q02 = GEN3_fingertips_pose_w[:, 2, 3:])
+        # ring
+        GEN3_ring_pos_r, GEN3_ring_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                                        t02 = GEN3_fingertips_pose_w[:, 3, :3], q02 = GEN3_fingertips_pose_w[:, 3, 3:])
+        
+        # shape --> num_envs x num_fingers (4) x xyzquat (7)
+        self.GEN3_fingertips_pose_r = torch.cat((torch.cat((GEN3_thumb_pos_r, GEN3_thumb_quat_r), dim = -1).unsqueeze(dim=1),
+                                                   torch.cat((GEN3_index_pos_r, GEN3_index_quat_r), dim = -1).unsqueeze(dim=1),
+                                                   torch.cat((GEN3_middle_pos_r, GEN3_middle_quat_r), dim = -1).unsqueeze(dim=1),
+                                                   torch.cat((GEN3_ring_pos_r, GEN3_ring_quat_r), dim = -1).unsqueeze(dim=1)), dim=1)
+        
+
 
     # Getter for the observations for the environment --> Overrides method of DirectRLEnv
     def _get_observations(self) -> dict:
@@ -430,7 +459,7 @@ class BimanualDirect(DirectRLEnv):
         # Computes reward according to the scaling values and poses (in utils)
         reward = compute_rewards_joint_space(self.cfg.rew_scale_hand_obj,
                                self.cfg.rew_scale_obj_target,
-                               self.GEN3_rot_ee_pose_r,
+                               self.GEN3_fingertips_pose_r,
                                self.grasp_point_obj_pose_r,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,

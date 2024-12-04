@@ -73,23 +73,24 @@ def compute_rewards(rew_scale_hand_obj: float,
 @torch.jit.script
 def compute_rewards_joint_space(rew_scale_hand_obj: float,
                                 rew_scale_obj_target: float,
-                                ee_pose: torch.Tensor,
+                                fingertips_pose: torch.Tensor,
                                 obj_pose: torch.Tensor,
                                 rew_change_thres: float, 
                                 target_pose: torch.Tensor,
                                 device: str):
     
     # Compute distance between ee_pose and obj_pose
-    dist_ee_pose_obj = torch.norm(ee_pose[:, :3] - obj_pose[:, :3], p=2, dim=-1)
+    avg_distance_fingertips_obj = torch.mean(torch.norm(fingertips_pose[:, :, :3] - obj_pose[:, :3].unsqueeze(dim=1).repeat(1, 4, 1),
+                                              p=2, dim=-1), dim=1)
     
     # Compute distance between obj_pose and target_pose
     dist_obj_target = torch.norm(obj_pose[:, :3] - target_pose[:, :3], p=2, dim=-1)
 
     # Check if GEN3 has reached the object
-    obj_reached = dist_ee_pose_obj < rew_change_thres
+    obj_reached = avg_distance_fingertips_obj < rew_change_thres
 
     # Compute reward terms
-    rew_term1 = rew_scale_hand_obj * torch.exp(-3*dist_ee_pose_obj) * (~obj_reached)
+    rew_term1 = rew_scale_hand_obj * torch.exp(-3*avg_distance_fingertips_obj) * (~obj_reached)
     rew_term2 = rew_scale_obj_target * torch.exp(-3*dist_obj_target) * obj_reached
 
     reward = rew_term1 + rew_term2
