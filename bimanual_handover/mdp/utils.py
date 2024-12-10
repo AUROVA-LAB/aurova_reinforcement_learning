@@ -35,6 +35,7 @@ def compute_rewards(rew_scale_hand_obj: float,
                     rew_scale_obj_target: float,
                     ee_pose: torch.Tensor,
                     obj_pose: torch.Tensor,
+                    prev_dist: torch.Tensor,
                     rew_change_thres: float,
                     target_pose: torch.Tensor,
                     device: str):
@@ -52,22 +53,27 @@ def compute_rewards(rew_scale_hand_obj: float,
 
     # Dual quaternion distance between GEN3 hand and object
     hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
-    print("Distance: ", hand_obj_dist[:, 1])
 
     # Check if translation module is below the threshold
     obj_reached = hand_obj_dist[:, 1] < rew_change_thres
     
     # Dual quaternion distance between object and target pose
     obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+    
+    # Obtains the distance
+    dist = hand_obj_dist[:, 0] * (~obj_reached) + obj_target_dist[:, 0] * obj_reached
+
+    # Obtains wether the agent is approaching or not
+    mod = 2*(dist < prev_dist) - 1
 
     # Compute intermediate reward terms with scaling values and boolean flags
-    rew_term1 = rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) * (~obj_reached)
-    rew_term2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) * obj_reached
+    rew_term1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) * (~obj_reached)
+    rew_term2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) * obj_reached
 
     # Obtain final reward
     reward = rew_term1 + rew_term2
     
-    return reward
+    return reward, dist
 
 
 # Reward computation -- joint space env

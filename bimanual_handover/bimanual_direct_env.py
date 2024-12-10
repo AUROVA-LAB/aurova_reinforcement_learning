@@ -110,6 +110,8 @@ class BimanualDirect(DirectRLEnv):
             self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
             os.makedirs(self.output_dir, exist_ok=True)
 
+
+        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs, 1).to(self.device)
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -506,13 +508,16 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Computes reward according to the scaling values and poses (in utils)
-        return compute_rewards(self.cfg.rew_scale_hand_obj,
-                               self.cfg.rew_scale_obj_target,
-                               self.tips_pose_r,
-                               self.grasp_point_obj_pose_r,
-                               self.cfg.rew_change_thres,
-                               self.cfg.target_pose,
-                               self.device)
+        rew, self.prev_dist = compute_rewards(self.cfg.rew_scale_hand_obj,
+                                              self.cfg.rew_scale_obj_target,
+                                              self.tips_pose_r,
+                                              self.grasp_point_obj_pose_r,
+                                              self.prev_dist,
+                                              self.cfg.rew_change_thres,
+                                              self.cfg.target_pose,
+                                              self.device)
+        
+        return rew
     
 
     # Verifies when to reset the environment --> Overrides method of DirecRLEnv
@@ -662,4 +667,5 @@ class BimanualDirect(DirectRLEnv):
 
         # Updates the poses of the GEN3 end effector and the object in the reset
         self.update_new_poses()
+        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs, 1).to(self.device)
         
