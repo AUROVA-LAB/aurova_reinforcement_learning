@@ -49,6 +49,8 @@ import gymnasium as gym
 import numpy as np
 import os
 from datetime import datetime
+import torch
+from torch import nn
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -148,6 +150,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create agent from stable baselines
     agent = PPO(policy_arch, env, verbose=1, **agent_cfg)
+    agent.policy.action_net = nn.Sequential(
+            nn.Linear(64, 22),
+            nn.Tanh())
+
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
     agent.set_logger(new_logger)
