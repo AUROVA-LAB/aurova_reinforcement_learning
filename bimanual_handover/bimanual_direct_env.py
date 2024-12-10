@@ -510,6 +510,7 @@ class BimanualDirect(DirectRLEnv):
                                self.cfg.rew_scale_obj_target,
                                self.tips_pose_r,
                                self.grasp_point_obj_pose_r,
+                               self.contacts,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,
                                self.device)

@@ -138,6 +138,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # Dictionary of contact sensors configurations --> Updated later
     contact_sensors_dict = {"object_w_hands": object_w_hands}
 
+    # Contacts mask for reward computation
+    contact_mask = None
+
 
     # camera
     camera_cfg: CameraCfg = CameraCfg(
@@ -310,13 +313,15 @@ def update_cfg(cfg, num_envs, device):
     cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_45_z_pos_quat = cfg.rot_45_z_pos_quat.repeat(num_envs, 1).to(device)
+
+    cfg.contact_mask = torch.tensor([0.0, 0.0, 0.0, 0.0]).repeat(num_envs, 1).to(device)
     
     return cfg
 
 
 def update_collisions(cfg, num_envs):
 
-    '''
+    
     # Contact between robot 1 hand and object
     robot1_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
@@ -344,12 +349,7 @@ def update_collisions(cfg, num_envs):
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
     )
-
-    # Build contact sensors dictionary
-    cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
-                                "hand2_w_object": hand2_w_object,
-                                "robot1_w_robot2": robot1_w_robot2}
-    '''
+    
     robot2_w_ground: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
         update_period=0.05, 
@@ -357,7 +357,12 @@ def update_collisions(cfg, num_envs):
         debug_vis=True,
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
     )
-    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground} 
+
+    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground,
+                                "robot1_w_object": robot1_w_object,
+                                "hand2_w_object": hand2_w_object,
+                                "robot1_w_robot2": robot1_w_robot2} 
+    
     
 
     return cfg

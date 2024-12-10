@@ -35,6 +35,7 @@ def compute_rewards(rew_scale_hand_obj: float,
                     rew_scale_obj_target: float,
                     ee_pose: torch.Tensor,
                     obj_pose: torch.Tensor,
+                    contacts: torch.Tensor,
                     rew_change_thres: float,
                     target_pose: torch.Tensor,
                     device: str):
@@ -52,7 +53,6 @@ def compute_rewards(rew_scale_hand_obj: float,
 
     # Dual quaternion distance between GEN3 hand and object
     hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
-    print("Distance: ", hand_obj_dist[:, 1])
 
     # Check if translation module is below the threshold
     obj_reached = hand_obj_dist[:, 1] < rew_change_thres
