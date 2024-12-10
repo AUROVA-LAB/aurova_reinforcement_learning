@@ -507,17 +507,40 @@ class BimanualDirect(DirectRLEnv):
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''
 
-        # Computes reward according to the scaling values and poses (in utils)
-        rew = compute_rewards(self.cfg.rew_scale_hand_obj,
-                                              self.cfg.rew_scale_obj_target,
-                                              self.tips_pose_r,
-                                              self.grasp_point_obj_pose_r,
-                                              self.prev_dist,
-                                              self.cfg.rew_change_thres,
-                                              self.cfg.target_pose,
-                                              self.device)
-        self.prev_dist = rew[1]
-        return rew[0]
+        
+        rew_scale_hand_obj = self.cfg.rew_scale_hand_obj
+        rew_scale_obj_target = self.cfg.rew_scale_obj_target
+        ee_pose = self.tips_pose_r
+        obj_pose = self.grasp_point_obj_pose_r
+        prev_dist = self.prev_dist
+        rew_change_thres = self.cfg.rew_change_thres
+        target_pose = self.cfg.target_pose
+        device = self.device
+        
+        # Dual quaternion distance between GEN3 hand and object
+        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+
+        # Check if translation module is below the threshold
+        obj_reached = hand_obj_dist[:, 1] < rew_change_thres
+        
+        # Dual quaternion distance between object and target pose
+        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+        
+        # Obtains the distance
+        dist = hand_obj_dist[:, 0] * (~obj_reached) + obj_target_dist[:, 0] * obj_reached
+
+        # Obtains wether the agent is approaching or not
+        mod = 2*(dist < prev_dist) - 1
+
+        # Compute intermediate reward terms with scaling values and boolean flags
+        rew_term1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) * (~obj_reached)
+        rew_term2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) * obj_reached
+
+        # Obtain final reward
+        reward = rew_term1 + rew_term2
+        
+        self.prev_dist = dist
+        return reward
     
 
     # Verifies when to reset the environment --> Overrides method of DirecRLEnv
