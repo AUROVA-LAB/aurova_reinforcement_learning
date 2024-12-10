@@ -76,7 +76,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True        # Activate marker visualization
+    debug_markers = False        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -277,7 +277,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.05
+    rew_change_thres = 0.025
 
     # Objective position -> origin GEN3 position with offset in X axis
     target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
