@@ -508,7 +508,7 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         # Computes reward according to the scaling values and poses (in utils)
-        rew, self.prev_dist = compute_rewards(self.cfg.rew_scale_hand_obj,
+        rew = compute_rewards(self.cfg.rew_scale_hand_obj,
                                               self.cfg.rew_scale_obj_target,
                                               self.tips_pose_r,
                                               self.grasp_point_obj_pose_r,
@@ -516,8 +516,8 @@ class BimanualDirect(DirectRLEnv):
                                               self.cfg.rew_change_thres,
                                               self.cfg.target_pose,
                                               self.device)
-        
-        return rew
+        self.prev_dist = rew[1]
+        return rew[0]
     
 
     # Verifies when to reset the environment --> Overrides method of DirecRLEnv
