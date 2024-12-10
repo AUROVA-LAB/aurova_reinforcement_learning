@@ -8,7 +8,7 @@ batch_size: 4096              # Minibatch size
 gae_lambda: 0.95              # Factor for trade-off of bias vs variance for Generalized Advantage Estimator
 gamma: 0.99                   # Discount factor
 n_epochs: 20                  # Number of epoch when optimizing the surrogate loss
-ent_coef: 0.01                # Number of epoch when optimizing the surrogate loss
+ent_coef: 0.01                # Entropy coefficient
 learning_rate: !!float 3e-4
 clip_range: !!float 0.2       # Clipping parameter for the value function
 use_sde: True                 # Mandatory if "squash_output" is activated
