@@ -111,7 +111,7 @@ class BimanualDirect(DirectRLEnv):
             os.makedirs(self.output_dir, exist_ok=True)
 
 
-        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs, 1).to(self.device)
+        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -690,5 +690,5 @@ class BimanualDirect(DirectRLEnv):
 
         # Updates the poses of the GEN3 end effector and the object in the reset
         self.update_new_poses()
-        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs, 1).to(self.device)
+        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         
