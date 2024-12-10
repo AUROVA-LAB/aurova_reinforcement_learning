@@ -52,6 +52,7 @@ def compute_rewards(rew_scale_hand_obj: float,
 
     # Dual quaternion distance between GEN3 hand and object
     hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+    print("Distance: ", hand_obj_dist[:, 1])
 
     # Check if translation module is below the threshold
     obj_reached = hand_obj_dist[:, 1] < rew_change_thres
@@ -134,7 +135,6 @@ def save_images_grid(
     ncol = int(np.ceil(n_images / nrow))
 
     fig, axes = plt.subplots(nrow, ncol, figsize=(ncol * 2, nrow * 2)) # -> tiene que ser un numpy array
-    print(filename)
     axes = np.array(axes)
 
     # Axes(0.125,0.11;0.775x0.77)
