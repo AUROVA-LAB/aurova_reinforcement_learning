@@ -46,16 +46,20 @@ class BimanualDirect(DirectRLEnv):
         # are used to draw the markers in the simulation
         self.debug_GEN3_ee_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.debug_grasp_point_obj_pose_w = copy.deepcopy(self.debug_GEN3_ee_pose_w)
+        self.debug_tips_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Poses for the object and GEN3 robot so they can match when performing the grasping
         self.GEN3_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.grasp_point_obj_pose_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
+        self.tips_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
         self._hand_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.hand_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
         self._all_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.all_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
 
+
+        self.finger_tips = torch.tensor([self.scene.articulations[key].find_bodies(self.cfg.finger_tips[idx])[0] for idx, key in enumerate(self.cfg.keys)]).to(self.device)
 
         # IK Controller
         controller_cfg = DifferentialIKControllerCfg(command_type = "pose", use_relative_mode = False, ik_method = "dls")
@@ -260,7 +264,7 @@ class BimanualDirect(DirectRLEnv):
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose(idx)
 
         # Perform an increment on the robot end effector in the root frame
-        new_act_pos, new_act_quat = combine_frame_transforms(t01 = self.reset_robot_poses_r[idx][:, :3], q01 = self.reset_robot_poses_r[idx][:, 3:7],
+        new_act_pos, new_act_quat = combine_frame_transforms(t01 = ee_pos_r, q01 = ee_quat_r,
                                                              t12 = actions[:, 0:3], q12 = actions[:, 3:7])
         self.reset_robot_poses_r[idx] = torch.cat((new_act_pos, new_act_quat), dim = -1)
 
@@ -351,10 +355,12 @@ class BimanualDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
                                                                          self.debug_GEN3_ee_pose_w[:, :3],
-                                                                         self.debug_grasp_point_obj_pose_w[:, :3])), 
+                                                                         self.debug_grasp_point_obj_pose_w[:, :3],
+                                                                         self.debug_tips_pose_w[:, :3])), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
                                                                           self.debug_GEN3_ee_pose_w[:, 3:],
-                                                                          self.debug_grasp_point_obj_pose_w[:,3:])), 
+                                                                          self.debug_grasp_point_obj_pose_w[:,3:],
+                                                                          self.debug_tips_pose_w[:, 3:])), 
                                                 marker_indices=marker_indices)
         
 
@@ -397,6 +403,23 @@ class BimanualDirect(DirectRLEnv):
                                                                               t02 = self.debug_GEN3_ee_pose_w[:, :3], q02 = self.debug_GEN3_ee_pose_w[:, 3:])
 
         self.GEN3_rot_ee_pose_r = torch.cat((GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r), dim = -1)
+
+
+
+        # Obtains the pose of the finger tips in world frame and performs the mean
+        self.debug_tips_pose_w = torch.mean(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.finger_tips[self.cfg.GEN3], 0:7], dim = -2)
+        
+        tip_pos_r, tip_or_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                        t02 = self.debug_tips_pose_w[:, :3], q02 = self.debug_tips_pose_w[:, 3:])
+        self.tips_pose_r = torch.cat((tip_pos_r, tip_or_r), dim = -1)
+
+        # Replaces the orientation with ee orientation
+        self.tips_pose_r[:, 3:] = self.GEN3_rot_ee_pose_r[:, 3:]
+
+        tips_pos_w, tips_or_w = combine_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                          t12 = self.tips_pose_r[:, :3], q12 = self.tips_pose_r[:, 3:])
+        self.debug_tips_pose_w = torch.cat((tips_pos_w, tips_or_w), dim = -1)
+
 
 
         # Obtains the pose of the object in the world frame
@@ -446,9 +469,6 @@ class BimanualDirect(DirectRLEnv):
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
-        
-        # Obtain end effector poses for the robots
-        # ee_pos_r_1, ee_quat_r_1, _, _ = self._get_ee_pose(self.cfg.UR5e)
 
         # Obtains the joint positions for the hand
         hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
@@ -457,8 +477,8 @@ class BimanualDirect(DirectRLEnv):
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
-                hand_joint_pos_1,
                 self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
+                hand_joint_pos_1,
                 hand_joint_pos_2,
                 self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
@@ -488,7 +508,7 @@ class BimanualDirect(DirectRLEnv):
         # Computes reward according to the scaling values and poses (in utils)
         return compute_rewards(self.cfg.rew_scale_hand_obj,
                                self.cfg.rew_scale_obj_target,
-                               self.GEN3_rot_ee_pose_r,
+                               self.tips_pose_r,
                                self.grasp_point_obj_pose_r,
                                self.cfg.rew_change_thres,
                                self.cfg.target_pose,
