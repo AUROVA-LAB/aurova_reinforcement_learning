@@ -151,7 +151,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # create agent from stable baselines
     agent = PPO(policy_arch, env, verbose=1, **agent_cfg)
     agent.policy.action_net = nn.Sequential(
-            nn.Linear(64, 22),
+            nn.Linear(64, 6),
             nn.Tanh())
 
     # configure the logger
