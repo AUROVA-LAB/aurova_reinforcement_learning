@@ -34,13 +34,9 @@ key_cmd = '\n'
 pos_cmd = "sdp869"
 neg_cmd = "wal241"
 inc = 1# 0.0075
-action = torch.tensor([[-0.6880,  0.1639,  0.6471, -0.2706,  0.6533, -0.2706, -0.6533]])
-action = torch.tensor([-0.4925,  0.1338,  0.4810, 1, -0.3832, -0.9236, -0.0028] + [0.0]*4 + [1]*4 + [2]*4 + [3]*4) # -0.0068, 1 en w por el angle scale
-action = torch.zeros(6+16)
-action[0] = 0.0
-action[7] = 0.263
-# action = torch.tensor([[-0.4925,  0.1338,  0.4810, 1,1,1,1]])
-# action = torch.zeros((1,6))
+
+action = torch.zeros(6)
+
 incs = torch.zeros_like(action)
 
 def on_press(key):
@@ -108,8 +104,6 @@ def main():
         with torch.inference_mode():
 
             obs, rew, terminated, truncated, info = env.step(update_cmd(action))
-            print(obs["policy"][:, :7])
-            print("---\n")
 
 
 
