@@ -67,12 +67,12 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 200             # Maximum steps in an episode
+    max_steps = 100             # Maximum steps in an episode
     angle_scale = 5*pi/180.0            # Action angle scalation
-    translation_scale = torch.tensor([0.015, 0.015, 0.015]) # Action translation scalation
+    translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
 
-    num_actions = 6 + 16        # Number of actions per environment (overridden)
-    num_observations = 7 + 16 + 16 + 7  # Number of observations per environment (overridden)
+    num_actions = 6            # Number of actions per environment (overridden)
+    num_observations = 7 + 7  # Number of observations per environment (overridden)
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -277,10 +277,13 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.025
+    rew_change_thres = 0.018
 
     # Objective position -> origin GEN3 position with offset in X axis
     target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
+    
+    # Bonus for reaching the object
+    bonus_obj_reach = 300
 
 
 

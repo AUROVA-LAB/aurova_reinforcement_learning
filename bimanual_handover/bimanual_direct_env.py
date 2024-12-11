@@ -112,6 +112,7 @@ class BimanualDirect(DirectRLEnv):
 
 
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
+        self.obj_reached = torch.zeros(self.num_envs).to(self.device)
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -178,6 +179,7 @@ class BimanualDirect(DirectRLEnv):
         # Convert orientation to quaternions
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
+        actions_quat[:, 8] = 0.263
         
         if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
@@ -185,7 +187,7 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
                                                     pitch = actions[:, 4],
                                                     yaw = actions[:, 5])
-            actions_quat[:, 7:] = actions[:, 6:]   
+            # actions_quat[:, 7:] = actions[:, 6:]   
         else:
             # Scale angle and rotation vector
             actions_quat[:, 3] *= self.cfg.angle_scale
@@ -205,13 +207,13 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
 
 
-
-        actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
+        
+        # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
         # Compute dual quaternion distance between Kinova's hand and object
-        dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
-        idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
-        self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
+        # dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
+        # idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
+        # self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
         return actions_quat
     
@@ -473,15 +475,11 @@ class BimanualDirect(DirectRLEnv):
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
 
         # Obtains the joint positions for the hand
-        hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
-        hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
 
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
                 self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
-                hand_joint_pos_1,
-                hand_joint_pos_2,
                 self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
             ),
             dim = -1
@@ -509,37 +507,28 @@ class BimanualDirect(DirectRLEnv):
 
         
         rew_scale_hand_obj = self.cfg.rew_scale_hand_obj
-        rew_scale_obj_target = self.cfg.rew_scale_obj_target
         ee_pose = self.tips_pose_r
         obj_pose = self.grasp_point_obj_pose_r
         prev_dist = self.prev_dist
         rew_change_thres = self.cfg.rew_change_thres
-        target_pose = self.cfg.target_pose
         device = self.device
         
         # Dual quaternion distance between GEN3 hand and object
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
 
         # Check if translation module is below the threshold
-        obj_reached = hand_obj_dist[:, 1] < rew_change_thres
-        
-        # Dual quaternion distance between object and target pose
-        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+        self.obj_reached = hand_obj_dist[:, 1] < rew_change_thres
         
         # Obtains the distance
-        dist = hand_obj_dist[:, 0] * (~obj_reached) + obj_target_dist[:, 0] * obj_reached
+        dist = hand_obj_dist[:, 0]
 
         # Obtains wether the agent is approaching or not
         mod = 2*(dist < prev_dist) - 1
 
         # Compute intermediate reward terms with scaling values and boolean flags
-        rew_term1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) * (~obj_reached)
-        rew_term2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) * obj_reached
-
-        # Obtain final reward
-        reward = rew_term1 + rew_term2
-        
+        reward = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached
         self.prev_dist = dist
+
         return reward
     
 
@@ -569,7 +558,7 @@ class BimanualDirect(DirectRLEnv):
         out_of_bounds = torch.logical_or(out_of_bounds_1, out_of_bounds_2)
 
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
-        terminated = time_out
+        terminated = torch.logical_or(time_out, self.obj_reached)
 
         return truncated, terminated
     
@@ -684,11 +673,8 @@ class BimanualDirect(DirectRLEnv):
 
         # Writes the new object position to the simulation
         self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((obj_pos, obj_quat), dim = -1), env_ids = env_ids)
-        
-        # Updates the command of the object, i.e. the spawning position
-        self.obj_cmd = torch.cat((obj_pos, obj_quat), dim = -1)
 
         # Updates the poses of the GEN3 end effector and the object in the reset
         self.update_new_poses()
-        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
+        self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         
