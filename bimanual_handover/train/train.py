@@ -49,7 +49,6 @@ import gymnasium as gym
 import numpy as np
 import os
 from datetime import datetime
-import torch
 from torch import nn
 
 from stable_baselines3 import PPO
@@ -74,6 +73,9 @@ from train_utils import AddNoiseObservation
 
 import wandb
 from wandb.integration.sb3 import WandbCallback
+
+from networks import *
+
 
 # directory for logging into
 path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train"
@@ -148,11 +150,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             clip_reward=np.inf,
         )
 
+    
+
     # create agent from stable baselines
-    agent = PPO(policy_arch, env, verbose=1, **agent_cfg)
-    agent.policy.action_net = nn.Sequential(
-            nn.Linear(64, 6),
-            nn.Tanh())
+    agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
+
+    raise
+    
 
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])

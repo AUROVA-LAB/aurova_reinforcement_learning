@@ -27,14 +27,21 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             net_arch=net_arch,
             **kwargs,
         )
-        self.mlp_extractor = CustomFeatureExtractor(observation_space=th.zeros(4))
-    
+        # self.mlp_extractor = CustomFeatureExtractor(observation_space=th.zeros(4))
+
+        features = 64
+        action_shape = 2
+
+        if net_arch is not None:
+            features = net_arch[-1]
+
+        if action_space.shape is not ():
+            action_shape = action_space.shape[0]
+
         # Replace the actor with your custom network
         self.action_net = nn.Sequential(
-            nn.Linear(self.features_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 2),  # Action dimension
-        )
+            nn.Linear(features, action_shape),
+            nn.Tanh())
 
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
