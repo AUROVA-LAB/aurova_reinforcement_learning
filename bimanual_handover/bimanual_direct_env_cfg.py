@@ -357,10 +357,47 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
         update_period=0.05, 
         history_length=1, 
-        debug_vis=True,
+        debug_vis=False,
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
     )
-    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground} 
+
+    finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger_1_.*",
+        update_period=0.05, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger_2_.*",
+        update_period=0.05, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_3_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger_3_.*",
+        update_period=0.05, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger_4_.*",
+        update_period=0.05, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground,
+                                "finger_1_w_object": finger_1_w_object,
+                                "finger_2_w_object": finger_2_w_object,
+                                "finger_3_w_object": finger_3_w_object,
+                                "finger_4_w_object": finger_4_w_object} 
     
 
     return cfg

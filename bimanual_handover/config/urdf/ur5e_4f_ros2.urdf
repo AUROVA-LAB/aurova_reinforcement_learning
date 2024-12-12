@@ -506,6 +506,29 @@
     <child link="hand_link_1.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
+
+  <link name="finger_1_contact_1">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_1.0_link"/>
+    <child link="finger_1_contact_1"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
   <link name="hand_link_2.0_link">
     <visual>
       <geometry>
@@ -532,6 +555,29 @@
     <child link="hand_link_2.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
+
+  <link name="finger_1_contact_2">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_2.0_link"/>
+    <child link="finger_1_contact_2"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
   <link name="hand_link_3.0_link">
     <visual>
       <geometry>
@@ -558,6 +604,29 @@
     <child link="hand_link_3.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
+
+  <!-- <link name="finger_1_contact_3">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_3" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link"/>
+    <child link="finger_1_contact_3"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
   <link name="hand_link_3.0_link_tip_link">
     <visual>
       <geometry>
@@ -585,6 +654,29 @@
     <child link="hand_link_3.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
+
+  <link name="finger_1_contact_3_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_3_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link_tip_link"/>
+    <child link="finger_1_contact_3_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
   <link name="hand_link_4.0_link">
     <visual>
       <geometry>
@@ -637,6 +729,29 @@
     <child link="hand_link_5.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
+
+  <link name="finger_2_contact_5">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact5_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_5.0_link"/>
+    <child link="finger_2_contact_5"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
   <link name="hand_link_6.0_link">
     <visual>
       <geometry>
@@ -663,6 +778,29 @@
     <child link="hand_link_6.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
+
+  <link name="finger_2_contact_6">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact6_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_6.0_link"/>
+    <child link="finger_2_contact_6"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
   <link name="hand_link_7.0_link">
     <visual>
       <geometry>
@@ -688,6 +826,29 @@
     <child link="hand_link_7.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
+
+  <!-- <link name="finger_2_contact_7">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact2_7" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link"/>
+    <child link="finger_2_contact_7"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
   <link name="hand_link_7.0_link_tip_link">
     <visual>
       <geometry>
@@ -714,6 +875,29 @@
     <child link="hand_link_7.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
+
+  <link name="finger_2_contact_7_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact2_7_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link_tip_link"/>
+    <child link="finger_2_contact_7_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
   <link name="hand_link_8.0_link">
     <visual>
       <geometry>
@@ -766,6 +950,29 @@
     <child link="hand_link_9.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
+
+  <link name="finger_3_contact_9">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact9_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_9.0_link"/>
+    <child link="finger_3_contact_9"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
   <link name="hand_link_10._link">
     <visual>
       <geometry>
@@ -792,6 +999,29 @@
     <child link="hand_link_10._link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
+
+  <link name="finger_3_contact_10">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact10_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_10._link"/>
+    <child link="finger_3_contact_10"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
   <link name="hand_link_11._link">
     <visual>
       <geometry>
@@ -817,6 +1047,29 @@
     <child link="hand_link_11._link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
+
+  <!-- <link name="finger_3_contact_11">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact2_11" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link"/>
+    <child link="finger_3_contact_11"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
   <link name="hand_link_11._link_tip_link">
     <visual>
       <geometry>
@@ -843,6 +1096,29 @@
     <child link="hand_link_11._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
+
+  <link name="finger_3_contact_11_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact2_11_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link_tip_link"/>
+    <child link="finger_3_contact_11_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
   <!-- THUMB -->
   <link name="hand_link_12._link">
     <visual>
@@ -863,7 +1139,7 @@
       <!-- RIGHT -->
       <!-- <origin rpy="0 0 0" xyz="-0.0179 0.009 0.0145"/> -->
       <!-- LEFT -->
-      <origin rpy="0 0 0" xyz="${-0.0358/2+0.0} ${-.018/2} ${.029/2}"/>
+      <origin rpy="0 0 0" xyz="-0.0179 -0.09 0.145"/>
     </collision>
     <inertial>
       <mass value="0.0176"/>
@@ -936,6 +1212,29 @@
     <child link="hand_link_14._link"/>
     <origin xyz="0 0 0.0177"/>
   </joint>
+
+<link name="finger_4_contact_14">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_14" type="fixed" dont_collapse="true">
+    <parent link="hand_link_14._link"/>
+    <child link="finger_4_contact_14"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.005"/>
+  </joint>
+
   <link name="hand_link_15._link">
     <visual>
       <geometry>
@@ -963,6 +1262,29 @@
     <child link="hand_link_15._link"/>
     <origin xyz="0 0 0.0514"/>
   </joint>
+
+  <link name="finger_4_contact_15">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.035"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.035"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_15" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link"/>
+    <child link="finger_4_contact_15"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.005"/>
+  </joint>
+
   <link name="hand_link_15._link_tip_link">
     <visual>
       <geometry>
@@ -989,6 +1311,30 @@
     <child link="hand_link_15._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.0455"/>
   </joint>
+
+  <link name="finger_4_contact_15_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_15_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link_tip_link"/>
+    <child link="finger_4_contact_15_tip"/>
+    <origin rpy="0 0 0" xyz="0.0 0 0.0"/>
+  </joint>
+
+
   <joint name="palm_2_ur" type="fixed" dont_collapse="true">
     <parent link="ee_link"/>
     <child link="hand_palm_link"/>
