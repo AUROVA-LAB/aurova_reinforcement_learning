@@ -70,18 +70,28 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     max_steps = 100             # Maximum steps in an episode
     angle_scale = 5*pi/180.0            # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
+    hand_joint_scale = 0.1
 
     num_actions = 6            # Number of actions per environment (overridden)
     num_observations = 7 + 7  # Number of observations per environment (overridden)
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False        # Activate marker visualization
+    debug_markers = True        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
+
+    APPROACH = 0
+    MANIPULATION = 1
+
+    phase = APPROACH
+
+    option = 1
+
+    path_to_pretrained = "2024-12-11_11-04-13"
 
     # simulation
     sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)

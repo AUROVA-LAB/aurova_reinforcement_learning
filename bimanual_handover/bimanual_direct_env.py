@@ -180,6 +180,10 @@ class BimanualDirect(DirectRLEnv):
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
         actions_quat[:, 8] = 0.263
+
+        if self.cfg.phase == self.cfg.MANIPULATION:
+            hand_joint_index = 6 + int(not self.cfg.euler_flag)
+            actions_quat[:, 7:] = actions[:, hand_joint_index:] * self.cfg.hand_joint_scale
         
         if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
@@ -474,8 +478,6 @@ class BimanualDirect(DirectRLEnv):
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
 
-        # Obtains the joint positions for the hand
-
         # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
         obs = torch.cat(
             (
@@ -484,6 +486,19 @@ class BimanualDirect(DirectRLEnv):
             ),
             dim = -1
         )
+
+        if self.cfg.phase == self.cfg.MANIPULATION:
+            # Obtains the joint positions for the hand
+            # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
+            hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+
+            obs = torch.cat(
+                (
+                    obs,
+                    hand_joint_pos_2,
+                ),
+                dim = -1
+            )
 
         # Builds the dictionary
         observations = {"policy": obs}
