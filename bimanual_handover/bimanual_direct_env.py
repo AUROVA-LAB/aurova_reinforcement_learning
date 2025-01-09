@@ -182,8 +182,17 @@ class BimanualDirect(DirectRLEnv):
         actions_quat[:, 8] = 0.263
 
         if self.cfg.phase == self.cfg.MANIPULATION:
-            hand_joint_index = 6 + int(not self.cfg.euler_flag)
+            hand_joint_index = 5 + int(not self.cfg.euler_flag)
+
             actions_quat[:, 7:] = actions[:, hand_joint_index:] * self.cfg.hand_joint_scale
+
+
+            actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
+
+            # Compute dual quaternion distance between Kinova's hand and object
+            dq_distance_ee_obj = dual_quaternion_error(self.tips_pose_r, self.grasp_point_obj_pose_r, self.device)
+            idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
+            self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
         
         if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
@@ -191,7 +200,7 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
                                                     pitch = actions[:, 4],
                                                     yaw = actions[:, 5])
-            # actions_quat[:, 7:] = actions[:, 6:]   
+
         else:
             # Scale angle and rotation vector
             actions_quat[:, 3] *= self.cfg.angle_scale
@@ -211,13 +220,6 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
 
 
-        
-        # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
-
-        # Compute dual quaternion distance between Kinova's hand and object
-        # dq_distance_ee_obj = dual_quaternion_error(self.GEN3_rot_ee_pose_r, self.grasp_point_obj_pose_r, self.device)
-        # idxs_env_open_hand = dq_distance_ee_obj[:, 1] < self.cfg.rew_change_thres
-        # self.new_poses[self.cfg.UR5e][idxs_env_open_hand, 6:] = self.open_hand_joints
 
         return actions_quat
     
@@ -280,11 +282,13 @@ class BimanualDirect(DirectRLEnv):
         # Set the command for the IKDifferentialController
         self.controller.set_command(self.reset_robot_poses_r[idx])
 
+        new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
+
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
         self.actions[idx] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
-                                       actions[:, 7:]), 
+                                       new_hand_joint_pos), 
                                        dim = -1)
 
 

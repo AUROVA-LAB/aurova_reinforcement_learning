@@ -72,8 +72,17 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.1
 
-    num_actions = 6            # Number of actions per environment (overridden)
-    num_observations = 7 + 7  # Number of observations per environment (overridden)
+    APPROACH = 0
+    MANIPULATION = 1
+
+    phase = MANIPULATION
+    option = 1
+
+    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps"
+
+    num_actions = 6 + phase * 16        # Number of actions per environment (overridden)
+    num_observations = 7 + 7 + phase * 16  # Number of observations per environment (overridden)
+    euler_flag = num_actions == 6
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -84,14 +93,6 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     velocity_limit = 10         # Velocity limit for robots' end effector
 
-    APPROACH = 0
-    MANIPULATION = 1
-
-    phase = APPROACH
-
-    option = 1
-
-    path_to_pretrained = "2024-12-11_11-04-13"
 
     # simulation
     sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
@@ -237,8 +238,6 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     Y: Negativo (diagonal hacia abajo)
     Z: En el eje longitudinal
     '''
-    
-    euler_flag = True
 
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
