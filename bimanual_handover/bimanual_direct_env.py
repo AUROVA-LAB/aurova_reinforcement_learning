@@ -113,8 +113,8 @@ class BimanualDirect(DirectRLEnv):
 
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         self.prev_dist_target = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
-        self.obj_reached = torch.zeros(self.num_envs).to(self.device)
-        self.obj_reached_target = torch.zeros(self.num_envs).to(self.device)
+        self.obj_reached = torch.zeros(self.num_envs).to(self.device).bool()
+        self.obj_reached_target = torch.zeros(self.num_envs).to(self.device).bool()
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -690,4 +690,5 @@ class BimanualDirect(DirectRLEnv):
         self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+
         
