@@ -152,8 +152,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # Add environment arguments to the arguments for the policy
-    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "env": env, "path": env_cfg.path_to_pretrained}
-    agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
+    # agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "env": env, "path": env_cfg.path_to_pretrained}
+    # agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
 
     # create agent from stable baselines
     agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
@@ -163,7 +163,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent.set_logger(new_logger)
 
     # callbacks for agent
-    checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=log_dir, name_prefix="model", verbose=2)
+    checkpoint_callback = CheckpointCallback(save_freq=1, save_path=log_dir, name_prefix="model", verbose=2)
     
     if args_cli.train:
         # train the agent

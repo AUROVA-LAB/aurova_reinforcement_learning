@@ -76,7 +76,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
     def __init__(self, observation_space, action_space, lr_schedule, net_arch=None, **kwargs):
         
         # Extract the arguments for the phase filtering
-        my_kwargs = kwargs.pop("my_kwargs")
+        # my_kwargs = kwargs.pop("my_kwargs")
 
         super(CustomActorCriticPolicy, self).__init__(
             observation_space,
@@ -86,41 +86,41 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
-        # If the phase is MANIPULATION
-        if my_kwargs["phase"] == my_kwargs["MANIPULATION"]:
-            if my_kwargs["option"] == 1:
-                # Change the settings to create a model for approaching
-                my_kwargs["cfg"]["policy_kwargs"]["my_kwargs"]["phase"] = my_kwargs["APPROACH"]
-                my_kwargs["env"].action_space = gym.spaces.Box(low = -1000, high = 1000, shape = (6,))
-                my_kwargs["env"].observation_space = gym.spaces.Box(low = -1000, high = 1000, shape = (7+7,))
+        # # If the phase is MANIPULATION
+        # if my_kwargs["phase"] == my_kwargs["MANIPULATION"]:
+        #     if my_kwargs["option"] == 1:
+        #         # Change the settings to create a model for approaching
+        #         my_kwargs["cfg"]["policy_kwargs"]["my_kwargs"]["phase"] = my_kwargs["APPROACH"]
+        #         my_kwargs["env"].action_space = gym.spaces.Box(low = -1000, high = 1000, shape = (6,))
+        #         my_kwargs["env"].observation_space = gym.spaces.Box(low = -1000, high = 1000, shape = (7+7,))
 
-                # Creates model for approaching
-                model = PPO(
-                    policy=CustomActorCriticPolicy,
-                    env = my_kwargs["env"],  # Replace with your environment
-                    verbose=1,
-                    **my_kwargs["cfg"]
-                )
+        #         # Creates model for approaching
+        #         model = PPO(
+        #             policy=CustomActorCriticPolicy,
+        #             env = my_kwargs["env"],  # Replace with your environment
+        #             verbose=1,
+        #             **my_kwargs["cfg"]
+        #         )
 
-                # Reset the phase
-                my_kwargs["cfg"]["policy_kwargs"]["my_kwargs"]["phase"] = my_kwargs["MANIPULATION"]
+        #         # Reset the phase
+        #         my_kwargs["cfg"]["policy_kwargs"]["my_kwargs"]["phase"] = my_kwargs["MANIPULATION"]
 
-                # Load pre-trained weights
-                pretrained_path = os.path.join("/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/", my_kwargs["path"], "policy.pth")
-                weights = th.load(pretrained_path, map_location="cpu", weights_only = "True")
+        #         # Load pre-trained weights
+        #         pretrained_path = os.path.join("/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/", my_kwargs["path"], "policy.pth")
+        #         weights = th.load(pretrained_path, map_location="cpu", weights_only = "True")
 
-                # Load weights into the model
-                model.policy.load_state_dict(weights)
+        #         # Load weights into the model
+        #         model.policy.load_state_dict(weights)
 
-                # Obtain the pre-trained feature extractor
-                prev_feature_extractor = model.policy.mlp_extractor.policy_net
+        #         # Obtain the pre-trained feature extractor
+        #         prev_feature_extractor = model.policy.mlp_extractor.policy_net
 
-                # Freeze the model
-                for name, p in prev_feature_extractor.named_parameters():
-                    p.requires_grad = False
+        #         # Freeze the model
+        #         for name, p in prev_feature_extractor.named_parameters():
+        #             p.requires_grad = False
                 
-                # Creates the new custom feature extractor
-                self.mlp_extractor = CustomMlpExtractor(feature_dim = self.mlp_extractor.policy_net[0].in_features, net_arch = net_arch, activation_fn = kwargs["activation_fn"], device = self.device, prev_feature_extractor = prev_feature_extractor, phase = my_kwargs["phase"], option = my_kwargs["option"])
+        #         # Creates the new custom feature extractor
+        #         self.mlp_extractor = CustomMlpExtractor(feature_dim = self.mlp_extractor.policy_net[0].in_features, net_arch = net_arch, activation_fn = kwargs["activation_fn"], device = self.device, prev_feature_extractor = prev_feature_extractor, phase = my_kwargs["phase"], option = my_kwargs["option"])
   
         features = 64
         action_shape = 2
