@@ -515,8 +515,8 @@ class BimanualDirect(DirectRLEnv):
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
         # Check if translation module is below the threshold
-        self.obj_reached = torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached)
-        self.obj_reached_target = obj_target_dist[:, 1] < rew_change_thres 
+        self.obj_reached = torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+        self.obj_reached_target = (obj_target_dist[:, 1] < rew_change_thres).bool()
 
         # Obtains the distance
         dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
