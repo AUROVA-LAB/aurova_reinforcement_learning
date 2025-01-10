@@ -384,7 +384,7 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the pose of the base of the GEN3 robot in the world frame
         GEN3_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.root_state_w[:, 0:7]
 
-        # Obtain the pose of the end effector (after the rotation) in GEN3 root frame
+        # Obtain the pose of the end effector in GEN3 root frame
         GEN3_rot_ee_pos_r, GEN3_rot_ee_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
                                                                               t02 = self.debug_GEN3_ee_pose_w[:, :3], q02 = self.debug_GEN3_ee_pose_w[:, 3:])
 
@@ -395,13 +395,15 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the pose of the finger tips in world frame and performs the mean
         self.debug_tips_pose_w = torch.mean(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.finger_tips[self.cfg.GEN3], 0:7], dim = -2)
         
+        # Transform tips pose to GEN3 root frame
         tip_pos_r, tip_or_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
                                                         t02 = self.debug_tips_pose_w[:, :3], q02 = self.debug_tips_pose_w[:, 3:])
         self.tips_pose_r = torch.cat((tip_pos_r, tip_or_r), dim = -1)
 
-        # Replaces the orientation with ee orientation
+        # Replaces the orientation with GEN3 ee orientation
         self.tips_pose_r[:, 3:] = self.GEN3_rot_ee_pose_r[:, 3:]
 
+        # Transforms the modified tips pose to the world frame
         tips_pos_w, tips_or_w = combine_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
                                                           t12 = self.tips_pose_r[:, :3], q12 = self.tips_pose_r[:, 3:])
         self.debug_tips_pose_w = torch.cat((tips_pos_w, tips_or_w), dim = -1)
@@ -414,16 +416,13 @@ class BimanualDirect(DirectRLEnv):
         # Transforms the object frame so as to generate a more suitable frame for grasping
         grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
                                                                              t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
-        # Transforms the object frame so as to generate a more suitable frame for grasping
         grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = grasp_point_obj_pos_w, q01 = grasp_point_obj_quat_w,
                                                                              t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_45_z_pos_quat)
-        
         self.debug_grasp_point_obj_pose_w = torch.cat((grasp_point_obj_pos_w, grasp_point_obj_quat_w), dim=-1)
 
         # Apply transformation to get the grasping point in the GEN3 root frame
         grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
                                                                               t02 = grasp_point_obj_pos_w, q02 = grasp_point_obj_quat_w)
-
         self.grasp_point_obj_pose_r = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
 
 
