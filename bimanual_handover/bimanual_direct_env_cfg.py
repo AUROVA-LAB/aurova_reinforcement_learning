@@ -67,20 +67,21 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 100             # Maximum steps in an episode
-    angle_scale = 5*pi/180.0            # Action angle scalation
+    max_steps = 200             # Maximum steps in an episode
+    angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.1
+    hand_joint_scale = 0.15
 
+    # Variables to distinguish the phases
     APPROACH = 0
     MANIPULATION = 1
 
-    phase = MANIPULATION
-    option = 1
+    phase = MANIPULATION       # Phase of the problem
+    option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps"
+    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * 16        # Number of actions per environment (overridden)
+    num_actions = 6 + phase * 16           # Number of actions per environment (overridden)
     num_observations = 7 + 7 + phase * 16  # Number of observations per environment (overridden)
     euler_flag = num_actions == 6
 
@@ -286,7 +287,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.018
+    rew_change_thres = 0.02
 
     # Objective position -> origin GEN3 position with offset in X axis
     target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
@@ -402,11 +403,7 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
-    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground,
-                                "finger_1_w_object": finger_1_w_object,
-                                "finger_2_w_object": finger_2_w_object,
-                                "finger_3_w_object": finger_3_w_object,
-                                "finger_4_w_object": finger_4_w_object} 
+    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground} 
     
 
     return cfg
