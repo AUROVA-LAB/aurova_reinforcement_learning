@@ -688,6 +688,6 @@ class BimanualDirect(DirectRLEnv):
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.obj_reached[env_ids] = torch.zeros(self.num_envs).to(self.device)[env_ids]
-        self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).to(self.device)[env_ids]
+        self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         
