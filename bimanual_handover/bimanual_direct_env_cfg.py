@@ -294,7 +294,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.018
+    rew_change_thres = 0.0235
     obj_reach_target_thres = 0.01
 
     # Objective position -> origin GEN3 position with offset in X axis
