@@ -552,10 +552,11 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
-        mod = 2*(torch.logical_or(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
+        # mod = 2*(torch.logical_or(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
+        mod = 2*(dist < prev_dist) - 1
 
-        # Compute intermediate reward terms with scaling values and boolean flags
-        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached
+        # Compute intermediate reward terms with scaling values and boolean flags --> / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
+        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0])  + self.cfg.bonus_obj_reach * self.obj_reached / 3
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
         reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached
