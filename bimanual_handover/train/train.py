@@ -28,7 +28,7 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--train", type=bool, default=False, help="Wether to train or perform normal loop")
+parser.add_argument("--train", type=bool, default=True, help="Wether to train or perform normal loop")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -152,8 +152,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # Add environment arguments to the arguments for the policy
-    # agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "path": env_cfg.path_to_pretrained}
-    # agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
+    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "path": env_cfg.path_to_pretrained}
+    agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
 
     # create agent from stable baselines
     agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
