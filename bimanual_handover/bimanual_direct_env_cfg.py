@@ -67,7 +67,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 300             # Maximum steps in an episode
+    max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.2      # Hand joint scalation
@@ -124,6 +124,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]]
+    
+    tips_displacement = torch.tensor([0.03, -0.03, 0.0])
 
     # All agent joint names
     all_joints = [[], []]
@@ -213,6 +215,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                 visible = debug_markers
             ),
             "tips": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "tips_back": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -324,6 +331,8 @@ def update_cfg(cfg, num_envs, device):
     cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_45_z_pos_quat = cfg.rot_45_z_pos_quat.repeat(num_envs, 1).to(device)
+
+    cfg.tips_displacement = cfg.tips_displacement.repeat(num_envs, 1).to(device)
     
     return cfg
 

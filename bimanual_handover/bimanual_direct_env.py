@@ -47,11 +47,13 @@ class BimanualDirect(DirectRLEnv):
         self.debug_GEN3_ee_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.debug_grasp_point_obj_pose_w = copy.deepcopy(self.debug_GEN3_ee_pose_w)
         self.debug_tips_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.debug_tips_back_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Poses for the object and GEN3 robot so they can match when performing the grasping
         self.GEN3_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.grasp_point_obj_pose_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
         self.tips_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.tips_pose_r_back = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
@@ -341,11 +343,13 @@ class BimanualDirect(DirectRLEnv):
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
                                                                          self.debug_GEN3_ee_pose_w[:, :3],
                                                                          self.debug_grasp_point_obj_pose_w[:, :3],
-                                                                         self.debug_tips_pose_w[:, :3])), 
+                                                                         self.debug_tips_pose_w[:, :3], 
+                                                                         self.debug_tips_back_pose_w[:, :3]),), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
                                                                           self.debug_GEN3_ee_pose_w[:, 3:],
                                                                           self.debug_grasp_point_obj_pose_w[:,3:],
-                                                                          self.debug_tips_pose_w[:, 3:])), 
+                                                                          self.debug_tips_pose_w[:, 3:],
+                                                                          self.debug_tips_back_pose_w[:, 3:]),), 
                                                 marker_indices=marker_indices)
         
 
@@ -402,10 +406,33 @@ class BimanualDirect(DirectRLEnv):
         # Replaces the orientation with GEN3 ee orientation
         self.tips_pose_r[:, 3:] = self.GEN3_rot_ee_pose_r[:, 3:]
 
+
+
+
+
+        # Clones the tips original pose
+        self.tips_pose_r_back = self.tips_pose_r.clone()
+
+        # Displaces the tips pose in front of the hand
+        tip_pos_r, tip_or_r = combine_frame_transforms(t01 = self.tips_pose_r[:, :3], q01 = self.tips_pose_r[:, 3:],
+                                                        t12 = self.cfg.tips_displacement, q12 = torch.tensor([1,0,0,0]).to(self.device).repeat(self.num_envs, 1))
+        self.tips_pose_r = torch.cat((tip_pos_r, tip_or_r), dim = -1)
+
+
+
+
+
+
+
         # Transforms the modified tips pose to the world frame
         tips_pos_w, tips_or_w = combine_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
-                                                          t12 = self.tips_pose_r[:, :3], q12 = self.tips_pose_r[:, 3:])
+                                                         t12 = self.tips_pose_r[:, :3], q12 = self.tips_pose_r[:, 3:])
         self.debug_tips_pose_w = torch.cat((tips_pos_w, tips_or_w), dim = -1)
+        
+        # Transforms the modified tips back pose to the world frame
+        tips_pos_w, tips_or_w = combine_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
+                                                         t12 = self.tips_pose_r_back[:, :3], q12 = self.tips_pose_r_back[:, 3:])
+        self.debug_tips_back_pose_w = torch.cat((tips_pos_w, tips_or_w), dim = -1)
 
 
 
@@ -500,6 +527,7 @@ class BimanualDirect(DirectRLEnv):
         rew_scale_hand_obj = self.cfg.rew_scale_hand_obj
         rew_scale_obj_target = self.cfg.rew_scale_obj_target
         ee_pose = self.tips_pose_r
+        ee_pose_bask = self.tips_pose_r_back
         obj_pose = self.grasp_point_obj_pose_r
         prev_dist = self.prev_dist
         prev_dist_target = self.prev_dist_target
@@ -510,6 +538,7 @@ class BimanualDirect(DirectRLEnv):
         
         # Dual quaternion distance between GEN3 hand and object
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
         
         # Dual quaternion distance between object and target pose
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
@@ -523,10 +552,10 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
-        mod = 2*(dist < prev_dist) - 1
+        mod = 2*(torch.logical_or(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
 
         # Compute intermediate reward terms with scaling values and boolean flags
-        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached
+        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
         reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached
