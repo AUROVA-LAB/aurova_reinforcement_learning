@@ -28,7 +28,7 @@ GEN3_4f_CFG = ArticulationCfg(
             "arm_joint_7": 5*pi/4 - pi,
             "joint_12_0": 0.263,
         },
-        pos = (-1.25, 0.0, 0.0)
+        pos = (-1.25, 0.25, 0.0)
     ),
     actuators={
         "arm": ImplicitActuatorCfg(
