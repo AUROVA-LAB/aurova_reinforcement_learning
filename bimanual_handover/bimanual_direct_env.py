@@ -322,7 +322,6 @@ class BimanualDirect(DirectRLEnv):
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
-
     # Update the position of the markers with debug purposes
     def update_markers(self):
         '''
@@ -505,6 +504,7 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = self.prev_dist
         prev_dist_target = self.prev_dist_target
         rew_change_thres = self.cfg.rew_change_thres
+        obj_reach_target_thres = self.cfg.obj_reach_target_thres
         device = self.device
         target_pose = self.cfg.target_pose
         
@@ -516,7 +516,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Check if translation module is below the threshold
         self.obj_reached = torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
-        self.obj_reached_target = (obj_target_dist[:, 1] < rew_change_thres).bool()
+        self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
         # Obtains the distance
         dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
