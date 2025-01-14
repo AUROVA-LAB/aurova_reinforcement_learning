@@ -153,6 +153,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     contact_sensors_dict = {"object_w_hands": object_w_hands}
 
 
+
+
     # camera
     camera_cfg: CameraCfg = CameraCfg(
         prim_path="/World/envs/env_.*/front_cam",
@@ -294,7 +296,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rew_scale_obj_target: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.0235
+    rew_change_thres = 0.0235 # 0.018
     obj_reach_target_thres = 0.01
 
     # Objective position -> origin GEN3 position with offset in X axis
@@ -359,6 +361,12 @@ def update_collisions(cfg, num_envs):
     )
 
 
+    # Build contact sensors dictionary
+    cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
+                                "hand2_w_object": hand2_w_object,
+                                "robot1_w_robot2": robot1_w_robot2}
+    '''
+
     # Contact between robot 1 hand and robot 2
     robot1_w_robot2: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
@@ -368,11 +376,6 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
     )
 
-    # Build contact sensors dictionary
-    cfg.contact_sensors_dict = {"robot1_w_object": robot1_w_object,
-                                "hand2_w_object": hand2_w_object,
-                                "robot1_w_robot2": robot1_w_robot2}
-    '''
     robot2_w_ground: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
         update_period=0.05, 
@@ -413,7 +416,7 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
-    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground} 
+    cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground,}
     
 
     return cfg
