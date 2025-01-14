@@ -563,9 +563,7 @@ class BimanualDirect(DirectRLEnv):
 
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
-
-        print(self.contacts)
-        
+                
         return reward
     
 
