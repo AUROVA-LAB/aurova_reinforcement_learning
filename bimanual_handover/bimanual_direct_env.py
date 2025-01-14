@@ -543,8 +543,16 @@ class BimanualDirect(DirectRLEnv):
         # Dual quaternion distance between object and target pose
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
-        # Check if translation module is below the threshold
-        self.obj_reached = torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+
+
+        # Obtain the contacts
+        contacts_w = self.contacts * self.cfg.contact_matrix
+        contacts_flag = (contacts_w[:, :5] > 0.0).int().sum(-1).bool()
+
+
+
+        # Check if there is contact or translation module is below the threshold for target
+        self.obj_reached = contacts_flag # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
         self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
         # Obtains the distance
@@ -559,7 +567,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached
+        reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached + contacts_w[:, :-1].sum(-1)
 
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
