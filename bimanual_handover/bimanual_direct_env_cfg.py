@@ -76,7 +76,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     APPROACH = 0
     MANIPULATION = 1
 
-    phase = MANIPULATION       # Phase of the problem
+    phase = APPROACH       # Phase of the problem
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
