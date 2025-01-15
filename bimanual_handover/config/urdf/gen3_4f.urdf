@@ -279,6 +279,50 @@
       <inertia ixx="1e-4" ixy="0.0" ixz="0.0" iyy="1e-4" iyz="0.0" izz="1e-4"/>
     </inertial>
   </link>
+
+  <link name="palm_aux_link">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.055 0.075"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.055 0.075"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="palm_aux_joint" type="fixed" dont_collapse="true">
+    <parent link="hand_palm_link"/>
+    <child link="palm_aux_link"/>
+    <origin rpy="0 0 0" xyz="0.0125 0.02 -0.04"/>
+  </joint>
+
+  <link name="palm_aux_link2">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.075 0.035"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="palm_aux_joint2" type="fixed" dont_collapse="true">
+    <parent link="hand_palm_link"/>
+    <child link="palm_aux_link2"/>
+    <origin rpy="0 0 0" xyz="0.0125 -0.02 -0.02"/>
+  </joint>
+
+
   <!-- ============================================================================= -->
   <!-- FINGERS -->
   <!-- RIGHT HAND due to which finger is number 0 -->
