@@ -125,7 +125,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]]  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
     
-    tips_displacement = torch.tensor([0.03, -0.03, 0.0])
+    tips_displacement = torch.tensor([0.025, -0.025, 0.0])
 
     # All agent joint names
     all_joints = [[], []]
@@ -426,6 +426,6 @@ def update_collisions(cfg, num_envs):
                                 "finger_4_w_object": finger_4_w_object,
                                 "robot1_w_robot2": robot1_w_robot2} 
     
-    cfg.contact_matrix = torch.tensor([0.0, 0.3, 0.3, 0.3, 0.3, -0.0])
+    cfg.contact_matrix = torch.tensor([0.0, 0.5, 0.5, 0.5, 0.5, -0.0])
 
     return cfg
