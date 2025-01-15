@@ -76,7 +76,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     APPROACH = 0
     MANIPULATION = 1
 
-    phase = APPROACH       # Phase of the problem
+    phase = MANIPULATION       # Phase of the problem
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
@@ -387,37 +387,92 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
     )
 
-    finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_.*",
+
+
+    finger_11_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_1",
         update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
-    finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_.*",
+    finger_12_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_2",
         update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
-    finger_3_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_.*",
+    finger_13_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_3_tip",
         update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
-    finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
+
+
+    finger_21_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_5",
         update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
+
+    finger_22_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_6",
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_23_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_7_tip",
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+
+
+
+    finger_31_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_9",
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_32_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_10",
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_33_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_11_tip",
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    # finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
+    #     prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
+    #     update_period=0.005, 
+    #     history_length=1, 
+    #     debug_vis=False,
+    #     filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    # )
 
     palm_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/palm_aux_.*",
@@ -428,14 +483,27 @@ def update_collisions(cfg, num_envs):
     )
 
     cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground, 
-                                "finger_1_w_object": finger_1_w_object,
-                                "finger_2_w_object": finger_2_w_object,
-                                "finger_3_w_object": finger_3_w_object,
-                                "finger_4_w_object": finger_4_w_object,
+                                
+                                "finger_11_w_object": finger_11_w_object,
+                                "finger_12_w_object": finger_12_w_object,
+                                "finger_13_w_object": finger_13_w_object,
+
+                                "finger_21_w_object": finger_21_w_object,
+                                "finger_22_w_object": finger_22_w_object,
+                                "finger_23_w_object": finger_23_w_object,
+
+                                "finger_31_w_object": finger_31_w_object,
+                                "finger_32_w_object": finger_32_w_object,
+                                "finger_33_w_object": finger_33_w_object,
+
                                 "palm_w_object": palm_w_object, 
                                 "robot1_w_robot2": robot1_w_robot2,
                                 }
     
-    cfg.contact_matrix = torch.tensor([0.0, 0.5, 0.5, 0.5, 0.5, 0.3, 0.0])
+    cfg.contact_matrix = torch.tensor([0.0, 
+                                        0.25, 0.25, 0.25,
+                                        0.25, 0.25, 0.25,
+                                        0.25, 0.25, 0.25,
+                                        0.25, 0.0])
 
     return cfg
