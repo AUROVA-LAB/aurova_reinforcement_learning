@@ -70,7 +70,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.2      # Hand joint scalation
+    hand_joint_scale = 0.3      # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
@@ -125,7 +125,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]]  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
     
-    tips_displacement = torch.tensor([0.025, -0.025, 0.0])
+    tips_displacement = torch.tensor([0.03, -0.03, 0.0])
 
     # All agent joint names
     all_joints = [[], []]
@@ -373,7 +373,7 @@ def update_collisions(cfg, num_envs):
     # Contact between robot 1 hand and robot 2
     robot1_w_robot2: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
-        update_period=0.01, 
+        update_period=0.005, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
@@ -381,7 +381,7 @@ def update_collisions(cfg, num_envs):
 
     robot2_w_ground: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
-        update_period=0.01, 
+        update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
@@ -389,7 +389,7 @@ def update_collisions(cfg, num_envs):
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_.*",
-        update_period=0.01, 
+        update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -397,7 +397,7 @@ def update_collisions(cfg, num_envs):
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_.*",
-        update_period=0.01, 
+        update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -405,7 +405,7 @@ def update_collisions(cfg, num_envs):
 
     finger_3_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_.*",
-        update_period=0.01, 
+        update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -413,7 +413,15 @@ def update_collisions(cfg, num_envs):
 
     finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
-        update_period=0.01, 
+        update_period=0.005, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    palm_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/palm_aux_.*",
+        update_period=0.005, 
         history_length=1, 
         debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -424,8 +432,10 @@ def update_collisions(cfg, num_envs):
                                 "finger_2_w_object": finger_2_w_object,
                                 "finger_3_w_object": finger_3_w_object,
                                 "finger_4_w_object": finger_4_w_object,
-                                "robot1_w_robot2": robot1_w_robot2} 
+                                "palm_w_object": palm_w_object, 
+                                "robot1_w_robot2": robot1_w_robot2,
+                                }
     
-    cfg.contact_matrix = torch.tensor([0.0, 0.5, 0.5, 0.5, 0.5, -0.0])
+    cfg.contact_matrix = torch.tensor([0.0, 0.5, 0.5, 0.5, 0.5, 0.3, 0.0])
 
     return cfg

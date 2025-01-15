@@ -549,7 +549,7 @@ class BimanualDirect(DirectRLEnv):
 
 
         # Check if there is contact or translation module is below the threshold for target
-        self.obj_reached = contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION) # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+        self.obj_reached = contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION) * False # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
         self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
         # Obtains the distance
