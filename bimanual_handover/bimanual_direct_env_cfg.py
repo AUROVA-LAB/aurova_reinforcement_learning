@@ -70,7 +70,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.3      # Hand joint scalation
+    hand_joint_scale = 0.2      # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
@@ -501,9 +501,9 @@ def update_collisions(cfg, num_envs):
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.25, 0.25, 0.25,
-                                        0.25, 0.25, 0.25,
-                                        0.25, 0.25, 0.25,
-                                        0.25, 0.0])
+                                        0.15, 0.15, 0.15,
+                                        0.15, 0.15, 0.15,
+                                        0.15, 0.15, 0.15,
+                                        0.15, -0.65])
 
     return cfg
