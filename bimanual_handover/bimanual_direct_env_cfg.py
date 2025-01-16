@@ -144,7 +144,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     )
     # ContactSensorCfg: Configuration for the contact sensor.
     #    update_period: Update period of the sensor buffers (in seconds).
-    #    history_length: Number of past frames to store in the sensor buffers.
+    #    history_length:1Number of past frames to store in the sensor buffers.
     #    debug_vis: Whether to visualize the sensor.
     #    filter_prim_paths_expr: The list of primitive paths (or expressions) to filter contacts with.
     #        It is declared as a list because it does not work using "regex" expressions
@@ -185,7 +185,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.0001),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.001),
+                                                            contact_offset=0.003),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
@@ -383,7 +383,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
     )
 
@@ -393,7 +393,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_1",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -401,7 +401,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_2",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -409,7 +409,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_3_tip",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -419,7 +419,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_5",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -427,7 +427,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_6",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -435,7 +435,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_7_tip",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -446,7 +446,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_9",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -454,7 +454,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_10",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -462,7 +462,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_11_tip",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -470,7 +470,7 @@ def update_collisions(cfg, num_envs):
     #     prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
     #     update_period=0.005, 
     #     history_length=1, 
-    #     debug_vis=False,
+    #     debug_vis=True,
     #     filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     # )
 
@@ -478,7 +478,7 @@ def update_collisions(cfg, num_envs):
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/palm_aux_.*",
         update_period=0.005, 
         history_length=1, 
-        debug_vis=False,
+        debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
@@ -501,9 +501,9 @@ def update_collisions(cfg, num_envs):
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.2, 0.2, 0.2,
-                                        0.2, 0.2, 0.2,
-                                        0.2, 0.2, 0.2,
-                                        0.0, -0.65])
+                                        0.35, 0.35, 0.35,
+                                        0.35, 0.35, 0.35,
+                                        0.35, 0.35, 0.35,
+                                        0.0, -1])
 
     return cfg
