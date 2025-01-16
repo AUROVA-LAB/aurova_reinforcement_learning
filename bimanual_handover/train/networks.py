@@ -153,6 +153,6 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
 
-        self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
-        self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
+        # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
+        # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
 
