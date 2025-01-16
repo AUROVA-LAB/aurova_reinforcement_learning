@@ -183,13 +183,20 @@ class BimanualDirect(DirectRLEnv):
         # Convert orientation to quaternions
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
-        actions_quat[:, 8] = 0.263
+        # actions_quat[:, 8] = 0.263
 
         if self.cfg.phase == self.cfg.MANIPULATION:
             hand_joint_index = 5 + int(not self.cfg.euler_flag)
-            actions_quat[:, 7:] = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
 
-            actions_quat[:, 7:11] = 0
+            actions_quat[:, 7:] = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
+            aux = actions_quat.clone()
+            actions_quat[:, 8] = aux[:, 12]
+            actions_quat[:, 12] = aux[:, 8] * 0
+            actions_quat[:, 7] = 0.0
+            actions_quat[:, 9] = 0
+            actions_quat[:, 10] = 0
+
+            # actions_quat[:, 8:11] = 0
 
             # actions_quat[:, 7:] = actions[:, hand_joint_index:] * self.cfg.hand_joint_scale
             # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
@@ -495,11 +502,11 @@ class BimanualDirect(DirectRLEnv):
             # Obtains the joint positions for the hand
             # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
             hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
-
+            
             obs = torch.cat(
                 (
                     obs,
-                    hand_joint_pos_2,
+                    torch.cat((hand_joint_pos_2[:, 1].unsqueeze(0), hand_joint_pos_2[:, 4].unsqueeze(0), hand_joint_pos_2[:, 6:]), dim = -1),
                 ),
                 dim = -1
             )

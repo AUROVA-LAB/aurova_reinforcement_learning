@@ -82,7 +82,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
     num_actions = 6 + phase * 4           # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * 16  # Number of observations per environment (overridden)
+    num_observations = 7 + 7 + phase * 12  # Number of observations per environment (overridden)
     euler_flag = num_actions == 6
 
     num_envs = 1                # Number of environments by default (overriden)
