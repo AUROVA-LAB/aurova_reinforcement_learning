@@ -506,7 +506,7 @@ class BimanualDirect(DirectRLEnv):
             obs = torch.cat(
                 (
                     obs,
-                    torch.cat((hand_joint_pos_2[:, 1].unsqueeze(0), hand_joint_pos_2[:, 4].unsqueeze(0), hand_joint_pos_2[:, 6:]), dim = -1),
+                    torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1),
                 ),
                 dim = -1
             )
