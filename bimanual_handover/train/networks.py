@@ -80,7 +80,7 @@ def insert_bn_dropout(seq):
         if isinstance(layer, nn.Linear):
             layers.append(nn.BatchNorm1d(layer.out_features))
         if isinstance(layer, nn.Tanh):
-            layers.append(nn.Dropout(p=0.5))  # Dropout after Tanh
+            layers.append(nn.Dropout(p=0.3))  # Dropout after Tanh
     return nn.Sequential(*layers)
 
 # Define a custom policy
