@@ -175,7 +175,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         obs = env.reset()
         # agent = PPO.load("/workspace/isaaclab/source/logs/sb3/Isaac-UR5e-joint-reach-v0/2024-10-16_12-32-25/model_18960000_steps.zip", weights_only=True)
                              
-        action = torch.zeros((env_cfg.scene.num_envs, 6+16))
+        action = torch.rand((env_cfg.scene.num_envs, 6+4))
+        action = torch.tensor([[0, 0, 0, 0, 0, 0, 
+                                 0.0, 0.1, 0, 0]])
 
         # Simulate physics
         while simulation_app.is_running():
