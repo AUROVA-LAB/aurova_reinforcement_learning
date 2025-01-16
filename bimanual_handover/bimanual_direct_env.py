@@ -190,7 +190,6 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 7:] = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
 
             actions_quat[:, 7:11] = 0
-            actions_quat[:, 8] = 0.263
 
             # actions_quat[:, 7:] = actions[:, hand_joint_index:] * self.cfg.hand_joint_scale
             # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
