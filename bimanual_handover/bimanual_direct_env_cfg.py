@@ -70,7 +70,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.2      # Hand joint scalation
+    hand_joint_scale = 0.1      # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
@@ -81,7 +81,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * 16           # Number of actions per environment (overridden)
+    num_actions = 6 + phase * 4           # Number of actions per environment (overridden)
     num_observations = 7 + 7 + phase * 16  # Number of observations per environment (overridden)
     euler_flag = num_actions == 6
 
@@ -501,9 +501,9 @@ def update_collisions(cfg, num_envs):
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.15, 0.15, 0.15,
-                                        0.15, 0.15, 0.15,
-                                        0.15, 0.15, 0.15,
-                                        0.15, -0.65])
+                                        0.2, 0.2, 0.2,
+                                        0.2, 0.2, 0.2,
+                                        0.2, 0.2, 0.2,
+                                        0.0, -0.65])
 
     return cfg
