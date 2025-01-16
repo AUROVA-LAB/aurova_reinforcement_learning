@@ -3,6 +3,7 @@ from torch import nn
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import MlpExtractor
+from stable_baselines3.common.type_aliases import Schedule
 import os
 import gymnasium as gym
 import copy
@@ -71,6 +72,16 @@ class CustomMlpExtractor(MlpExtractor):
         return self.value_net(th.cat((ee_obj, features[:, 14:]), dim = -1))
 
 
+
+def insert_bn_dropout(seq):
+    layers = []
+    for i, layer in enumerate(seq):
+        layers.append(layer)
+        if isinstance(layer, nn.Linear):
+            layers.append(nn.BatchNorm1d(layer.out_features))
+        if isinstance(layer, nn.Tanh):
+            layers.append(nn.Dropout(p=0.5))  # Dropout after Tanh
+    return nn.Sequential(*layers)
 
 # Define a custom policy
 class CustomActorCriticPolicy(ActorCriticPolicy):
@@ -141,3 +152,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
+
+        self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
+        self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
+
