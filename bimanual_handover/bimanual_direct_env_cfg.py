@@ -70,7 +70,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     max_steps = 200             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.1      # Hand joint scalation
+    hand_joint_scale = 0.075      # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
