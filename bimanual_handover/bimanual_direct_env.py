@@ -595,7 +595,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1 + contacts_w.sum(-1)) * torch.logical_not(self.obj_reached) + 1.2*self.rew_2 * self.obj_reached + (contacts_w.sum(-1) > 1.21).int() * 25
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 1.5*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 0.5).int() * 15
         
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]

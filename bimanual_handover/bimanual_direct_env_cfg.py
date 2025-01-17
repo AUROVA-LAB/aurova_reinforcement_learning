@@ -504,6 +504,6 @@ def update_collisions(cfg, num_envs):
                                         0.3, 0.3, 0.3,
                                         0.3, 0.3, 0.3,
                                         0.3, 0.3, 0.3,
-                                        0.0, -0.8])
+                                        0.0, -0.6])
 
     return cfg
