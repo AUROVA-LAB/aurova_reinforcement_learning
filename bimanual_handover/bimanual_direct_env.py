@@ -639,7 +639,7 @@ class BimanualDirect(DirectRLEnv):
 
         contacts_w = self.contacts * self.cfg.contact_matrix
 
-        terminated = torch.logical_or(terminated, contacts_w.sum(-1) > 0.8)
+        terminated = torch.logical_or(terminated, contacts_w.sum(-1) > 1.51)
 
         return truncated, terminated
     
