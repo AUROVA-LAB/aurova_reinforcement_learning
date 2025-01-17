@@ -187,14 +187,28 @@ class BimanualDirect(DirectRLEnv):
 
         if self.cfg.phase == self.cfg.MANIPULATION:
             hand_joint_index = 5 + int(not self.cfg.euler_flag)
-
-            actions_quat[:, 7:] = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
-            aux = actions_quat.clone()
-            actions_quat[:, 8] = aux[:, 12]
-            actions_quat[:, 12] = aux[:, 8] * 0
-            actions_quat[:, 7] = 0.0
+            val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
+            
+            actions_quat[:, 7] = 0
+            actions_quat[:, 8] = val[:, 0]
             actions_quat[:, 9] = 0
             actions_quat[:, 10] = 0
+            actions_quat[:, 11] = val[:, 1]
+            actions_quat[:, 12] = 0
+            actions_quat[:, 13] = val[:, 2]
+            actions_quat[:, 14] = val[:, 3]
+
+            actions_quat[:, 15] = val[:, 4]
+            actions_quat[:, 16] = val[:, 5]
+            actions_quat[:, 17] = val[:, 6]
+            actions_quat[:, 18] = val[:, 7]
+
+            actions_quat[:, 19] = val[:, 8]
+            actions_quat[:, 20] = val[:, 9]
+            actions_quat[:, 21] = val[:, 10]
+            actions_quat[:, 22] = val[:, 11]
+
+            
 
             # actions_quat[:, 8:11] = 0
 
@@ -502,11 +516,14 @@ class BimanualDirect(DirectRLEnv):
             # Obtains the joint positions for the hand
             # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
             hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+            # print(torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1))
             
             obs = torch.cat(
                 (
                     obs,
-                    torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1),
+                    torch.round(torch.cat((hand_joint_pos_2[:, 4].unsqueeze(-1), 
+                                           hand_joint_pos_2[:, 9].unsqueeze(-1), 
+                                           hand_joint_pos_2[:, -1].unsqueeze(-1)), dim = -1), decimals = 2),
                 ),
                 dim = -1
             )
@@ -576,8 +593,13 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 0.8).int() * 100
-
+        reward = reward_1 * torch.logical_not(self.obj_reached) + reward_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 1.21).int() * 10
+        # print((contacts_w.sum(-1) > 0.8).int() * 100)
+        # print((contacts_w.sum(-1) > 0.8).int()*100)
+        # if True in (contacts_w.sum(-1) > 1.2).tolist():
+        #     print(contacts_w.sum(-1) > 1.2)
+        #     print("AAAAAAAAAAAAAAAAAAAAAAAAA\n\n")
+            
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
                 

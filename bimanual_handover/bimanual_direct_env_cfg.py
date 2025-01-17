@@ -81,9 +81,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * 4           # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * 12  # Number of observations per environment (overridden)
-    euler_flag = num_actions == 6
+    num_actions = 6 + phase * 3           # Number of actions per environment (overridden)
+    num_observations = 7 + 7 + phase * 3  # Number of observations per environment (overridden)
+    euler_flag = True
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -185,7 +185,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.0001),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.003),
+                                                            contact_offset=0.002),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
@@ -501,9 +501,9 @@ def update_collisions(cfg, num_envs):
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.35, 0.35, 0.35,
-                                        0.35, 0.35, 0.35,
-                                        0.35, 0.35, 0.35,
-                                        0.0, -1])
+                                        0.3, 0.3, 0.3,
+                                        0.3, 0.3, 0.3,
+                                        0.3, 0.3, 0.3,
+                                        0.0, -0.8])
 
     return cfg
