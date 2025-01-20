@@ -578,7 +578,7 @@ class BimanualDirect(DirectRLEnv):
 
 
         # Check if there is contact or translation module is below the threshold for target
-        self.obj_reached = contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION) # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+        self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached) # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
         self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
         # Obtains the distance
@@ -595,7 +595,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 3*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 1.3).int() * 10
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 3*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 1.1).int() * 0.6
         
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
