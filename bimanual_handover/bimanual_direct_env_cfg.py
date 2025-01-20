@@ -187,7 +187,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.CuboidCfg(
             size=(0.035, 0.035, 0.45),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.0001),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
                                                             contact_offset=0.001),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
@@ -351,7 +351,7 @@ def update_collisions(cfg, num_envs):
     # Contact between robot 1 hand and robot 2
     robot1_w_robot2: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
@@ -359,7 +359,7 @@ def update_collisions(cfg, num_envs):
 
     robot2_w_ground: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/.*_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
@@ -367,7 +367,7 @@ def update_collisions(cfg, num_envs):
 
     robot2_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
@@ -377,7 +377,7 @@ def update_collisions(cfg, num_envs):
 
     finger_11_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_1_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -385,7 +385,7 @@ def update_collisions(cfg, num_envs):
 
     finger_12_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_2_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -393,7 +393,7 @@ def update_collisions(cfg, num_envs):
 
     finger_13_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_1_contact_3_tip_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -403,7 +403,7 @@ def update_collisions(cfg, num_envs):
 
     finger_21_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_5_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -411,7 +411,7 @@ def update_collisions(cfg, num_envs):
 
     finger_22_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_6_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -419,7 +419,7 @@ def update_collisions(cfg, num_envs):
 
     finger_23_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_2_contact_7_tip_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -430,7 +430,7 @@ def update_collisions(cfg, num_envs):
 
     finger_31_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_9_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -438,7 +438,7 @@ def update_collisions(cfg, num_envs):
 
     finger_32_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_10_link",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -446,7 +446,25 @@ def update_collisions(cfg, num_envs):
 
     finger_33_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_3_contact_11_tip_link",
-        update_period=0.005, 
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+
+
+    finger_41_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_contact_14_link",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_42_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_contact_15_tip_link",
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -454,7 +472,7 @@ def update_collisions(cfg, num_envs):
 
     # finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
     #     prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
-    #     update_period=0.005, 
+    #     update_period=0.001, 
     #     history_length=1, 
     #     debug_vis=True,
     #     filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -462,7 +480,7 @@ def update_collisions(cfg, num_envs):
 
     palm_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/palm_aux_.*",
-        update_period=0.005, 
+        update_period=0.001, 
         history_length=1, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
@@ -482,6 +500,9 @@ def update_collisions(cfg, num_envs):
                                 "finger_32_w_object": finger_32_w_object,
                                 "finger_33_w_object": finger_33_w_object,
 
+                                "finger_41_w_object": finger_41_w_object,
+                                "finger_42_w_object": finger_42_w_object,
+
                                 "palm_w_object": palm_w_object, 
                                 "robot1_w_robot2": robot1_w_robot2,
                                 }
@@ -490,6 +511,7 @@ def update_collisions(cfg, num_envs):
                                         0.375, 0.35, 0.12,
                                         0.375, 0.35, 0.12,
                                         0.375, 0.35, 0.12,
-                                        0.3, -2.2])
+                                        0.35,  0.12,
+                                        0.35, -2.2])
 
     return cfg
