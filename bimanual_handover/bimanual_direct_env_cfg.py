@@ -189,7 +189,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.0001),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.002),
+                                                            contact_offset=0.001),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
