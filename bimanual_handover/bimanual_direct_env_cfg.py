@@ -67,7 +67,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # env
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 200             # Maximum steps in an episode
+    max_steps = 275             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.075      # Hand joint scalation
@@ -365,14 +365,6 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
     )
 
-    robot2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/.*_link",
-        update_period=0.001, 
-        history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/{cfg.keys[cfg.UR5e]}/{joint}" for i in range(cfg.num_envs) for joint in cfg.links[cfg.UR5e]],
-    )
-
 
 
     finger_11_w_object: ContactSensorCfg = ContactSensorCfg(
@@ -536,12 +528,12 @@ def update_collisions(cfg, num_envs):
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.35, 0.35, 0.12,
-                                        0.35, 0.35, 0.12,
-                                        0.35, 0.35, 0.12,
-                                        0.35,  0.35,
-                                        0.2, 0.2, 0.2,
-                                        0.35, -2.2,
+                                        0.65, 0.65, 0.4,
+                                        0.65, 0.65, 0.4,
+                                        0.65, 0.65, 0.4,
+                                        0.65,  0.65,
+                                        0.65, 0.65, 0.65,
+                                        0.4, -3.5,
                                         ])
 
     return cfg
