@@ -1050,7 +1050,7 @@
   </link>
   <joint name="joint_13.0" type="revolute">
     <axis xyz="0 0 -1"/>
-    <limit effort="0.35" lower="-0.105" upper="1.163" velocity="6.283"/>
+    <limit effort="0.35" lower="-1.05" upper="1.163" velocity="6.283"/>
     <parent link="hand_link_12._link"/>
     <child link="hand_link_13._link"/>
     <!-- LEFT -->
