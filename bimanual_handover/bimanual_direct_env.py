@@ -192,18 +192,18 @@ class BimanualDirect(DirectRLEnv):
             val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
 
             actions_quat[:, 7] = 0
-            actions_quat[:, 8] = val[:, 0]
+            actions_quat[:, 8] = val[:, 0] * 2
             actions_quat[:, 9] = 0
             actions_quat[:, 10] = 0
-            actions_quat[:, 11] = val[:, 1]
+            actions_quat[:, 11] = val[:, 1] * 5
             actions_quat[:, 12] = 0.0
-            actions_quat[:, 13] = val[:, 2]
-            actions_quat[:, 14] = val[:, 3]
+            actions_quat[:, 13] = val[:, 2] * 5
+            actions_quat[:, 14] = val[:, 3] * 5
 
-            actions_quat[:, 15] = val[:, 4]
-            actions_quat[:, 16] = val[:, 5]
-            actions_quat[:, 17] = val[:, 6]
-            actions_quat[:, 18] = val[:, 7]
+            actions_quat[:, 15] = val[:, 4]*4
+            actions_quat[:, 16] = val[:, 5] * 2
+            actions_quat[:, 17] = val[:, 6]*4
+            actions_quat[:, 18] = val[:, 7]*4
 
             actions_quat[:, 19] = val[:, 8]
             actions_quat[:, 20] = val[:, 9]
@@ -552,7 +552,7 @@ class BimanualDirect(DirectRLEnv):
         '''
 
         
-        rew_scale_hand_obj = self.cfg.rew_scale_hand_obj
+        rew_scale_hand_obj = self.cfg.rew_scale_hand_obj * torch.ones(self.num_envs).to(self.device)
         rew_scale_obj_target = self.cfg.rew_scale_obj_target
         ee_pose = self.tips_pose_r
         ee_pose_bask = self.tips_pose_r_back
@@ -578,7 +578,7 @@ class BimanualDirect(DirectRLEnv):
         aux = contacts_w[:, -7:-2].clone()
         thumb_col = aux.sum(-1) > 0.0        
 
-        contacts_flag = torch.logical_and(contacts_w.sum(-1) - aux.sum(-1) > 0.7, thumb_col)
+        contacts_flag = torch.logical_and(contacts_w.sum(-1) - aux.sum(-1) > 0.4, thumb_col)
 
         bonus = self.obj_reached.clone().bool()
         # Check if there is contact or translation module is below the threshold for target
@@ -599,12 +599,16 @@ class BimanualDirect(DirectRLEnv):
         # mod = 2*(torch.logical_and(dist < prev_dist, ee_pose[:, 1] - obj_pose[:, 1] > 0.0275)) - 1
         # mod = 2*(dist < prev_dist) - 1
 
+        # Grab all the contacts except the first and the last
+        contacts_w = contacts_w[:, 1:-1]
+        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-1].sum(-1) + 1)        
+
         # Compute intermediate reward terms with scaling values and boolean flags --> / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         # reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(ee_pose[:, 1] - obj_pose[:, 1] < 0.0275).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 4*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + self.cfg.bonus_obj_reach * bonus / 3
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 7.5*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
         
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
