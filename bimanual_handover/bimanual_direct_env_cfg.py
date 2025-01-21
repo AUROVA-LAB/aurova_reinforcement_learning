@@ -470,6 +470,30 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
+    finger_43_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_link_14__link",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_44_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_link_15__link",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_45_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_link_15__link_tip_link",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
     # finger_4_w_object: ContactSensorCfg = ContactSensorCfg(
     #     prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/finger_4_.*",
     #     update_period=0.001, 
@@ -503,15 +527,21 @@ def update_collisions(cfg, num_envs):
                                 "finger_41_w_object": finger_41_w_object,
                                 "finger_42_w_object": finger_42_w_object,
 
+                                "finger_43_w_object": finger_43_w_object,
+                                "finger_44_w_object": finger_44_w_object,
+                                "finger_45_w_object": finger_45_w_object,
+                                
                                 "palm_w_object": palm_w_object, 
                                 "robot1_w_robot2": robot1_w_robot2,
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
-                                        0.375, 0.35, 0.12,
-                                        0.375, 0.35, 0.12,
-                                        0.375, 0.35, 0.12,
-                                        0.35,  0.12,
-                                        0.35, -2.2])
+                                        0.35, 0.35, 0.12,
+                                        0.35, 0.35, 0.12,
+                                        0.35, 0.35, 0.12,
+                                        0.35,  0.35,
+                                        0.2, 0.2, 0.2,
+                                        0.35, -2.2,
+                                        ])
 
     return cfg

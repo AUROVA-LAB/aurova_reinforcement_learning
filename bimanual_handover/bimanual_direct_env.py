@@ -188,15 +188,15 @@ class BimanualDirect(DirectRLEnv):
         # actions_quat[:, 8] = 0.263
 
         if self.cfg.phase == self.cfg.MANIPULATION:
-            hand_joint_index = 5 + int(not self.cfg.euler_flag)
+            hand_joint_index = 6 + int(not self.cfg.euler_flag)
             val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
-            
+
             actions_quat[:, 7] = 0
             actions_quat[:, 8] = val[:, 0]
             actions_quat[:, 9] = 0
             actions_quat[:, 10] = 0
             actions_quat[:, 11] = val[:, 1]
-            actions_quat[:, 12] = 0
+            actions_quat[:, 12] = 0.0
             actions_quat[:, 13] = val[:, 2]
             actions_quat[:, 14] = val[:, 3]
 
@@ -309,6 +309,7 @@ class BimanualDirect(DirectRLEnv):
         self.controller.set_command(self.reset_robot_poses_r[idx])
 
         new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
+        new_hand_joint_pos[:, 5] = -0.65
 
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
@@ -574,11 +575,19 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtain the contacts
         contacts_w = self.contacts * self.cfg.contact_matrix
-        contacts_flag = contacts_w.sum(-1) > 0.7
+        aux = contacts_w[:, -7:-2].clone()
+        thumb_col = aux.sum(-1) > 0.0        
 
+        contacts_flag = torch.logical_and(contacts_w.sum(-1) - aux.sum(-1) > 0.7, thumb_col)
 
+        bonus = self.obj_reached.clone().bool()
         # Check if there is contact or translation module is below the threshold for target
         self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached) # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+        new_bonus = self.obj_reached.clone().bool()
+
+        bonus = torch.logical_and(new_bonus, torch.logical_not(bonus))
+
+
         self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
         # Obtains the distance
@@ -595,7 +604,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 3.5*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + (contacts_w.sum(-1) > 1.1).int() * 0.5
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 4*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + self.cfg.bonus_obj_reach * bonus / 3
         
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
