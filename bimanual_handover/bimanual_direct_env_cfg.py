@@ -279,9 +279,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.125,  0.125],
-                                 [-0.125,  0.125],
-                                 [-0.125,  0.125],
+    ee_pose_incs = torch.tensor([[-0.15,  0.15],
+                                 [-0.15,  0.15],
+                                 [-0.15,  0.15],
                                  [-0.3,  0.3],
                                  [-0.3,  0.3],
                                  [-0.3,  0.3]])
@@ -289,8 +289,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # To which robot apply the sampling poses
     apply_range = [True, False]
 
-    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15
-    gen3_height_limit = 0.21
+    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15 # = 0.35
+    gen3_height_limit = 0.1
     
     # Translation respect to the object link frame for object grasping point observation
     grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.175])
@@ -298,7 +298,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # reward scales
     rew_scale_hand_obj: float= 1.0
-    rew_scale_obj_target: float= 1.0
+    rew_scale_obj_target: float= 12.0
 
     # Position threshold for changing reach reward
     rew_change_thres = 0.0235 # 0.018
@@ -502,6 +502,14 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
+    hand_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.GEN3] + "/hand_link.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
     cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground, 
                                 
                                 "finger_11_w_object": finger_11_w_object,
@@ -525,6 +533,8 @@ def update_collisions(cfg, num_envs):
                                 
                                 "palm_w_object": palm_w_object, 
                                 "robot1_w_robot2": robot1_w_robot2,
+
+                                "hand_w_object": hand_w_object,
                                 }
     
     cfg.contact_matrix = torch.tensor([0.0, 
@@ -533,7 +543,8 @@ def update_collisions(cfg, num_envs):
                                         0.65, 0.65, 0.4,
                                         0.65,  0.65,
                                         0.65, 0.65, 0.65,
-                                        0.4, -3.5,
+                                        0.4, -4.5,
+                                        0.15
                                         ])
 
     return cfg
