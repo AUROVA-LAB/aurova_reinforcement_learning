@@ -100,12 +100,12 @@ class BimanualDirect(DirectRLEnv):
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
 
         # Obtain the number of contact sensors per environment
-        num_contacts = 0
+        self.num_contacts = 0
         for __ in self.cfg.contact_sensors_dict:
-            num_contacts += 1
+            self.num_contacts += 1
 
         # Variable to store contacts between prims
-        self.contacts = torch.empty(self.num_envs, num_contacts).fill_(False).to(self.device)
+        self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
 
         # Create output directory to save images
         if self.cfg.save_imgs:
@@ -201,14 +201,14 @@ class BimanualDirect(DirectRLEnv):
             actions_quat[:, 14] = val[:, 3] * 5
 
             actions_quat[:, 15] = val[:, 4]*4
-            actions_quat[:, 16] = val[:, 5] * 2
+            actions_quat[:, 16] = val[:, 5] * 3
             actions_quat[:, 17] = val[:, 6]*4
             actions_quat[:, 18] = val[:, 7]*4
 
-            actions_quat[:, 19] = val[:, 8]
-            actions_quat[:, 20] = val[:, 9]
-            actions_quat[:, 21] = val[:, 10]
-            actions_quat[:, 22] = val[:, 11]
+            actions_quat[:, 19] = val[:, 8] * 2.5
+            actions_quat[:, 20] = val[:, 9] * 2.5
+            actions_quat[:, 21] = val[:, 10] * 2.5
+            actions_quat[:, 22] = val[:, 11] * 2.5
 
             
 
@@ -519,14 +519,12 @@ class BimanualDirect(DirectRLEnv):
             # Obtains the joint positions for the hand
             # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
             hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
-            # print(torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1))
+            sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
             
             obs = torch.cat(
                 (
                     obs,
-                    torch.round(torch.cat((hand_joint_pos_2[:, 4].unsqueeze(-1), 
-                                           hand_joint_pos_2[:, 9].unsqueeze(-1), 
-                                           hand_joint_pos_2[:, -1].unsqueeze(-1)), dim = -1), decimals = 2),
+                    sel_hand_joint.view(-1, 3,4).mean(dim = -1).view(-1, 3),
                 ),
                 dim = -1
             )
@@ -575,10 +573,10 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtain the contacts
         contacts_w = self.contacts * self.cfg.contact_matrix
-        aux = contacts_w[:, -7:-2].clone()
+        aux = contacts_w[:, -8:-3].clone()
         thumb_col = aux.sum(-1) > 0.0        
 
-        contacts_flag = torch.logical_and(contacts_w.sum(-1) - aux.sum(-1) > 0.4, thumb_col)
+        contacts_flag = torch.logical_and(contacts_w[:, :-1].sum(-1) - aux.sum(-1) > 0.4, thumb_col)
 
         bonus = self.obj_reached.clone().bool()
         # Check if there is contact or translation module is below the threshold for target
@@ -600,19 +598,23 @@ class BimanualDirect(DirectRLEnv):
         # mod = 2*(dist < prev_dist) - 1
 
         # Grab all the contacts except the first and the last
-        contacts_w = contacts_w[:, 1:-1]
-        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-1].sum(-1) + 1)        
+        whole_hand = contacts_w[:, -1]
+        # contacts_w = contacts_w[:, 1:-1]
+        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
 
         # Compute intermediate reward terms with scaling values and boolean flags --> / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         # reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(ee_pose[:, 1] - obj_pose[:, 1] < 0.0275).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
-        reward_2 = mod * rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
+        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 7.5*self.rew_2 * self.obj_reached + contacts_w.sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
-        
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 7.5*(reward_2 + whole_hand) * self.obj_reached * (contacts_w[:, 1:].sum(-1) > 0.0).int()  + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
+        reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:].sum(-1) > 0.0).int()
+
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
-                
+            
+        print(reward_2)
+
         return reward
     
 
@@ -773,5 +775,7 @@ class BimanualDirect(DirectRLEnv):
         self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+
+        self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
 
         
