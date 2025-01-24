@@ -463,7 +463,7 @@ class BimanualDirect(DirectRLEnv):
         grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = obj_pose_w[:, :3], q01 = obj_pose_w[:, 3:],
                                                                              t12 = self.cfg.grasp_obs_obj_pos_trans, q12 = self.cfg.grasp_obs_obj_quat_trans)
         grasp_point_obj_pos_w, grasp_point_obj_quat_w = combine_frame_transforms(t01 = grasp_point_obj_pos_w, q01 = grasp_point_obj_quat_w,
-                                                                             t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_45_z_pos_quat)
+                                                                             t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_225_z_pos_quat)
         self.debug_grasp_point_obj_pose_w = torch.cat((grasp_point_obj_pos_w, grasp_point_obj_quat_w), dim=-1)
 
         # Apply transformation to get the grasping point in the GEN3 root frame
