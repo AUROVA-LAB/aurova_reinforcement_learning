@@ -39,7 +39,7 @@ class BimanualDirect(DirectRLEnv):
         super().__init__(cfg, render_mode, **kwargs)
         
         # Initial poses sampled in reset for both robots
-        self.new_action_joint_positions = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
+        self.reset_joint_positions = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
 
         # Debug poses for the object and end effector of the GEN3 robot. These poses 
         # are used to draw the markers in the simulation
@@ -158,93 +158,6 @@ class BimanualDirect(DirectRLEnv):
         light_cfg.func("/World/Light", light_cfg)
 
 
-    # Method to preprocess the actions so they have a proper format
-    def _preprocess_actions(self, actions: torch.Tensor) -> torch.Tensor:
-        '''
-        In:
-            - actions - torch.Tensor: raw actions. --> rotation is in the form of a quaternion.
-                Format: [x, y, z, alpha, x_, y_, z_]:
-                    actions[:3]: translation.
-                    actions[3]: rotation angle of a quaternion.
-                    actions[4:]: rotation vector of a quaternion
-
-        Out:
-            - actions - torch.Tensor: preprocessed actions.
-        '''
-
-        # Clamp actions
-        actions = torch.clamp(actions, -1, 1)
-
-        # Scale actions
-        actions[:, :3]  *= self.cfg.translation_scale
-        # Convert orientation to quaternions
-        actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
-        actions_quat[:, :3] = actions[:, :3]
-        # actions_quat[:, 8] = 0.263
-
-        if self.cfg.phase == self.cfg.MANIPULATION:
-            hand_joint_index = 6 + int(not self.cfg.euler_flag)
-            val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
-
-            actions_quat[:, 7] = 0
-            actions_quat[:, 8] = val[:, 0] * 2
-            actions_quat[:, 9] = 0
-            actions_quat[:, 10] = 0
-            actions_quat[:, 11] = val[:, 1] * 5
-            actions_quat[:, 12] = 0.0
-            actions_quat[:, 13] = val[:, 2] * 5
-            actions_quat[:, 14] = val[:, 3] * 5
-
-            actions_quat[:, 15] = val[:, 4]*4
-            actions_quat[:, 16] = val[:, 5] * 3
-            actions_quat[:, 17] = val[:, 6]*4
-            actions_quat[:, 18] = val[:, 7]*4
-
-            actions_quat[:, 19] = val[:, 8] * 2.5
-            actions_quat[:, 20] = val[:, 9] * 2.5
-            actions_quat[:, 21] = val[:, 10] * 2.5
-            actions_quat[:, 22] = val[:, 11] * 2.5
-
-            
-
-            # actions_quat[:, 8:11] = 0
-
-            # actions_quat[:, 7:] = actions[:, hand_joint_index:] * self.cfg.hand_joint_scale
-            # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
-
-
-            self.new_action_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
-        
-        if self.cfg.euler_flag:
-            actions[:, 3:6] *= self.cfg.angle_scale
-            
-            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
-                                                    pitch = actions[:, 4],
-                                                    yaw = actions[:, 5])
-
-        else:
-            # Scale angle and rotation vector
-            actions_quat[:, 3] *= self.cfg.angle_scale
-            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
-
-            # Real part of the quaternion
-            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
-            
-            # Imaginary part of the quaternion
-            v = actions_quat[:, 4:7]
-            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
-
-            # Build the quaternion
-            q = sin_a * v
-
-            # Reassign quaternion
-            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
-
-
-
-        return actions_quat
-    
-    
     # Obtain the end effector pose of the index robot in the base frame
     def _get_ee_pose(self, idx):
         '''
@@ -279,6 +192,92 @@ class BimanualDirect(DirectRLEnv):
         return ee_pos_r, ee_quat_r, jacobian, joint_pos
 
 
+    # Method to preprocess the actions so they have a proper format
+    def _preprocess_actions(self, actions: torch.Tensor) -> torch.Tensor:
+        '''
+        In:
+            - actions - torch.Tensor: raw actions. --> rotation is in the form of a quaternion.
+                Format: [x, y, z, rotation]:
+                    actions[:3]: translation.
+                    actions[3]: rotation angle of a quaternion.
+                    actions[4:]: rotation as a: (1) vector of a quaternion or (2) euler angles.
+
+        Out:
+            - actions - torch.Tensor: preprocessed actions.
+        '''
+
+        # Clamp actions
+        actions = torch.clamp(actions, -1, 1)
+
+        # Scale actions
+        actions[:, :3]  *= self.cfg.translation_scale
+
+        # Action in quaternion form
+        actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
+        actions_quat[:, :3] = actions[:, :3]
+
+        # Manipulation phase case, preprocess the actions for the hand
+        if self.cfg.phase == self.cfg.MANIPULATION:
+
+            # Determines the index of the hand joints
+            hand_joint_index = 6 + int(not self.cfg.euler_flag)
+            
+            # Obtains extended action
+            val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
+
+            # Assigns the values to the respective joints
+            actions_quat[:, 7] = 0
+            actions_quat[:, 8] = val[:, 0] * 2
+            actions_quat[:, 9] = 0
+            actions_quat[:, 10] = 0
+            actions_quat[:, 11] = val[:, 1] * 5
+            actions_quat[:, 12] = 0.0
+            actions_quat[:, 13] = val[:, 2] * 5
+            actions_quat[:, 14] = val[:, 3] * 5
+
+            actions_quat[:, 15] = val[:, 4]*4
+            actions_quat[:, 16] = val[:, 5] * 3
+            actions_quat[:, 17] = val[:, 6]*4
+            actions_quat[:, 18] = val[:, 7]*4
+
+            actions_quat[:, 19] = val[:, 8] * 2.5
+            actions_quat[:, 20] = val[:, 9] * 2.5
+            actions_quat[:, 21] = val[:, 10] * 2.5
+            actions_quat[:, 22] = val[:, 11] * 2.5
+
+            # Assigns hand opening if the object is reached
+            self.reset_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
+        
+        # If the actions are in euler, transform them to quaternion
+        if self.cfg.euler_flag:
+            actions[:, 3:6] *= self.cfg.angle_scale
+            
+            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
+                                                    pitch = actions[:, 4],
+                                                    yaw = actions[:, 5])
+
+        # Else, the actions are already in quaternion form
+        else:
+            # Scale angle and rotation vector
+            actions_quat[:, 3] *= self.cfg.angle_scale
+            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
+
+            # Real part of the quaternion
+            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
+            
+            # Imaginary part of the quaternion
+            v = actions_quat[:, 4:7]
+            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
+
+            # Build the quaternion
+            q = sin_a * v
+
+            # Reassign quaternion
+            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
+
+        return actions_quat
+    
+
     # Performs the action increment
     def perform_increment(self, idx, actions):
         '''
@@ -297,11 +296,11 @@ class BimanualDirect(DirectRLEnv):
         # Perform an increment on the robot end effector in the root frame
         new_act_pos, new_act_quat = combine_frame_transforms(t01 = ee_pos_r, q01 = ee_quat_r,
                                                              t12 = actions[:, 0:3], q12 = actions[:, 3:7])
-        self.reset_robot_poses_r[idx] = torch.cat((new_act_pos, new_act_quat), dim = -1)
+        new_poses = torch.cat((new_act_pos, new_act_quat), dim = -1)
 
 
         # Set the command for the IKDifferentialController
-        self.controller.set_command(self.reset_robot_poses_r[idx])
+        self.controller.set_command(new_poses)
 
         new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
         new_hand_joint_pos[:, 5] = -0.65
@@ -340,7 +339,7 @@ class BimanualDirect(DirectRLEnv):
     def _apply_action(self) -> None:
         
         # Applies joint actions to the robots 
-        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_action_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
+        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.reset_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
@@ -592,17 +591,15 @@ class BimanualDirect(DirectRLEnv):
         # mod = 2*(torch.logical_and(dist < prev_dist, ee_pose[:, 1] - obj_pose[:, 1] > 0.0275)) - 1
         # mod = 2*(dist < prev_dist) - 1
 
-        # Grab all the contacts except the first and the last
-        whole_hand = contacts_w[:, -1]
-        # contacts_w = contacts_w[:, 1:-1]
+        # Grab all the contacts except the first and the last one
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
 
         # Compute intermediate reward terms with scaling values and boolean flags --> / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         # reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(ee_pose[:, 1] - obj_pose[:, 1] < 0.0275).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
-        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
+        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2 + whole_hand) * self.obj_reached * (contacts_w[:, 1:].sum(-1) > 0.0).int() + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2) * self.obj_reached + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
         reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:].sum(-1) > 0.0).int()
 
         self.prev_dist = hand_obj_dist[:, 0]
@@ -707,7 +704,7 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the joint positions to reset. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.new_action_joint_positions[idx][env_ids] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        self.reset_joint_positions[idx][env_ids] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                          self.default_joint_pos[idx][:, (6+idx):]), 
                                          dim=-1)[env_ids]
         joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
