@@ -16,8 +16,8 @@ from omni.isaac.lab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_
 from omni.isaac.lab.utils.math import sample_uniform
 from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from omni.isaac.lab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
-from omni.isaac.lab.sensors import Camera, ContactSensorCfg, ContactSensor
+from omni.isaac.lab.utils.math import quat_from_euler_xyz
+from omni.isaac.lab.sensors import ContactSensor
 from omni.isaac.lab.markers import VisualizationMarkers
 from omni.isaac.lab.assets import RigidObject
 
@@ -30,7 +30,7 @@ all the methods need an index to differentiate from which robot get the informat
 different from one another.
 '''
 
-
+# Class for the Bimanual Direct Environment
 class BimanualDirect(DirectRLEnv):
     cfg: BimanualDirectCfg
 
@@ -38,9 +38,8 @@ class BimanualDirect(DirectRLEnv):
     def __init__(self, cfg: BimanualDirectCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         
-        # --- Debug variables ---
-        # WILL BE REMOVED: initial poses sampled in reset for both robots
-        self.new_poses = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
+        # Initial poses sampled in reset for both robots
+        self.new_action_joint_positions = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
 
         # Debug poses for the object and end effector of the GEN3 robot. These poses 
         # are used to draw the markers in the simulation
@@ -49,19 +48,19 @@ class BimanualDirect(DirectRLEnv):
         self.debug_tips_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.debug_tips_back_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
-        # Poses for the object and GEN3 robot so they can match when performing the grasping
+        # Poses for the object and GEN3 robot
         self.GEN3_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.grasp_point_obj_pose_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
         self.tips_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.tips_pose_r_back = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
-        # Indexes for: robot joints, hand joints, all joints
+        # Indexes for: robot joints, hand joints, all joints, finger tips, end effector's jacobian
         self._robot_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
         self._hand_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.hand_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
         self._all_joints_idx = [self.scene.articulations[key].find_joints(self.cfg.all_joints[idx])[0] for idx, key in enumerate(self.cfg.keys)]
-
-
         self.finger_tips = torch.tensor([self.scene.articulations[key].find_bodies(self.cfg.finger_tips[idx])[0] for idx, key in enumerate(self.cfg.keys)]).to(self.device)
+        self.ee_jacobi_idx = torch.tensor([self.scene.articulations[key].find_bodies(self.cfg.ee_link[idx])[0][0] - 1 for idx, key in enumerate(self.cfg.keys)]).to(self.device)
+
 
         # IK Controller
         controller_cfg = DifferentialIKControllerCfg(command_type = "pose", use_relative_mode = False, ik_method = "dls")
@@ -73,16 +72,12 @@ class BimanualDirect(DirectRLEnv):
         self.controller = DifferentialIKController(controller_cfg, num_envs = self.num_envs, device = self.device)
         # DifferentialIKController: Differential inverse kinematics (IK) controller.
         #    num_envs: Number of environments handled by the controller.
-        #    device: Device into which the controller is stored.
-
-
-        # Indexes for the both robots' end effector for Jacobian computation
-        self.ee_jacobi_idx = torch.tensor([self.scene.articulations[key].find_bodies(self.cfg.ee_link[idx])[0][0] - 1 for idx, key in enumerate(self.cfg.keys)]).to(self.device)
-       
+        #    device: Device into which the controller is stored.       
 
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = [self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos,
                                   self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.default_joint_pos]
+        
         # Default joints to open the hand
         self.open_hand_joints = torch.zeros((1, 16)).to(self.device)
         self.open_hand_joints[:, 1] = 0.263  # this value is the zero for the joint0 of the thumb
@@ -218,7 +213,7 @@ class BimanualDirect(DirectRLEnv):
             # actions_quat[:, 7:] = torch.mean(actions_quat[:, 7:].view(-1, 4, 4), 2, False).repeat_interleave(4, dim = -1)
 
 
-            self.new_poses[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
+            self.new_action_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
         
         if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
@@ -345,7 +340,7 @@ class BimanualDirect(DirectRLEnv):
     def _apply_action(self) -> None:
         
         # Applies joint actions to the robots 
-        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_poses[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
+        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.new_action_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
@@ -607,7 +602,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
         reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0]) + self.cfg.bonus_obj_reach * self.obj_reached_target
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 7.5*(reward_2 + whole_hand) * self.obj_reached * (contacts_w[:, 1:].sum(-1) > 0.0).int()  + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2 + whole_hand) * self.obj_reached * (contacts_w[:, 1:].sum(-1) > 0.0).int() + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
         reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:].sum(-1) > 0.0).int()
 
         self.prev_dist = hand_obj_dist[:, 0]
@@ -712,7 +707,7 @@ class BimanualDirect(DirectRLEnv):
         # Obtains the joint positions to reset. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.new_poses[idx][env_ids] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        self.new_action_joint_positions[idx][env_ids] = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                          self.default_joint_pos[idx][:, (6+idx):]), 
                                          dim=-1)[env_ids]
         joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
