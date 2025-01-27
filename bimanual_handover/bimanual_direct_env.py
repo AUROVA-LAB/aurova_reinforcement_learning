@@ -107,13 +107,18 @@ class BimanualDirect(DirectRLEnv):
             self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
             os.makedirs(self.output_dir, exist_ok=True)
 
-
+        # Previous distances
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         self.prev_dist_target = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
+        
+        # Object reached flags
         self.obj_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.obj_reached_target = torch.zeros(self.num_envs).to(self.device).bool()
 
+        # Reward tensor for the second phase
         self.rew_2 = torch.ones(self.num_envs).to(self.device)
+
+        self.back = torch.tensor([0.0, 0.05, -0.051, 1, 0, 0, 0]).to(self.device).repeat(self.num_envs, 1)
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -283,12 +288,11 @@ class BimanualDirect(DirectRLEnv):
         '''
         In: 
             - idx - int(0,1): index of the robot.
-            - actions - torch.tensor(N, 7): the increment to be performed to the actual pose.
+            - actions - torch.tensor(N, 7 + 16): the increment to be performed to the actual pose and hand joint position.
 
         Out:
             - None
         '''
-
 
         # Obtains the poses
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose(idx)
@@ -302,6 +306,7 @@ class BimanualDirect(DirectRLEnv):
         # Set the command for the IKDifferentialController
         self.controller.set_command(new_poses)
 
+        # Perform the increment for the hand
         new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
         new_hand_joint_pos[:, 5] = -0.65
 
@@ -331,7 +336,7 @@ class BimanualDirect(DirectRLEnv):
         #self.perform_increment(idx = self.cfg.UR5e, actions = actions)
 
         # --- GEN3 actions ---
-        # Obtains the increments and the poses
+        # Obtains the increments and the poses for the GEN3 robot
         self.perform_increment(idx = self.cfg.GEN3, actions = actions)
 
 
@@ -349,22 +354,24 @@ class BimanualDirect(DirectRLEnv):
         Current markers:
             - End effector of the UR5e.
             - End effector of the GEN3.
-            - Spawning position for the object.
+            - Grasping position for the object (transformated to match GEN3's).
+            - Tips of the fingers of the GEN3.
+            - Tips of the fingers of the GEN3 (displaced in front of the hand).
         '''
         
         # Obtains the positions of the of the robots
-        ee_pose_w_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 0:7]
+        ee_pose_w_UR5e = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 0:7]
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
+        self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_UR5e[:, :3], 
                                                                          self.debug_GEN3_ee_pose_w[:, :3],
                                                                          self.debug_grasp_point_obj_pose_w[:, :3],
                                                                          self.debug_tips_pose_w[:, :3], 
                                                                          self.debug_tips_back_pose_w[:, :3]),), 
-                                                orientations = torch.cat((ee_pose_w_1[:, 3:], 
+                                                orientations = torch.cat((ee_pose_w_UR5e[:, 3:], 
                                                                           self.debug_GEN3_ee_pose_w[:, 3:],
                                                                           self.debug_grasp_point_obj_pose_w[:,3:],
                                                                           self.debug_tips_pose_w[:, 3:],
@@ -400,6 +407,7 @@ class BimanualDirect(DirectRLEnv):
             - None
         '''
 
+        # ---- GEN3 transformations ----
         # Obtain the pose of the GEN3 end effector in world frame
         self.debug_GEN3_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 0:7]
 
@@ -414,6 +422,8 @@ class BimanualDirect(DirectRLEnv):
 
 
 
+
+        # ---- Tips transformations ----
         # Obtains the pose of the finger tips in world frame and performs the mean
         self.debug_tips_pose_w = torch.mean(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.finger_tips[self.cfg.GEN3], 0:7], dim = -2)
         
@@ -428,7 +438,6 @@ class BimanualDirect(DirectRLEnv):
 
 
 
-
         # Clones the tips original pose
         self.tips_pose_r_back = self.tips_pose_r.clone()
 
@@ -436,9 +445,6 @@ class BimanualDirect(DirectRLEnv):
         tip_pos_r, tip_or_r = combine_frame_transforms(t01 = self.tips_pose_r[:, :3], q01 = self.tips_pose_r[:, 3:],
                                                         t12 = self.cfg.tips_displacement, q12 = torch.tensor([1,0,0,0]).to(self.device).repeat(self.num_envs, 1))
         self.tips_pose_r = torch.cat((tip_pos_r, tip_or_r), dim = -1)
-
-
-
 
 
 
@@ -455,6 +461,8 @@ class BimanualDirect(DirectRLEnv):
 
 
 
+
+        # ---- Object transformations ----
         # Obtains the pose of the object in the world frame
         obj_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :7]
 
@@ -500,21 +508,26 @@ class BimanualDirect(DirectRLEnv):
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
 
-        # Builds the tensor with all the observations in a single row tensor (N, 7+16+7+16)
+        # Builds the tensor with all the observations in a single row tensor (N, 7+16)
         obs = torch.cat(
             (
-                self.GEN3_rot_ee_pose_r, # torch.cat((ee_pos_r_2, ee_quat_r_2), dim = -1),
-                self.grasp_point_obj_pose_r,    # torch.cat((grasp_point_obj_pos, grasp_point_obj_quat), dim = -1),
+                self.GEN3_rot_ee_pose_r,
+                self.grasp_point_obj_pose_r,
             ),
             dim = -1
         )
 
+        # In case of manipulation phase, add the hand joint positions
         if self.cfg.phase == self.cfg.MANIPULATION:
+
             # Obtains the joint positions for the hand
             # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
             hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+            
+            # Selects the hand joints to be observed
             sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
             
+            # Concatenates the mean of selected hand joint positions
             obs = torch.cat(
                 (
                     obs,
@@ -543,7 +556,8 @@ class BimanualDirect(DirectRLEnv):
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''
 
-        
+
+        # ---- Variable assignments ----
         rew_scale_hand_obj = self.cfg.rew_scale_hand_obj * torch.ones(self.num_envs).to(self.device)
         rew_scale_obj_target = self.cfg.rew_scale_obj_target
         ee_pose = self.tips_pose_r
@@ -551,12 +565,13 @@ class BimanualDirect(DirectRLEnv):
         obj_pose = self.grasp_point_obj_pose_r
         prev_dist = self.prev_dist
         prev_dist_target = self.prev_dist_target
-        rew_change_thres = self.cfg.rew_change_thres
         obj_reach_target_thres = self.cfg.obj_reach_target_thres
         device = self.device
         target_pose = self.cfg.target_pose
         
-        # Dual quaternion distance between GEN3 hand and object
+
+        # ---- Distance computation ----
+        # Dual quaternion distance between GEN3 hand tips and object
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
         hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
         
@@ -564,44 +579,67 @@ class BimanualDirect(DirectRLEnv):
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
 
-
-        # Obtain the contacts
+        # ---- Contact computation ----
+        # Obtain the weighted contacts
         contacts_w = self.contacts * self.cfg.contact_matrix
-        aux = contacts_w[:, -8:-3].clone()
-        thumb_col = aux.sum(-1) > 0.0        
 
-        contacts_flag = torch.logical_and(contacts_w[:, :-1].sum(-1) - aux.sum(-1) > 0.4, thumb_col)
+        # Thumb contact
+        thumb_w = contacts_w[:, -8:-3].clone()
+        thumb_con = thumb_w.sum(-1) > 0.0        
 
+
+        # ---- Flag ----
+        # There is contact if the thumb and the fingers (finger collide without the thumb) are in contact
+        contacts_flag = torch.logical_and(contacts_w[:, :-1].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
+
+        # Reached flag pre-conditions
         bonus = self.obj_reached.clone().bool()
-        # Check if there is contact or translation module is below the threshold for target
-        self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached) # torch.logical_or(hand_obj_dist[:, 1] < rew_change_thres, self.obj_reached).bool()
+
+        # Check it the object is reached (contact with the object) and set it
+        self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
+        
+        # Reached flag after conditions
         new_bonus = self.obj_reached.clone().bool()
 
+        # The bonus must be activated if the object is reached at this step
         bonus = torch.logical_and(new_bonus, torch.logical_not(bonus))
 
+        # Check if the object has reached the target
+        self.obj_reached_target = (obj_pose[:, 0] < 0.05).bool() # (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
-        self.obj_reached_target = (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
 
-        # Obtains the distance
+        # ---- Distance evaluation ----
+        # Obtains the distance according to the object reached flag
         dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
         mod = 2*(torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
-        # mod = 2*(torch.logical_and(dist < prev_dist, ee_pose[:, 1] - obj_pose[:, 1] > 0.0275)) - 1
-        # mod = 2*(dist < prev_dist) - 1
 
-        # Grab all the contacts except the first and the last one
+        # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
 
-        # Compute intermediate reward terms with scaling values and boolean flags --> / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
-        # reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(ee_pose[:, 1] - obj_pose[:, 1] < 0.0275).int()) + self.cfg.bonus_obj_reach * self.obj_reached / 5
+
+        # ---- Distance reward ----
+        # Reward for the first phase --> Approaching (mod) hand-obj distance divided by wether the object is approaching with the palm
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
+        
+        # Reward for the second phase --> Object-target distance the target
         reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
 
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2) * self.obj_reached + contacts_w[:, 1:-1].sum(-1) + self.cfg.bonus_obj_reach * bonus / 2
+
+        # ---- Reward composition ----
+        # Phase reward plus phase 1 bonuses
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+
+        # Reward for the contacts
+        reward = reward + contacts_w[:, 1:-1].sum(-1) 
+
+        # Reward for reaching target
         reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:].sum(-1) > 0.0).int()
 
+
+        # Update previous distances
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
             
@@ -639,9 +677,6 @@ class BimanualDirect(DirectRLEnv):
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
         terminated = torch.logical_or(time_out, self.obj_reached_target * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
 
-        contacts_w = self.contacts * self.cfg.contact_matrix
-
-        # terminated = torch.logical_or(terminated, contacts_w.sum(-1) > 1.51)
 
         return truncated, terminated
     
