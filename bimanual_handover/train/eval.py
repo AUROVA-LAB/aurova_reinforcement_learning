@@ -8,7 +8,7 @@ parser.add_argument("--disable_fabric", action="store_true", default=False, help
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 parser.add_argument("--task", type=str, default="Isaac-UR5e-joint-reach-v0", help="Name of the task.")
 parser.add_argument("--model_dir", type=str, default="", help="Directory where the models are stored.")
-parser.add_argument("--num_episodes", type=int, default=3, help="Number of steps per trial.")
+parser.add_argument("--num_episodes", type=int, default=30, help="Number of steps per trial.")
 
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -55,12 +55,14 @@ def main():
 
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
+        
+        model_name_ = "model_266240000_steps.zip"
 
         # Accumulated reward for all the episodes
         r = torch.zeros((args_cli.num_envs))
 
         # Loading model
-        model = PPO.load(os.path.join(dir, model_name))      
+        model = PPO.load(os.path.join(dir, model_name))
         model.policy.eval()
 
         print(f"\n\n{idx + 1}. Loading model: " + model_name)
@@ -92,7 +94,7 @@ def main():
                     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
         
         # Compute mean reward
-        mean_rew = r.item() / args_cli.num_episodes
+        mean_rew = torch.mean(r).item() / args_cli.num_episodes
 
         print(f" ------ Reward per episode: {mean_rew}")
 
