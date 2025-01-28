@@ -79,8 +79,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * 3           # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * 3  # Number of observations per environment (overridden)
+    num_actions = 6 + 6 + phase * (3 + 3)          # Number of actions per environment (overridden)
+    num_observations = 7 + 7 + phase * (3 + 3)     # Number of observations per environment (overridden)
     euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -187,11 +187,15 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # Link names for the robots
     links = [['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
-              'finger_1_contact_1', 'finger_1_contact_2', 'finger_1_contact_3_tip',
-              'finger_2_contact_5', 'finger_2_contact_6', 'finger_2_contact_7_tip',
-              'finger_3_contact_9', 'finger_3_contact_10', 'finger_3_contact_11_tip',
-              'finger_4_contact_14', 'finger_4_contact_15_tip'], 
-    ['base_link', 'shoulder_link', 'half_arm_1_link', 'half_arm_2_link', 'forearm_link', 'spherical_wrist_1_link', 'spherical_wrist_2_link', 'bracelet_link', 'end_effector_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link']]
+              'finger_1_contact_1_link', 'finger_1_contact_2_link', 'finger_1_contact_3_tip_link',
+              'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
+              'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
+              'finger_4_contact_14_link', 'finger_4_contact_15_tip_link'], 
+    ['base_link', 'shoulder_link', 'half_arm_1_link', 'half_arm_2_link', 'forearm_link', 'spherical_wrist_1_link', 'spherical_wrist_2_link', 'bracelet_link', 'end_effector_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
+     'finger_1_contact_1_link', 'finger_1_contact_2_link', 'finger_1_contact_3_tip_link',
+              'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
+              'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
+              'finger_4_contact_14_link', 'finger_4_contact_15_tip_link']]
 
     # Fingers tips for the robots
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
@@ -218,8 +222,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
-    ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
-                                      [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
+    ee_init_pose_quat = torch.tensor([[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+                                      [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
@@ -237,7 +241,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                                  [-0.3,  0.3]])
     
     # Which robot apply the sampling poses
-    apply_range = [True, False]
+    apply_range = [True, True]
 
 
 
@@ -259,7 +263,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     obj_quat_trans[0], obj_quat_trans[1:] = rot_quat[-1].clone(), rot_quat[:3].clone()
     
     # Height limits for the object and the GEN3 robot
-    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.25 # = 0.35
+    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15 # = 0.45
     gen3_height_limit = 0.1
     
     # Translation respect to the object link frame for object grasping point observation

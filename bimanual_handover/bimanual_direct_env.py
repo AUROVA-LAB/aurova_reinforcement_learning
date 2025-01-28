@@ -215,11 +215,13 @@ class BimanualDirect(DirectRLEnv):
         actions = torch.clamp(actions, -1, 1)
 
         # Scale actions
-        actions[:, :3]  *= self.cfg.translation_scale
+        actions[:, :3]    *= self.cfg.translation_scale
+        actions[:, 9:12]  *= self.cfg.translation_scale
 
         # Action in quaternion form
-        actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
-        actions_quat[:, :3] = actions[:, :3]
+        actions_quat = torch.zeros((self.num_envs, 2,(7+16))).to(self.device)
+        actions_quat[:, self.cfg.UR5e, :3] = actions[:, :3]
+        actions_quat[:, self.cfg.GEN3, :3] = actions[:, 9:12]
 
         # Manipulation phase case, preprocess the actions for the hand
         if self.cfg.phase == self.cfg.MANIPULATION:
@@ -228,57 +230,80 @@ class BimanualDirect(DirectRLEnv):
             hand_joint_index = 6 + int(not self.cfg.euler_flag)
             
             # Obtains extended action
-            val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
+            val = actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
+            val_2 = actions[:, 9+hand_joint_index:hand_joint_index+3+9]# * self.cfg.hand_joint_scale)
 
+            val = torch.cat((val, val_2), dim = -1).view(self.num_envs, -1, 3)# torch.cat((val, val_2), dim = 0)
+
+            # Índices para intercalar filas
+            indices = torch.arange(val.size(0)).view(2, -1).T.flatten()
+
+            # Tensor con filas intercaladas
+            tensor_intercalado = val[indices]
+            
             # Assigns the values to the respective joints
-            actions_quat[:, 7] = 0
-            actions_quat[:, 8] = val[:, 0] * 2
-            actions_quat[:, 9] = 0
-            actions_quat[:, 10] = 0
-            actions_quat[:, 11] = val[:, 1] * 5
-            actions_quat[:, 12] = 0.0
-            actions_quat[:, 13] = val[:, 2] * 5
-            actions_quat[:, 14] = val[:, 3] * 5
+            # actions_quat[:, self.cfg.UR5e, 7] = 0
+            actions_quat[:, :, 8] = val[:, :, 0] * 5
+            # actions_quat[:, :, 9] = 0
+            # actions_quat[:, :, 10] = 0
+            actions_quat[:, :, 11] = val[:, :, 0] * 5
+            # actions_quat[:, :, 12] = 0.0
+            actions_quat[:, :, 13] = val[:, :, 0] * 5
+            actions_quat[:, :, 14] = val[:, :, 0] * 5
 
-            actions_quat[:, 15] = val[:, 4]*4
-            actions_quat[:, 16] = val[:, 5] * 3
-            actions_quat[:, 17] = val[:, 6]*4
-            actions_quat[:, 18] = val[:, 7]*4
+            actions_quat[:, :, 15:] = tensor_intercalado.view(self.num_envs, 2, 3)[:, :, 1:].repeat_interleave(4, dim = -1)*3
 
-            actions_quat[:, 19] = val[:, 8] * 2.5
-            actions_quat[:, 20] = val[:, 9] * 2.5
-            actions_quat[:, 21] = val[:, 10] * 2.5
-            actions_quat[:, 22] = val[:, 11] * 2.5
 
-            # Assigns hand opening if the object is reached
-            self.reset_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
-        
         # If the actions are in euler, transform them to quaternion
         if self.cfg.euler_flag:
             actions[:, 3:6] *= self.cfg.angle_scale
             
-            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
+            actions_quat[:, self.cfg.UR5e, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
                                                     pitch = actions[:, 4],
                                                     yaw = actions[:, 5])
+            
+            actions[:, 3+9:6+9] *= self.cfg.angle_scale
+            
+            actions_quat[:, self.cfg.GEN3, 3:7] = quat_from_euler_xyz(roll = actions[:, 3+9],
+                                                    pitch = actions[:, 4+9],
+                                                    yaw = actions[:, 5+9])
 
         # Else, the actions are already in quaternion form
         else:
             # Scale angle and rotation vector
-            actions_quat[:, 3] *= self.cfg.angle_scale
-            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
+            actions_quat[:, self.cfg.UR5e, 3] *= self.cfg.angle_scale
+            actions_quat[:, self.cfg.UR5e, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
 
             # Real part of the quaternion
-            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
+            w = torch.cos(actions_quat[:, self.cfg.UR5e, 3]/2).unsqueeze(dim = 0).T
             
             # Imaginary part of the quaternion
-            v = actions_quat[:, 4:7]
-            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
+            v = actions_quat[:, self.cfg.UR5e, 4:7]
+            sin_a = torch.sin(actions_quat[:, self.cfg.UR5e, 3] / 2).unsqueeze(dim=0).T
 
             # Build the quaternion
             q = sin_a * v
 
             # Reassign quaternion
-            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
+            actions_quat[:, self.cfg.UR5e, 3:7] = torch.cat((w, q), dim = 1)     
+
+
+            # Scale angle and rotation vector
+            actions_quat[:, self.cfg.GEN3, 3] *= self.cfg.angle_scale
+            actions_quat[:, self.cfg.GEN3, 4:7] = torch.nn.functional.normalize(actions_quat[:, self.cfg.GEN3, 4:7])
+
+            # Real part of the quaternion
+            w = torch.cos(actions_quat[:, self.cfg.GEN3, 3]/2).unsqueeze(dim = 0).T
+            
+            # Imaginary part of the quaternion
+            v = actions_quat[:, self.cfg.GEN3, 4:7]
+            sin_a = torch.sin(actions_quat[:, self.cfg.GEN3, 3] / 2).unsqueeze(dim=0).T
+
+            # Build the quaternion
+            q = sin_a * v
+
+            # Reassign quaternion
+            actions_quat[:, self.cfg.GEN3, 3:7] = torch.cat((w, q), dim = 1)
 
         return actions_quat
     
@@ -299,7 +324,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Perform an increment on the robot end effector in the root frame
         new_act_pos, new_act_quat = combine_frame_transforms(t01 = ee_pos_r, q01 = ee_quat_r,
-                                                             t12 = actions[:, 0:3], q12 = actions[:, 3:7])
+                                                             t12 = actions[:, idx, 0:3], q12 = actions[:, idx, 3:7])
         new_poses = torch.cat((new_act_pos, new_act_quat), dim = -1)
 
 
@@ -307,8 +332,9 @@ class BimanualDirect(DirectRLEnv):
         self.controller.set_command(new_poses)
 
         # Perform the increment for the hand
-        new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
-        new_hand_joint_pos[:, 5] = -0.65
+        new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, idx, 7:] * self.cfg.phase
+        
+        if idx == self.cfg.GEN3: new_hand_joint_pos[:, 5] = -0.65
 
         # Get the actions for the UR5e. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
@@ -333,7 +359,7 @@ class BimanualDirect(DirectRLEnv):
 
         # --- UR5e actions ---
         # Set the command for the IKDifferentialController
-        #self.perform_increment(idx = self.cfg.UR5e, actions = actions)
+        self.perform_increment(idx = self.cfg.UR5e, actions = actions)
 
         # --- GEN3 actions ---
         # Obtains the increments and the poses for the GEN3 robot
@@ -344,7 +370,7 @@ class BimanualDirect(DirectRLEnv):
     def _apply_action(self) -> None:
         
         # Applies joint actions to the robots 
-        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.reset_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
+        self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.actions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
 
 
@@ -521,17 +547,19 @@ class BimanualDirect(DirectRLEnv):
         if self.cfg.phase == self.cfg.MANIPULATION:
 
             # Obtains the joint positions for the hand
-            # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
+            hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
             hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
             
             # Selects the hand joints to be observed
-            sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
+            sel_hand_joint_1 = torch.round(torch.cat((hand_joint_pos_1[:, 1].unsqueeze(-1), hand_joint_pos_1[:, 4].unsqueeze(-1), hand_joint_pos_1[:, 6:]), dim = -1), decimals = 1)
+            sel_hand_joint_2 = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
             
             # Concatenates the mean of selected hand joint positions
             obs = torch.cat(
                 (
                     obs,
-                    sel_hand_joint.view(-1, 3,4).mean(dim = -1).view(-1, 3),
+                    sel_hand_joint_1.view(-1, 3,4).mean(dim = -1).view(-1, 3),
+                    sel_hand_joint_2.view(-1, 3,4).mean(dim = -1).view(-1, 3),
                 ),
                 dim = -1
             )
@@ -675,7 +703,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
-        terminated = torch.logical_or(time_out, self.obj_reached_target * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
+        terminated = torch.logical_or(time_out, torch.logical_and(self.obj_reached, self.obj_reached_target) * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
 
 
         return truncated, terminated
@@ -801,6 +829,6 @@ class BimanualDirect(DirectRLEnv):
         self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
-        self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+        self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
 
         
