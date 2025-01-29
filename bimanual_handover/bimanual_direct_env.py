@@ -242,9 +242,9 @@ class BimanualDirect(DirectRLEnv):
             
             # Obtains extended action
             val = actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
-            val_2 = actions[:, 9+hand_joint_index:hand_joint_index+3+9]# * self.cfg.hand_joint_scale)
+            val_2 = gen3_actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)
 
-            val = torch.cat((val, val_2), dim = 0)
+            val = torch.cat((val, val_2), 0)
 
             # Índices para intercalar filas
             indices = torch.arange(val.size(0)).view(2, -1).T.flatten()

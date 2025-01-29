@@ -77,7 +77,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     phase = MANIPULATION       # Phase of the task (0: approach, 1: manipulation)
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2025-01-24_11-51-46/model.zip" # Path to the pre-trained approaching model
+    path_to_pretrained = "2025-01-24_11-51-46/model" # Path to the pre-trained approaching model
 
     num_actions = 6 + phase * (3)          # Number of actions per environment (overridden)
     num_observations = 7 + 7 + phase * (3)     # Number of observations per environment (overridden)
