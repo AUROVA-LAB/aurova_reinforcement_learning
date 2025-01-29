@@ -67,8 +67,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 275             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
-    translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
-    hand_joint_scale = 0.075    # Hand joint scalation
+    translation_scale = torch.tensor([0.02, 0.02, 0.02])*0.5 # Action translation scalation
+    hand_joint_scale = 0.075 *0.5   # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
@@ -488,6 +488,15 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
+    # Contact between robot 2 hand and object
+    robot1_w_obj: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
     # Dictionary of contact sensors configurations
     cfg.contact_sensors_dict = {"robot2_w_ground": robot2_w_ground, 
                                 
@@ -514,6 +523,8 @@ def update_collisions(cfg, num_envs):
                                 "robot1_w_robot2": robot1_w_robot2,
 
                                 "hand_w_object": hand_w_object,
+
+                                "robot1_w_obj": robot1_w_obj
                                 }
     
     # Updated contact matrix
@@ -524,7 +535,8 @@ def update_collisions(cfg, num_envs):
                                         0.65,  0.65,
                                         0.65, 0.65, 0.65,
                                         0.4, 0.0,
-                                        0.15
+                                        0.15,
+                                        0.3
                                         ])
 
     return cfg

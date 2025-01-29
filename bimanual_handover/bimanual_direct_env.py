@@ -612,13 +612,13 @@ class BimanualDirect(DirectRLEnv):
         contacts_w = self.contacts * self.cfg.contact_matrix
 
         # Thumb contact
-        thumb_w = contacts_w[:, -8:-3].clone()
+        thumb_w = contacts_w[:, -9:-4].clone()
         thumb_con = thumb_w.sum(-1) > 0.0        
 
 
         # ---- Flag ----
         # There is contact if the thumb and the fingers (finger collide without the thumb) are in contact
-        contacts_flag = torch.logical_and(contacts_w[:, :-1].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
+        contacts_flag = torch.logical_and(contacts_w[:, :-2].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
 
         # Reached flag pre-conditions
         bonus = self.obj_reached.clone().bool()
@@ -642,7 +642,8 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
-        mod = 2*(torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
+        mod = torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
+        mod = 2*(torch.logical_and(mod, contacts_w[:, -1] > 0.0)) - 1
 
         # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
@@ -658,13 +659,13 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus phase 1 bonuses
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2 - contacts_w[:, -1]) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
 
         # Reward for the contacts
-        reward = reward + contacts_w[:, 1:-1].sum(-1) 
+        reward = reward + contacts_w[:, 1:-2].sum(-1) 
 
         # Reward for reaching target
-        reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:].sum(-1) > 0.0).int()
+        reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:-1].sum(-1) > 0.0).int()
 
 
         # Update previous distances
