@@ -242,27 +242,28 @@ class BimanualDirect(DirectRLEnv):
             
             # Obtains extended action
             val = actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
-            val_2 = gen3_actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)
+            val_2 = actions[:, 9+hand_joint_index:hand_joint_index+3+9]# * self.cfg.hand_joint_scale)
 
-            val = torch.cat((val, val_2), dim = -1).view(self.num_envs, -1, 3)# torch.cat((val, val_2), dim = 0)
+            val = torch.cat((val, val_2), dim = 0)
 
             # Índices para intercalar filas
             indices = torch.arange(val.size(0)).view(2, -1).T.flatten()
 
             # Tensor con filas intercaladas
-            tensor_intercalado = val[indices]
+            tensor_intercalado = val[indices].view(self.num_envs, 2, 3)
             
             # Assigns the values to the respective joints
             # actions_quat[:, self.cfg.UR5e, 7] = 0
-            actions_quat[:, :, 8] = val[:, :, 0] * 5
+            actions_quat[:, :, 8] = tensor_intercalado[:, :, 0] * 5
             # actions_quat[:, :, 9] = 0
             # actions_quat[:, :, 10] = 0
-            actions_quat[:, :, 11] = val[:, :, 0] * 5
+            actions_quat[:, :, 11] = tensor_intercalado[:, :, 0] * 5
             # actions_quat[:, :, 12] = 0.0
-            actions_quat[:, :, 13] = val[:, :, 0] * 5
-            actions_quat[:, :, 14] = val[:, :, 0] * 5
+            actions_quat[:, :, 13] = tensor_intercalado[:, :, 0] * 5
+            actions_quat[:, :, 14] = tensor_intercalado[:, :, 0] * 5
 
-            actions_quat[:, :, 15:] = tensor_intercalado.view(self.num_envs, 2, 3)[:, :, 1:].repeat_interleave(4, dim = -1)*3
+            actions_quat[:, :, 15:] = tensor_intercalado[:, :, 1:].repeat_interleave(4, dim = -1)*3
+
 
 
         # If the actions are in euler, transform them to quaternion
