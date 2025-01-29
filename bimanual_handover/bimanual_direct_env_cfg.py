@@ -67,8 +67,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 275             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
-    translation_scale = torch.tensor([0.02, 0.02, 0.02])*0.5 # Action translation scalation
-    hand_joint_scale = 0.075 *0.5   # Hand joint scalation
+    translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
+    hand_joint_scale = 0.075    # Hand joint scalation
 
     # Variables to distinguish the phases
     APPROACH = 0
@@ -77,10 +77,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     phase = MANIPULATION       # Phase of the task (0: approach, 1: manipulation)
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
+    path_to_pretrained = "2025-01-24_11-51-46/model.zip" # Path to the pre-trained approaching model
 
-    num_actions = 6 + 6 + phase * (3 + 3)          # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * (3 + 3)     # Number of observations per environment (overridden)
+    num_actions = 6 + phase * (3)          # Number of actions per environment (overridden)
+    num_observations = 7 + 7 + phase * (3)     # Number of observations per environment (overridden)
     euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -490,7 +490,7 @@ def update_collisions(cfg, num_envs):
 
     # Contact between robot 2 hand and object
     robot1_w_obj: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/finger.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.UR5e] + "/hand_link.*",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,

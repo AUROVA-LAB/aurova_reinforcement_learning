@@ -184,7 +184,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         while simulation_app.is_running():
             with torch.inference_mode():
                 
-                action = torch.rand((env_cfg.scene.num_envs, 6 + 3 + 6 + 3))
+                action = torch.zeros((env_cfg.scene.num_envs, 6 + 3))
 
                 # Step the environment
                 obs, reward, done, info = env.step(action)

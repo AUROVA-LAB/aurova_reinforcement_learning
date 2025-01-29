@@ -20,6 +20,7 @@ from omni.isaac.lab.utils.math import quat_from_euler_xyz
 from omni.isaac.lab.sensors import ContactSensor
 from omni.isaac.lab.markers import VisualizationMarkers
 from omni.isaac.lab.assets import RigidObject
+from stable_baselines3 import PPO
 
 '''
                     ############## IMPORTANT #################
@@ -119,6 +120,12 @@ class BimanualDirect(DirectRLEnv):
         self.rew_2 = torch.ones(self.num_envs).to(self.device)
 
         self.back = torch.tensor([0.0, 0.05, -0.051, 1, 0, 0, 0]).to(self.device).repeat(self.num_envs, 1)
+
+        path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/sb3/Isaac-Bimanual-Direct-reach-v0"
+        self.GEN3_agent = PPO.load(os.path.join(path_to_train, self.cfg.path_to_pretrained))
+        self.GEN3_agent.policy.eval()
+
+        self.obs_gen3 = None
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -211,17 +218,21 @@ class BimanualDirect(DirectRLEnv):
             - actions - torch.Tensor: preprocessed actions.
         '''
 
+        with torch.inference_mode():
+            gen3_actions = torch.tensor(self.GEN3_agent.predict(self.obs_gen3.cpu().numpy(), deterministic = True)[0]).to(self.device)
+
         # Clamp actions
         actions = torch.clamp(actions, -1, 1)
+        gen3_actions = torch.clamp(gen3_actions, -1, 1)
 
         # Scale actions
         actions[:, :3]    *= self.cfg.translation_scale
-        actions[:, 9:12]  *= self.cfg.translation_scale
+        gen3_actions[:, :3] *= self.cfg.translation_scale
 
         # Action in quaternion form
         actions_quat = torch.zeros((self.num_envs, 2,(7+16))).to(self.device)
         actions_quat[:, self.cfg.UR5e, :3] = actions[:, :3]
-        actions_quat[:, self.cfg.GEN3, :3] = actions[:, 9:12]
+        actions_quat[:, self.cfg.GEN3, :3] = gen3_actions[:, :3]
 
         # Manipulation phase case, preprocess the actions for the hand
         if self.cfg.phase == self.cfg.MANIPULATION:
@@ -231,7 +242,7 @@ class BimanualDirect(DirectRLEnv):
             
             # Obtains extended action
             val = actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
-            val_2 = actions[:, 9+hand_joint_index:hand_joint_index+3+9]# * self.cfg.hand_joint_scale)
+            val_2 = gen3_actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)
 
             val = torch.cat((val, val_2), dim = -1).view(self.num_envs, -1, 3)# torch.cat((val, val_2), dim = 0)
 
@@ -262,11 +273,11 @@ class BimanualDirect(DirectRLEnv):
                                                     pitch = actions[:, 4],
                                                     yaw = actions[:, 5])
             
-            actions[:, 3+9:6+9] *= self.cfg.angle_scale
+            gen3_actions[:, 3:6] *= self.cfg.angle_scale
             
-            actions_quat[:, self.cfg.GEN3, 3:7] = quat_from_euler_xyz(roll = actions[:, 3+9],
-                                                    pitch = actions[:, 4+9],
-                                                    yaw = actions[:, 5+9])
+            actions_quat[:, self.cfg.GEN3, 3:7] = quat_from_euler_xyz(roll = gen3_actions[:, 3],
+                                                    pitch = gen3_actions[:, 4],
+                                                    yaw = gen3_actions[:, 5])
 
         # Else, the actions are already in quaternion form
         else:
@@ -555,18 +566,25 @@ class BimanualDirect(DirectRLEnv):
             sel_hand_joint_2 = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
             
             # Concatenates the mean of selected hand joint positions
+            self.obs_gen3 = torch.cat( 
+                (
+                    obs,
+                    sel_hand_joint_2.view(-1, 3,4).mean(dim = -1).view(-1, 3),
+                ),
+                dim = -1
+            )
+
             obs = torch.cat(
                 (
                     obs,
                     sel_hand_joint_1.view(-1, 3,4).mean(dim = -1).view(-1, 3),
-                    sel_hand_joint_2.view(-1, 3,4).mean(dim = -1).view(-1, 3),
                 ),
                 dim = -1
             )
 
         # Builds the dictionary
         observations = {"policy": obs}
-        
+
         # Updates markers
         if self.cfg.debug_markers:
             self.update_markers()
@@ -646,7 +664,7 @@ class BimanualDirect(DirectRLEnv):
         mod = 2*(torch.logical_and(mod, contacts_w[:, -1] > 0.0)) - 1
 
         # Modifies scalation according to the contacts detected
-        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
+        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-3].sum(-1) + 1)        
 
 
         # ---- Distance reward ----
