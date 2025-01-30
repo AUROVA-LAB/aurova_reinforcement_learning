@@ -226,12 +226,14 @@ class BimanualDirect(DirectRLEnv):
         gen3_actions = torch.clamp(gen3_actions, -1, 1)
 
         # Scale actions
-        actions[:, :3]    *= self.cfg.translation_scale
+        actions    *= self.cfg.translation_scale
         gen3_actions[:, :3] *= self.cfg.translation_scale
 
         # Action in quaternion form
         actions_quat = torch.zeros((self.num_envs, 2,(7+16))).to(self.device)
-        actions_quat[:, self.cfg.UR5e, :3] = actions[:, :3]
+        
+        # actions_quat[:, self.cfg.UR5e, :3] = self.reset_robot_poses_r[self.cfg.UR5e][:, :3]
+        # actions_quat[:, self.cfg.UR5e, 3:7] = self.reset_robot_poses_r[self.cfg.UR5e][:, 3:]
         actions_quat[:, self.cfg.GEN3, :3] = gen3_actions[:, :3]
 
         # Manipulation phase case, preprocess the actions for the hand
@@ -241,7 +243,7 @@ class BimanualDirect(DirectRLEnv):
             hand_joint_index = 6 + int(not self.cfg.euler_flag)
             
             # Obtains extended action
-            val = actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
+            val = actions# * self.cfg.hand_joint_scale)# .repeat_interleave(4, dim = -1)
             val_2 = gen3_actions[:, hand_joint_index:hand_joint_index+3]# * self.cfg.hand_joint_scale)
 
             val = torch.cat((val, val_2), 0)
@@ -268,11 +270,11 @@ class BimanualDirect(DirectRLEnv):
 
         # If the actions are in euler, transform them to quaternion
         if self.cfg.euler_flag:
-            actions[:, 3:6] *= self.cfg.angle_scale
+            # actions[:, 3:6] *= self.cfg.angle_scale
             
-            actions_quat[:, self.cfg.UR5e, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
-                                                    pitch = actions[:, 4],
-                                                    yaw = actions[:, 5])
+            # actions_quat[:, self.cfg.UR5e, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
+            #                                         pitch = actions[:, 4],
+            #                                         yaw = actions[:, 5])
             
             gen3_actions[:, 3:6] *= self.cfg.angle_scale
             
@@ -678,13 +680,13 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus phase 1 bonuses
-        reward = (reward_1) * torch.logical_not(self.obj_reached) + 10*(reward_2 - contacts_w[:, -1]) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+        reward = (contacts_w[:, -1]) * torch.logical_not(self.obj_reached) + 2*(torch.ones_like(contacts_w[:, -1]) - contacts_w[:, -1]) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
 
         # Reward for the contacts
-        reward = reward + contacts_w[:, 1:-2].sum(-1) 
+        # reward = reward + contacts_w[:, 1:-2].sum(-1) 
 
         # Reward for reaching target
-        reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:-1].sum(-1) > 0.0).int()
+        # reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:-1].sum(-1) > 0.0).int()
 
 
         # Update previous distances

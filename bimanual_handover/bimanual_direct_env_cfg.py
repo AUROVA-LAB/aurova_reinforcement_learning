@@ -79,7 +79,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     path_to_pretrained = "2025-01-24_11-51-46/model" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * (3)          # Number of actions per environment (overridden)
+    num_actions = phase * (3)          # Number of actions per environment (overridden)
     num_observations = 7 + 7 + phase * (3)     # Number of observations per environment (overridden)
     euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
 
