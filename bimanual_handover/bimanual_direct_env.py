@@ -126,6 +126,8 @@ class BimanualDirect(DirectRLEnv):
         self.GEN3_agent.policy.eval()
 
         self.obs_gen3 = None
+
+        self.prev_hand_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -678,10 +680,12 @@ class BimanualDirect(DirectRLEnv):
         # Reward for the second phase --> Object-target distance the target
         reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
 
+        hand_dist = (self.open_hand_joints - actual_hand_pose).sum(-1)
+        mod_hand = 2*(hand_dist < self.prev_hand_dist) - 1
 
         # ---- Reward composition ----
         # Phase reward plus phase 1 bonuses
-        reward = rew_scale_hand_obj * contacts_w[:, -1] * torch.logical_not(self.obj_reached) + 0.5*(self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+        reward = rew_scale_hand_obj * contacts_w[:, -1] * torch.logical_not(self.obj_reached) + mod_hand * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
 
         # Reward for the contacts
         # reward = reward + contacts_w[:, 1:-2].sum(-1) 
@@ -693,6 +697,7 @@ class BimanualDirect(DirectRLEnv):
         # Update previous distances
         self.prev_dist = hand_obj_dist[:, 0]
         self.prev_dist_target = obj_target_dist[:, 0]
+        self.prev_hand_dist = hand_dist
             
         return reward
     
@@ -849,6 +854,8 @@ class BimanualDirect(DirectRLEnv):
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
+        self.prev_hand_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
+
         self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
