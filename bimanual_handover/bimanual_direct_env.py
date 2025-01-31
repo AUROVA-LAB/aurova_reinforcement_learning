@@ -617,6 +617,7 @@ class BimanualDirect(DirectRLEnv):
         obj_reach_target_thres = self.cfg.obj_reach_target_thres
         device = self.device
         target_pose = self.cfg.target_pose
+        actual_hand_pose = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         
 
         # ---- Distance computation ----
@@ -680,7 +681,7 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus phase 1 bonuses
-        reward = (contacts_w[:, -1]) * torch.logical_not(self.obj_reached) + 2*(torch.ones_like(contacts_w[:, -1]) - contacts_w[:, -1]) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+        reward = rew_scale_hand_obj * contacts_w[:, -1] * torch.logical_not(self.obj_reached) + 0.5*(self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
 
         # Reward for the contacts
         # reward = reward + contacts_w[:, 1:-2].sum(-1) 
