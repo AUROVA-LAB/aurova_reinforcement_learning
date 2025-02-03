@@ -78,6 +78,7 @@ class BimanualDirect(DirectRLEnv):
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = [self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos,
                                   self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.default_joint_pos]
+        self.default_hand_joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.default_joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
         
         # Default joints to open the hand
         self.open_hand_joints = torch.zeros((1, 16)).to(self.device)
@@ -636,13 +637,13 @@ class BimanualDirect(DirectRLEnv):
         contacts_w = self.contacts * self.cfg.contact_matrix
 
         # Thumb contact
-        thumb_w = contacts_w[:, -9:-4].clone()
+        thumb_w = contacts_w[:, -10:-5].clone()
         thumb_con = thumb_w.sum(-1) > 0.0        
 
 
         # ---- Flag ----
         # There is contact if the thumb and the fingers (finger collide without the thumb) are in contact
-        contacts_flag = torch.logical_and(contacts_w[:, :-2].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
+        contacts_flag = torch.logical_and(contacts_w[:, :-3].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
 
         # Reached flag pre-conditions
         bonus = self.obj_reached.clone().bool()
@@ -667,10 +668,10 @@ class BimanualDirect(DirectRLEnv):
 
         # Obtains wether the agent is approaching or not
         mod = torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
-        mod = 2*(torch.logical_and(mod, contacts_w[:, -1] > 0.0)) - 1
+        mod = 2*(torch.logical_and(mod, contacts_w[:, -2:].sum(-1) > 0.0)) - 1
 
         # Modifies scalation according to the contacts detected
-        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-3].sum(-1) + 1)        
+        rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-4].sum(-1) + 1)        
 
 
         # ---- Distance reward ----
@@ -685,7 +686,7 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus phase 1 bonuses
-        reward = rew_scale_hand_obj * contacts_w[:, -1] * torch.logical_not(self.obj_reached) + mod_hand * self.obj_reached + self.cfg.bonus_obj_reach * bonus / 2
+        reward = rew_scale_hand_obj * (-self.default_hand_joint_pos + actual_hand_pose).sum(-1) * torch.logical_not(self.obj_reached) + (self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached
 
         # Reward for the contacts
         # reward = reward + contacts_w[:, 1:-2].sum(-1) 
@@ -699,7 +700,7 @@ class BimanualDirect(DirectRLEnv):
         self.prev_dist_target = obj_target_dist[:, 0]
         self.prev_hand_dist = hand_dist
             
-        return reward
+        return reward*0.5
     
 
     # Verifies when to reset the environment --> Overrides method of DirecRLEnv
