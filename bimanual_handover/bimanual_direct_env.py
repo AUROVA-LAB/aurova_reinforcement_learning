@@ -637,14 +637,11 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase 1 reward: difference of joint position between actual and CLOSED
-        reward = rew_scale_hand_obj * (-self.default_hand_joint_pos + actual_hand_pose - self.falling.int() * self.cfg.bonus_obj_reach).sum(-1) * torch.logical_not(self.obj_reached)
+        reward = rew_scale_hand_obj * (-self.falling.int() * self.cfg.bonus_obj_reach + (-self.default_hand_joint_pos + actual_hand_pose).sum(-1)) * torch.logical_not(self.obj_reached)
         
         # Phase 2 reward: difference of joint position between actual and OPENED
         reward = reward + (self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached
         
-                # Phase reward plus phase 1 bonuses
-        reward = rew_scale_hand_obj * (-self.default_hand_joint_pos + actual_hand_pose).sum(-1) * torch.logical_not(self.obj_reached) + (self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached
-
         return reward*0.5
     
 
