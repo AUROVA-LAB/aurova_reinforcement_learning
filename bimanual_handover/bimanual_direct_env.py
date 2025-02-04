@@ -114,7 +114,7 @@ class BimanualDirect(DirectRLEnv):
         self.obj_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.obj_reached_target = torch.zeros(self.num_envs).to(self.device).bool()
 
-        path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/"
+        path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/sb3/Isaac-Bimanual-Direct-reach-v0"
         self.GEN3_agent = PPO.load(os.path.join(path_to_train, self.cfg.path_to_pretrained))
         self.GEN3_agent.policy.eval()
 
