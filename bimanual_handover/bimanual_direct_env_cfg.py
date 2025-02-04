@@ -282,7 +282,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for changing reach reward
     rew_change_thres = 0.0235 # 0.018
-    obj_reach_target_thres = 0.01
+    obj_reach_target_thres = 0.05
 
     # Bonus for reaching the target
     bonus_obj_reach = 300

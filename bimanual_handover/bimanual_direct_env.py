@@ -103,33 +103,23 @@ class BimanualDirect(DirectRLEnv):
 
         # Variable to store contacts between prims
         self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+        self.falling  = torch.empty(self.num_envs).fill_(False).bool().to(self.device)
 
         # Create output directory to save images
         if self.cfg.save_imgs:
             self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
             os.makedirs(self.output_dir, exist_ok=True)
-
-        # Previous distances
-        self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
-        self.prev_dist_target = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         
         # Object reached flags
         self.obj_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.obj_reached_target = torch.zeros(self.num_envs).to(self.device).bool()
 
-        # Reward tensor for the second phase
-        self.rew_2 = torch.ones(self.num_envs).to(self.device)
-
-        self.back = torch.tensor([0.0, 0.05, -0.051, 1, 0, 0, 0]).to(self.device).repeat(self.num_envs, 1)
-
-        path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/sb3/Isaac-Bimanual-Direct-reach-v0"
+        path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/"
         self.GEN3_agent = PPO.load(os.path.join(path_to_train, self.cfg.path_to_pretrained))
         self.GEN3_agent.policy.eval()
 
         self.obs_gen3 = None
 
-        self.prev_hand_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
-    
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
     def _setup_scene(self, ):
@@ -611,25 +601,8 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Variable assignments ----
         rew_scale_hand_obj = self.cfg.rew_scale_hand_obj * torch.ones(self.num_envs).to(self.device)
-        rew_scale_obj_target = self.cfg.rew_scale_obj_target
-        ee_pose = self.tips_pose_r
-        ee_pose_bask = self.tips_pose_r_back
         obj_pose = self.grasp_point_obj_pose_r
-        prev_dist = self.prev_dist
-        prev_dist_target = self.prev_dist_target
-        obj_reach_target_thres = self.cfg.obj_reach_target_thres
-        device = self.device
-        target_pose = self.cfg.target_pose
         actual_hand_pose = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
-        
-
-        # ---- Distance computation ----
-        # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
-        
-        # Dual quaternion distance between object and target pose
-        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
 
         # ---- Contact computation ----
@@ -638,68 +611,40 @@ class BimanualDirect(DirectRLEnv):
 
         # Thumb contact
         thumb_w = contacts_w[:, -10:-5].clone()
-        thumb_con = thumb_w.sum(-1) > 0.0        
+        thumb_con = thumb_w.sum(-1) > 0.0     
+
+        # Falling conditions
+        GEN3_falling = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 2] < self.cfg.gen3_height_limit
+        object_falling = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 2] < self.cfg.object_height_limit
+        self.falling = torch.logical_or(GEN3_falling, object_falling)   
 
 
         # ---- Flag ----
         # There is contact if the thumb and the fingers (finger collide without the thumb) are in contact
         contacts_flag = torch.logical_and(contacts_w[:, :-3].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
 
-        # Reached flag pre-conditions
-        bonus = self.obj_reached.clone().bool()
 
         # Check it the object is reached (contact with the object) and set it
         self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
-        
-        # Reached flag after conditions
-        new_bonus = self.obj_reached.clone().bool()
-
-        # The bonus must be activated if the object is reached at this step
-        bonus = torch.logical_and(new_bonus, torch.logical_not(bonus))
 
         # Check if the object has reached the target
-        self.obj_reached_target = (obj_pose[:, 0] < 0.05).bool() # (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
+        self.obj_reached_target = (obj_pose[:, 0] < self.cfg.obj_reach_target_thres).bool()
 
-
-        # ---- Distance evaluation ----
-        # Obtains the distance according to the object reached flag
-        dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
-        prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
-
-        # Obtains wether the agent is approaching or not
-        mod = torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
-        mod = 2*(torch.logical_and(mod, contacts_w[:, -2:].sum(-1) > 0.0)) - 1
 
         # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-4].sum(-1) + 1)        
 
 
-        # ---- Distance reward ----
-        # Reward for the first phase --> Approaching (mod) hand-obj distance divided by wether the object is approaching with the palm
-        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
-        
-        # Reward for the second phase --> Object-target distance the target
-        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
-
-        hand_dist = (self.open_hand_joints - actual_hand_pose).sum(-1)
-        mod_hand = 2*(hand_dist < self.prev_hand_dist) - 1
-
         # ---- Reward composition ----
-        # Phase reward plus phase 1 bonuses
+        # Phase 1 reward: difference of joint position between actual and CLOSED
+        reward = rew_scale_hand_obj * (-self.default_hand_joint_pos + actual_hand_pose - self.falling.int() * self.cfg.bonus_obj_reach).sum(-1) * torch.logical_not(self.obj_reached)
+        
+        # Phase 2 reward: difference of joint position between actual and OPENED
+        reward = reward + (self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached
+        
+                # Phase reward plus phase 1 bonuses
         reward = rew_scale_hand_obj * (-self.default_hand_joint_pos + actual_hand_pose).sum(-1) * torch.logical_not(self.obj_reached) + (self.open_hand_joints - actual_hand_pose).sum(-1) * self.obj_reached
 
-        # Reward for the contacts
-        # reward = reward + contacts_w[:, 1:-2].sum(-1) 
-
-        # Reward for reaching target
-        # reward = reward + self.cfg.bonus_obj_reach * self.obj_reached_target * (contacts_w[:, 1:-1].sum(-1) > 0.0).int()
-
-
-        # Update previous distances
-        self.prev_dist = hand_obj_dist[:, 0]
-        self.prev_dist_target = obj_target_dist[:, 0]
-        self.prev_hand_dist = hand_dist
-            
         return reward*0.5
     
 
@@ -722,16 +667,13 @@ class BimanualDirect(DirectRLEnv):
         out_of_bounds_2 = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 7:], dim = -1) > self.cfg.velocity_limit
         out_of_bounds = torch.logical_or(out_of_bounds_1, out_of_bounds_2)
 
-        # Falling conditions
-        GEN3_falling = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.GEN3]+1, 2] < self.cfg.gen3_height_limit
-        object_falling = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 2] < self.cfg.object_height_limit
-        falling = torch.logical_or(GEN3_falling, object_falling)
+        
         
         # Contact conditions
         GEN3_ground_contact = self.contacts[:, 0]
 
         # Truncated and terminated variables
-        truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
+        truncated = torch.logical_or(torch.logical_or(self.falling, out_of_bounds), GEN3_ground_contact)
         terminated = torch.logical_or(time_out, torch.logical_and(self.obj_reached, self.obj_reached_target) * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
 
 
@@ -852,14 +794,13 @@ class BimanualDirect(DirectRLEnv):
         # Updates the poses of the GEN3 end effector and the object in the reset
         self.update_new_poses()
 
-        # Reset previous distances
-        self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.prev_hand_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-
+        # Reset reached flags
         self.obj_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
+        self.falling[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+
+        # Reset contact detections
         self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
 
         
