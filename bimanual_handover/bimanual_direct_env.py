@@ -360,7 +360,7 @@ class BimanualDirect(DirectRLEnv):
         '''
         
         # Obtains the positions of the of the robots
-        ee_pose_w_UR5e = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.ee_jacobi_idx[self.cfg.UR5e]+1, 0:7]
+        ee_pose_w_UR5e = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.finger_tips[self.cfg.UR5e], 0:7].mean(1)
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
@@ -569,6 +569,9 @@ class BimanualDirect(DirectRLEnv):
         device = self.device
         target_pose = self.cfg.target_pose
         
+        tips_ur5e = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.body_state_w[:, self.finger_tips[self.cfg.UR5e], 0:7].mean(1)[:, :3]
+        tips_gen3 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.body_state_w[:, self.finger_tips[self.cfg.GEN3], 0:7].mean(1)[:, :3]
+        obj = self.scene.rigid_objects["object"].data.body_state_w[:, 0, :3]
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
@@ -577,6 +580,10 @@ class BimanualDirect(DirectRLEnv):
         
         # Dual quaternion distance between object and target pose
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+
+        # Distance between hand tips
+        tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
+        obj_dist = torch.norm((obj - tips_gen3), dim = -1)
 
 
         # ---- Contact computation ----
@@ -614,7 +621,8 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
-        mod = 2*(torch.logical_and(dist < prev_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])) - 1
+        pre_mod = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
+        mod = 2*(torch.logical_and(dist < prev_dist, pre_mod)) - 1
 
         # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
@@ -622,7 +630,7 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the first phase --> Approaching (mod) hand-obj distance divided by wether the object is approaching with the palm
-        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(hand_obj_dist_back[:,0] < hand_obj_dist[:,0]).int())
+        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(torch.logical_not(pre_mod)).int())
         
         # Reward for the second phase --> Object-target distance the target
         reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
