@@ -232,9 +232,9 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = torch.tensor([[-0.15,  0.15],
                                  [-0.15,  0.15],
                                  [-0.15,  0.15],
-                                 [-0.5,  0.5],
-                                 [-2*pi/5,  2*pi/5],
-                                 [-0.5,  0.5]])
+                                 [-0.3,  0.3],
+                                 [-0.65,  0.65],
+                                 [-0.3,  0.3]])
     
     # Which robot apply the sampling poses
     apply_range = [True, False]
