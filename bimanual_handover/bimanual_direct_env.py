@@ -617,7 +617,7 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance evaluation ----
         # Obtains the distance according to the object reached flag
-        dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
+        dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 1] * self.obj_reached.int()
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
@@ -633,7 +633,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(torch.logical_not(pre_mod)).int())
         
         # Reward for the second phase --> Object-target distance the target
-        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
+        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 1])
 
 
         # ---- Reward composition ----
@@ -649,7 +649,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Update previous distances
         self.prev_dist = hand_obj_dist[:, 0]
-        self.prev_dist_target = obj_target_dist[:, 0]
+        self.prev_dist_target = obj_target_dist[:, 1]
             
         return reward
     
