@@ -56,6 +56,7 @@ rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negati
 rot_225_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 225 degrees rotation in Z axis 
 rot_225_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1])) # Positive 225 degrees rotation in Z axis
 rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))         # Positive 180 degrees rotation in Z axis
 
 
 # Configuration class for the environment
@@ -65,8 +66,8 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 275             # Maximum steps in an episode
-    angle_scale = 14*pi/180.0    # Action angle scalation
+    max_steps = 100             # Maximum steps in an episode
+    angle_scale = 15*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
 
@@ -162,6 +163,11 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            "grasp_point_obj_2": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
         }
     )
     # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
@@ -219,7 +225,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
-                                      [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
+                                      [0.35954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
@@ -231,10 +237,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # Increments in the original poses for sampling random values on each axis
     ee_pose_incs = torch.tensor([[-0.12,  0.12],
                                  [-0.12,  0.12],
-                                 [-0.15,  0.15],
-                                 [-0.3,  0.3],
-                                 [-0.9,  0.9],
-                                 [-0.3,  0.3]])
+                                 [-0.12,  0.12],
+                                 [-0.3,   0.3],
+                                 [-0.8,   0.8],
+                                 [-0.3,   0.3]])
     
     # Which robot apply the sampling poses
     apply_range = [True, False]
@@ -249,6 +255,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
     rot_225_z_neg_quat = rot2tensor(rot_225_z_neg)
     rot_225_z_pos_quat = rot2tensor(rot_225_z_pos)
+    rot_180_z_pos_quat = rot2tensor(rot_180_z_pos)
 
     # Aggregate rotations as quaternions
     rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
@@ -313,6 +320,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_225_z_neg_quat = cfg.rot_225_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_225_z_pos_quat = cfg.rot_225_z_pos_quat.repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_quat = cfg.rot_180_z_pos_quat.repeat(num_envs, 1).to(device)
 
     cfg.tips_displacement = cfg.tips_displacement.repeat(num_envs, 1).to(device)
 
