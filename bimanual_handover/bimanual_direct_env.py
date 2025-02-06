@@ -596,10 +596,11 @@ class BimanualDirect(DirectRLEnv):
 
         hand_obj_dist_aux = dual_quaternion_error(ee_pose, obj_pose_aux, device)
         hand_obj_dist_back_aux = dual_quaternion_error(ee_pose_bask, obj_pose_aux, device)
-
-        hand_obj_dist = torch.where(hand_obj_dist[:, 0] < hand_obj_dist_aux[:, 0], hand_obj_dist, hand_obj_dist_aux)
-        hand_obj_dist_back = torch.where(hand_obj_dist_back[:, 0] < hand_obj_dist_back_aux[:, 0], hand_obj_dist_back, hand_obj_dist_back_aux)
         
+        hand_obj_dist = torch.where(hand_obj_dist[:, 0].unsqueeze(-1) < hand_obj_dist_aux[:, 0].unsqueeze(-1), hand_obj_dist, hand_obj_dist_aux)
+        hand_obj_dist_back = torch.where(hand_obj_dist_back[:, 0].unsqueeze(-1) < hand_obj_dist_back_aux[:, 0].unsqueeze(-1), hand_obj_dist_back, hand_obj_dist_back_aux)
+        
+
         # Dual quaternion distance between object and target pose
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
