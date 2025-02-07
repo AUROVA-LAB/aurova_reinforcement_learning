@@ -67,7 +67,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 275             # Maximum steps in an episode
-    angle_scale = 10*pi/180.0    # Action angle scalation
+    angle_scale = 8.5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
 
@@ -86,7 +86,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False        # Activate marker visualization
+    debug_markers = True        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -224,8 +224,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
-    ee_init_pose_quat = torch.tensor([[-0.35, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+    ee_init_pose_quat = torch.tensor([[-0.5144, -0.0333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
                                       [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
+    # ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+    #                                   [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
@@ -235,15 +237,15 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.1,  0.1],
-                                 [-0.1,  0.1],
-                                 [-0.1,  0.1],
-                                 [-0.4,  0.4],
-                                 [-0.85, 0.85],
-                                 [-0.4,  0.4]])
+    ee_pose_incs = torch.tensor([[-0.12,  0.12],
+                                 [-0.12,  0.12],
+                                 [-0.12,  0.12],
+                                 [-0.25,   0.25],
+                                 [-0.65,   0.65],
+                                 [-0.25,   0.25]])
     
     # Which robot apply the sampling poses
-    apply_range = [1, 0.4]
+    apply_range = [False, False]
 
 
 

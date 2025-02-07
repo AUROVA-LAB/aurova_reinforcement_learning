@@ -73,12 +73,14 @@ class CustomMlpExtractor(MlpExtractor):
 
 
 
-def insert_bn_dropout(seq):
+def insert_bn_dropout(seq, bias = False):
     layers = []
     for i, layer in enumerate(seq):
-        layers.append(layer)
+        # layers.append(layer)
         if isinstance(layer, nn.Linear):
-            layers.append(nn.BatchNorm1d(layer.out_features))
+            layers.append(nn.Linear(layer.in_features, layer.out_features, bias = bias))
+        else:
+            layers.append(layer)
         # if isinstance(layer, nn.Tanh):
         #     layers.append(nn.Dropout(p=0.0))  # Dropout after Tanh
     return nn.Sequential(*layers)
@@ -145,14 +147,18 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         if action_space.shape != ():
             action_shape = action_space.shape[0]
 
+        bias = False
+
         # Replace the actor with your custom network
         self.action_net = nn.Sequential(
-            nn.Linear(features, action_shape),
+            nn.Linear(features, action_shape, bias = bias),
             nn.Tanh())
 
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
 
-        # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
-        # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
+        self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net, bias = bias)
+        self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net, bias = bias)
+
+        raise
 

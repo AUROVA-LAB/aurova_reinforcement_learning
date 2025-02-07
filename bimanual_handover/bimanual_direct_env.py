@@ -47,12 +47,10 @@ class BimanualDirect(DirectRLEnv):
         self.debug_grasp_point_obj_pose_w = copy.deepcopy(self.debug_GEN3_ee_pose_w)
         self.debug_tips_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.debug_tips_back_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
-        self.debug_grasp_point_obj_pose_aux_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Poses for the object and GEN3 robot
         self.GEN3_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.grasp_point_obj_pose_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
-        self.grasp_point_obj_pose_aux_r = copy.deepcopy(self.GEN3_rot_ee_pose_r)
         self.tips_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.tips_pose_r_back = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
@@ -372,14 +370,12 @@ class BimanualDirect(DirectRLEnv):
                                                                          self.debug_GEN3_ee_pose_w[:, :3],
                                                                          self.debug_grasp_point_obj_pose_w[:, :3],
                                                                          self.debug_tips_pose_w[:, :3], 
-                                                                         self.debug_tips_back_pose_w[:, :3],
-                                                                         self.debug_grasp_point_obj_pose_aux_w[:, :3],)), 
+                                                                         self.debug_tips_back_pose_w[:, :3]),), 
                                                 orientations = torch.cat((ee_pose_w_UR5e[:, 3:], 
                                                                           self.debug_GEN3_ee_pose_w[:, 3:],
                                                                           self.debug_grasp_point_obj_pose_w[:,3:],
                                                                           self.debug_tips_pose_w[:, 3:],
-                                                                          self.debug_tips_back_pose_w[:, 3:],
-                                                                          self.debug_grasp_point_obj_pose_aux_w[:, 3:],)), 
+                                                                          self.debug_tips_back_pose_w[:, 3:]),), 
                                                 marker_indices=marker_indices)
         
 
@@ -477,21 +473,10 @@ class BimanualDirect(DirectRLEnv):
                                                                              t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_225_z_pos_quat)
         self.debug_grasp_point_obj_pose_w = torch.cat((grasp_point_obj_pos_w, grasp_point_obj_quat_w), dim=-1)
 
-        # Opposing system
-        grasp_point_obj_pos_aux_w, grasp_point_obj_quat_aux_w = combine_frame_transforms(t01 = self.debug_grasp_point_obj_pose_w[:, :3], q01 = self.debug_grasp_point_obj_pose_w[:, 3:],
-                                                                                         t12 = torch.zeros_like(grasp_point_obj_pos_w), q12 = self.cfg.rot_180_z_pos_quat)
-        self.debug_grasp_point_obj_pose_aux_w = torch.cat((grasp_point_obj_pos_aux_w, grasp_point_obj_quat_aux_w), dim=-1)
-
-
         # Apply transformation to get the grasping point in the GEN3 root frame
         grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
                                                                               t02 = grasp_point_obj_pos_w, q02 = grasp_point_obj_quat_w)
         self.grasp_point_obj_pose_r = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
-
-        # Apply transformation to get the opposing grasping point in the GEN3 root frame
-        grasp_point_obj_pos_aux_r, grasp_point_obj_quat_aux_r = subtract_frame_transforms(t01 = GEN3_root_pose_w[:, :3], q01 = GEN3_root_pose_w[:, 3:],
-                                                                              t02 = grasp_point_obj_pos_aux_w, q02 = grasp_point_obj_quat_aux_w)
-        self.grasp_point_obj_pose_aux_r = torch.cat((grasp_point_obj_pos_aux_r, grasp_point_obj_quat_aux_r), dim = -1)
 
 
     # Getter for the observations for the environment --> Overrides method of DirectRLEnv
@@ -578,7 +563,6 @@ class BimanualDirect(DirectRLEnv):
         ee_pose = self.tips_pose_r
         ee_pose_bask = self.tips_pose_r_back
         obj_pose = self.grasp_point_obj_pose_r
-        obj_pose_aux = self.grasp_point_obj_pose_aux_r
         prev_dist = self.prev_dist
         prev_dist_target = self.prev_dist_target
         obj_reach_target_thres = self.cfg.obj_reach_target_thres
@@ -593,14 +577,7 @@ class BimanualDirect(DirectRLEnv):
         # Dual quaternion distance between GEN3 hand tips and object
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
         hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
-
-        # hand_obj_dist_aux = dual_quaternion_error(ee_pose, obj_pose_aux, device)
-        # hand_obj_dist_back_aux = dual_quaternion_error(ee_pose_bask, obj_pose_aux, device)
         
-        # hand_obj_dist = torch.where(hand_obj_dist[:, 0].unsqueeze(-1) < hand_obj_dist_aux[:, 0].unsqueeze(-1), hand_obj_dist, hand_obj_dist_aux)
-        # hand_obj_dist_back = torch.where(hand_obj_dist_back[:, 0].unsqueeze(-1) < hand_obj_dist_back_aux[:, 0].unsqueeze(-1), hand_obj_dist_back, hand_obj_dist_back_aux)
-        
-
         # Dual quaternion distance between object and target pose
         obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
