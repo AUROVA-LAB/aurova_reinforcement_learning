@@ -594,11 +594,11 @@ class BimanualDirect(DirectRLEnv):
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
         hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
 
-        hand_obj_dist_aux = dual_quaternion_error(ee_pose, obj_pose_aux, device)
-        hand_obj_dist_back_aux = dual_quaternion_error(ee_pose_bask, obj_pose_aux, device)
+        # hand_obj_dist_aux = dual_quaternion_error(ee_pose, obj_pose_aux, device)
+        # hand_obj_dist_back_aux = dual_quaternion_error(ee_pose_bask, obj_pose_aux, device)
         
-        hand_obj_dist = torch.where(hand_obj_dist[:, 0].unsqueeze(-1) < hand_obj_dist_aux[:, 0].unsqueeze(-1), hand_obj_dist, hand_obj_dist_aux)
-        hand_obj_dist_back = torch.where(hand_obj_dist_back[:, 0].unsqueeze(-1) < hand_obj_dist_back_aux[:, 0].unsqueeze(-1), hand_obj_dist_back, hand_obj_dist_back_aux)
+        # hand_obj_dist = torch.where(hand_obj_dist[:, 0].unsqueeze(-1) < hand_obj_dist_aux[:, 0].unsqueeze(-1), hand_obj_dist, hand_obj_dist_aux)
+        # hand_obj_dist_back = torch.where(hand_obj_dist_back[:, 0].unsqueeze(-1) < hand_obj_dist_back_aux[:, 0].unsqueeze(-1), hand_obj_dist_back, hand_obj_dist_back_aux)
         
 
         # Dual quaternion distance between object and target pose
@@ -644,8 +644,9 @@ class BimanualDirect(DirectRLEnv):
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
-        pre_mod = hand_obj_dist_back[:,0] > hand_obj_dist[:,0]
+        pre_mod = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
         mod = 2*(torch.logical_and(dist < prev_dist, pre_mod)) - 1
+
 
         # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
