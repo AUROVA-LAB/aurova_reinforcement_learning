@@ -160,5 +160,3 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net, bias = bias)
         self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net, bias = bias)
 
-        raise
-
