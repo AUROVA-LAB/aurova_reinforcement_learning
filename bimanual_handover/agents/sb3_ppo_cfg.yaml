@@ -1,5 +1,5 @@
 # Reference: https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/hyperparams/ppo.yml#L32
-seed: 14
+seed: 13
 
 n_timesteps: !!float 3e8      # Total timesteps in which the agent will learn
 policy: 'MlpPolicy'           # Type of Policy
