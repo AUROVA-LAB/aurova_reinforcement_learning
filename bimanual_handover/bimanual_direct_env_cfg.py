@@ -86,7 +86,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True        # Activate marker visualization
+    debug_markers = False        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
