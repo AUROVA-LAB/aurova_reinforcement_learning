@@ -243,7 +243,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                                  [-0.4,  0.4]])
     
     # Which robot apply the sampling poses
-    apply_range = [True, False]
+    apply_range = [1, 0.4]
 
 
 
