@@ -151,12 +151,12 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
         # Replace the actor with your custom network
         self.action_net = nn.Sequential(
-            nn.Linear(features, action_shape, bias = bias),
+            nn.Linear(features, action_shape),
             nn.Tanh())
 
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
 
-        self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net, bias = bias)
-        self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net, bias = bias)
+        # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net, bias = bias)
+        # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net, bias = bias)
 

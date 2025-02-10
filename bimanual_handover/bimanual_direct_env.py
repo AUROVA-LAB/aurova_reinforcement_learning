@@ -603,7 +603,7 @@ class BimanualDirect(DirectRLEnv):
         bonus = self.obj_reached.clone().bool()
 
         # Check it the object is reached (contact with the object) and set it
-        self.obj_reached = torch.logical_or(contacts_flag, self.obj_reached)
+        self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
         
         # Reached flag after conditions
         new_bonus = self.obj_reached.clone().bool()
@@ -617,13 +617,12 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance evaluation ----
         # Obtains the distance according to the object reached flag
-        dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 1] * self.obj_reached.int()
+        dist = hand_obj_dist[:, 0] * torch.logical_not(self.obj_reached).int() + obj_target_dist[:, 0] * self.obj_reached.int()
         prev_dist = prev_dist * torch.logical_not(self.obj_reached).int() + prev_dist_target * self.obj_reached.int()
 
         # Obtains wether the agent is approaching or not
         pre_mod = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0])
         mod = 2*(torch.logical_and(dist < prev_dist, pre_mod)) - 1
-
 
         # Modifies scalation according to the contacts detected
         rew_scale_hand_obj = rew_scale_hand_obj / (self.contacts[:, 1:-2].sum(-1) + 1)        
@@ -634,7 +633,7 @@ class BimanualDirect(DirectRLEnv):
         reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist[:, 0]) / (1 + 2*(torch.logical_not(pre_mod)).int())
         
         # Reward for the second phase --> Object-target distance the target
-        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 1])
+        reward_2 = rew_scale_obj_target * torch.exp(-2*obj_target_dist[:, 0])
 
 
         # ---- Reward composition ----
@@ -650,7 +649,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Update previous distances
         self.prev_dist = hand_obj_dist[:, 0]
-        self.prev_dist_target = obj_target_dist[:, 1]
+        self.prev_dist_target = obj_target_dist[:, 0]
             
         return reward
     
