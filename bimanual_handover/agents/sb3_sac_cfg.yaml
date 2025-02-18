@@ -1,13 +1,15 @@
 # Reference: https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/hyperparams/ppo.yml#L32
-seed: 42
+seed: 56
 
-n_timesteps: !!float 3e8      # Total timesteps in which the agent will learn
+n_timesteps: !!float 6e8      # Total timesteps in which the agent will learn
 policy: 'MlpPolicy'           # Type of Policy
+buffer_size: 10000000          # Buffer size
 batch_size: 4096              # Minibatch size
-gamma: 0.99                   # Discount factor
+gamma: 0.95                   # Discount factor
 ent_coef: 0.01                # Entropy coefficient
-learning_starts: 1000         # How many steps of the model to collect transitions for before learning starts
+learning_starts: 10000         # How many steps of the model to collect transitions for before learning starts
 learning_rate: !!float 1e-4
+train_freq: 16
 use_sde: True                 # Mandatory if "squash_output" is activated
 policy_kwargs: "dict(
                   activation_fn=torch.nn.Tanh,
