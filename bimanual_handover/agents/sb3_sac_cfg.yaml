@@ -9,7 +9,7 @@ gamma: 0.95                   # Discount factor
 ent_coef: 0.01                # Entropy coefficient
 learning_starts: 10000         # How many steps of the model to collect transitions for before learning starts
 learning_rate: !!float 1e-4
-train_freq: 16
+train_freq: 3
 use_sde: True                 # Mandatory if "squash_output" is activated
 policy_kwargs: "dict(
                   activation_fn=torch.nn.Tanh,
