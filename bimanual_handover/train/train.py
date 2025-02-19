@@ -152,12 +152,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # Add environment arguments to the arguments for the policy
-    # agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "path": env_cfg.path_to_pretrained}
-    # agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
+    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "path": env_cfg.path_to_pretrained}
+    agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
 
     # create agent from stable baselines
-    # agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
-    agent = SAC(policy = "MlpPolicy", env = env, verbose=1, **agent_cfg)
+    agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
+    # agent = SAC(policy = "MlpPolicy", env = env, verbose=1, **agent_cfg)
 
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
