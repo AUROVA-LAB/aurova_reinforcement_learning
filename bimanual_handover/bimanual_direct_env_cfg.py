@@ -233,7 +233,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                                  [-0.15,  0.15],
                                  [-0.15,  0.15],
                                  [-0.3,  0.3],
-                                 [-0.65,  0.65],
+                                 [-0.75,  0.75],
                                  [-0.3,  0.3]])
     
     # Which robot apply the sampling poses
