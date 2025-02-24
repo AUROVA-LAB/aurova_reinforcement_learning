@@ -6,7 +6,7 @@ from collections.abc import Sequence
 import copy
 
 from .mdp.utils import compute_rewards, save_images_grid
-from .mdp.rewards import dual_quaternion_error 
+from .mdp.rewards import dual_quaternion_error, cartesian_error
 from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
 
 import omni.isaac.lab.sim as sim_utils
@@ -575,11 +575,11 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
+        hand_obj_dist = cartesian_error(ee_pose, obj_pose, device)
+        hand_obj_dist_back = cartesian_error(ee_pose_bask, obj_pose, device)
         
         # Dual quaternion distance between object and target pose
-        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+        obj_target_dist = cartesian_error(obj_pose, target_pose, device)
 
         # Distance between hand tips
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
