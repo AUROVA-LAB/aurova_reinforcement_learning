@@ -84,7 +84,7 @@ def SE3_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Te
 
     t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.46
     
-    r_dist = torch.acos(torch.clamp((trace_diff - 1) / 2, -1.0, 1.0)) / pi
+    r_dist = torch.abs(torch.acos(torch.clamp((trace_diff - 1) / 2, -1.0, 1.0))) / pi
 
     distance = t_dist + r_dist
         
