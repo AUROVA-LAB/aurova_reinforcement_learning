@@ -119,6 +119,11 @@ class BimanualDirect(DirectRLEnv):
         self.rew_2 = torch.ones(self.num_envs).to(self.device)
 
         self.back = torch.tensor([0.0, 0.05, -0.051, 1, 0, 0, 0]).to(self.device).repeat(self.num_envs, 1)
+
+        self.err_aux = torch.zeros((self.num_envs, 3)).to(self.device)
+        self.cont_err = torch.zeros(self.num_envs).to(self.device)
+
+        self.aux_info = [[0.0, 0.0, 0.0], 0.0]
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -537,7 +542,9 @@ class BimanualDirect(DirectRLEnv):
             )
 
         # Builds the dictionary
-        observations = {"policy": obs}
+        observations = {"policy": obs, 
+                        "dist": self.aux_info[0],
+                        "phase":self.aux_info[1]}
         
         # Updates markers
         if self.cfg.debug_markers:
@@ -575,11 +582,23 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = SE3_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = SE3_error(ee_pose_bask, obj_pose, device)
+        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
+
+        
+
+        # if not self.obj_reached[1]:
+        #     self.err_aux[1] += hand_obj_dist[1]
+        #     self.cont_err[1] += 1
+
+        #     print("EULER Distancia total: ", self.err_aux[1, 0])
+        #     print("EULER Distancia translacion: ", self.err_aux[1, 1])
+        #     print("EULER Distancia rotacion: ", self.err_aux[1, 2])
+        #     print("DQ Contador: ", self.cont_err[1])
+        #     print("---------------\n\n")
         
         # Dual quaternion distance between object and target pose
-        obj_target_dist = SE3_error(obj_pose, target_pose, device)
+        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
         # Distance between hand tips
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
@@ -601,6 +620,28 @@ class BimanualDirect(DirectRLEnv):
 
         # Reached flag pre-conditions
         bonus = self.obj_reached.clone().bool()
+
+        if not self.obj_reached[0]:
+            self.err_aux[0] += hand_obj_dist[0]
+            self.cont_err[0] += 1
+
+            phase_0_flag = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0]).item()
+            phase_2_flag = (contacts_w[:, :-1].sum(-1) > 0.4).item()
+
+            phase = 1
+
+            if phase_0_flag:
+                phase = 0
+            if phase_2_flag:
+                phase = 2
+
+            self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), phase]
+
+            # print("DQ Distancia total: ", self.err_aux[0, 0])
+            # print("DQ Distancia translacion: ", self.err_aux[0, 1])
+            # print("DQ Distancia rotacion: ", self.err_aux[0, 2])
+            # print("DQ Contador: ", self.cont_err[0])
+            # print("-------")
 
         # Check it the object is reached (contact with the object) and set it
         self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
@@ -683,7 +724,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
-        terminated = torch.logical_or(time_out, self.obj_reached_target * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
+        terminated = torch.logical_or(time_out, self.obj_reached * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
 
 
         return truncated, terminated
