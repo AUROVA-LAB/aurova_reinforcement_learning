@@ -45,7 +45,7 @@ def main():
     # Filter models
     path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/"
     dir = os.path.join(path_to_train, args_cli.model_dir)
-    dir2 = os.path.join(path_to_train, args_cli.model_dir2)
+    # dir2 = os.path.join(path_to_train, args_cli.model_dir2)
 
     # models = [file for file in os.listdir(dir) if file.endswith(".zip")]
 
@@ -63,8 +63,8 @@ def main():
     model = PPO.load(os.path.join(dir, model_name_))
     model.policy.eval()
     
-    model2 = PPO.load(os.path.join(dir2, model_name2_))
-    model2.policy.eval()
+    # model2 = PPO.load(os.path.join(dir2, model_name2_))
+    # model2.policy.eval()
 
     # print(f"\n\n{idx + 1}. Loading model: " + model_name_)
 
