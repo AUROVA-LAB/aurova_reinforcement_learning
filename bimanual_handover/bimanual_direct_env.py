@@ -543,8 +543,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Builds the dictionary
         observations = {"policy": obs, 
-                        "dist": self.aux_info[0],
-                        "phase":self.aux_info[1]}
+                        "phase": self.obj_reached}
         
         # Updates markers
         if self.cfg.debug_markers:
@@ -622,20 +621,21 @@ class BimanualDirect(DirectRLEnv):
         bonus = self.obj_reached.clone().bool()
 
         if not self.obj_reached[0]:
+            hand_obj_dist[0, 1] = obj_dist[0]
             self.err_aux[0] += hand_obj_dist[0]
             self.cont_err[0] += 1
 
-            phase_0_flag = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0]).item()
-            phase_2_flag = (contacts_w[:, :-1].sum(-1) > 0.4).item()
+            # phase_0_flag = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0]).item()
+            # phase_2_flag = (contacts_w[:, :-1].sum(-1) > 0.4).item()
 
-            phase = 1
+            # phase = 1
 
-            if phase_0_flag:
-                phase = 0
-            if phase_2_flag:
-                phase = 2
+            # if phase_0_flag:
+            #     phase = 0
+            # if phase_2_flag:
+            #     phase = 2
 
-            self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), phase]
+            self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), self.obj_reached.int()]
 
             # print("DQ Distancia total: ", self.err_aux[0, 0])
             # print("DQ Distancia translacion: ", self.err_aux[0, 1])
@@ -724,7 +724,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
-        terminated = torch.logical_or(time_out, self.obj_reached * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
+        terminated = torch.logical_or(time_out, self.obj_reached_target * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
 
 
         return truncated, terminated

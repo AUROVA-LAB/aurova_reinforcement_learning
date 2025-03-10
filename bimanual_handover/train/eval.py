@@ -89,11 +89,11 @@ def main():
         while simulation_app.is_running():
             with torch.inference_mode():
                 # Generate action
-                action, __ = model.predict(obs["policy"].cpu().numpy(), deterministic = True)
-                # action2, __ = model2.predict(obs["policy"].cpu().numpy(), deterministic = True)
+                # action, __ = model.predict(obs["policy"].cpu().numpy(), deterministic = True)
+                action2, __ = model2.predict(obs["policy"].cpu().numpy(), deterministic = True)
                 
                 # Step the environemnt
-                obs, rew, terminated, truncated, info = env.step(torch.tensor((action)))
+                obs, rew, terminated, truncated, info = env.step(torch.tensor((action2)))
                 
                 # Accumulate reward
                 r += rew.cpu()

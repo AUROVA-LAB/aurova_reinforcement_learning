@@ -48,10 +48,20 @@ def plot_results(event_files):
             plt.plot(timestep, mean_reward, label=labels[i], color=colors[i])
             plt.fill_between(timestep, mean_reward - std_reward, mean_reward + std_reward, color=colors[i], alpha=0.3)
 
-    plt.xlabel("Timesteps", fontsize=28)
+    plt.xlabel("Time Step", fontsize=28)
     plt.ylabel("Average Reward", fontsize=28)
     
-    # plt.legend()
+
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.ticklabel_format(
+                    axis="x",
+                    style="sci",
+                    scilimits=(0,0),
+                    useMathText=False
+)
+    plt.gca().xaxis.get_offset_text().set_fontsize(20)  # or whatever size you want
+    plt.rc('font', size=20)
     plt.legend(fontsize='xx-large')
     plt.grid()
     plt.show()

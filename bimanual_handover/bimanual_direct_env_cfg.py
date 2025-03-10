@@ -117,14 +117,23 @@ class BimanualDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.035, 0.035, 0.45),
+            size=(0.035, 0.035, 0.35),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
                                                             contact_offset=0.001),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+        # spawn=sim_utils.CylinderCfg(
+        #     radius = 0.019,
+        #     height = 0.45,
+        #     rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+        #     mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
+        #     collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+        #                                                     contact_offset=0.001),
+        #     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+        # ),
+        # init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
     )
     # RigidObjectCfg: Configuration parameters for a rigid object.
     #    spawn: Spawn configuration for the asset. --> Deciding which object type it is spawned
