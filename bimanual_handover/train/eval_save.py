@@ -53,7 +53,7 @@ def main():
     obs, __ = env.reset()
 
 
-    model_name_ = "model_599552000_steps.zip"
+    model_name_ = "model_599552000_steps"
     model_name2_ = "model_599552000_steps.zip"
 
     # Accumulated reward for all the episodes
