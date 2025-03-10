@@ -47,7 +47,7 @@ def main():
     dir = os.path.join(path_to_train, args_cli.model_dir)
     dir2 = os.path.join(path_to_train, args_cli.model_dir2)
 
-    models = [file for file in os.listdir(dir) if file.endswith(".zip")]
+    # models = [file for file in os.listdir(dir) if file.endswith(".zip")]
 
     # Reset
     obs, __ = env.reset()
