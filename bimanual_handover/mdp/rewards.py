@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import torch
-from .dq import dq_distance, q_mul
+from .dq import dq_distance, q_mul, q_conjugate
 
 from omni.isaac.lab.utils.math import euler_xyz_from_quat
 
@@ -62,6 +62,27 @@ def cartesian_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> to
         
     return torch.cat((distance.unsqueeze(-1), t_dist.unsqueeze(-1), r_dist.unsqueeze(-1)), dim = -1)
 
+
+
+# Compute error as a dual quaternion distance
+def quat_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    # Convert position and orientation (pose) to dual quaternion
+    pos_1, pos_2 = pose1[:, :3], pose2[:, :3]
+
+    t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.66
+
+
+    q_diff =  q_mul(pose1[:, 3:], q_conjugate(pose2[:, 3:]))
+
+    q_diff[:, 0] = torch.abs(q_diff[:, 0]) - 1
+
+    # Obtain the norm of the primary and dual part
+    rotation_mod = torch.norm(q_diff, dim = -1)
+
+    # The distance is the sum of the modules
+    distance = t_dist + rotation_mod
+
+    return torch.cat((distance, t_dist, rotation_mod)).view(distance.shape[0], 3)
 
 
 ##
