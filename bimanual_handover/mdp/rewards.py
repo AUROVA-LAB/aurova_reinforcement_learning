@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import torch
-from .dq import dq_distance, q_mul
+from .dq import dq_distance, q_mul, q_conjugate
+
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
 
 
 # Compute error as a dual quaternion distance
@@ -27,6 +29,60 @@ def dual_quaternion_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str)
     distance = dq_distance(pose2_dq, pose1_dq)
         
     return distance
+
+# Compute error as a dual quaternion distance
+def cartesian_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pose1 / pose2 - torch.Tensor(N, 7): poses to compute the distance in translation(3) + rotation in quaternions(4).
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - distance - torch.Tensor(N, 3): distance[:, 0] in dual quaternions, translation module[:, 1] and rotation module[:, 2].
+    '''
+    # Convert position and orientation (pose) to dual quaternion
+    pos_1, pos_2 = pose1[:, :3], pose2[:, :3]
+
+    r1, p1, y1 = euler_xyz_from_quat(quat = pose1[:, 3:])
+    r2, p2, y2 = euler_xyz_from_quat(quat = pose2[:, 3:])
+
+    euler_1 = torch.cat((r1.unsqueeze(-1), p1.unsqueeze(-1), y1.unsqueeze(-1)), dim=-1)
+    euler_2 = torch.cat((r2.unsqueeze(-1), p2.unsqueeze(-1), y2.unsqueeze(-1)), dim=-1)
+    
+    euler_1 = torch.tensor(euler_1).to(device)
+    euler_2 = torch.tensor(euler_2).to(device)
+
+    euler_1 = torch.where(euler_1 > 0.0, euler_1, -euler_1)
+    euler_2 = torch.where(euler_2 > 0.0, euler_2, -euler_2)
+
+    t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.46
+    r_dist = (euler_1 - euler_2).norm(dim = -1) / 3.1
+
+    distance = t_dist + r_dist
+        
+    return torch.cat((distance.unsqueeze(-1), t_dist.unsqueeze(-1), r_dist.unsqueeze(-1)), dim = -1)
+
+
+
+# Compute error as a dual quaternion distance
+def quat_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    # Convert position and orientation (pose) to dual quaternion
+    pos_1, pos_2 = pose1[:, :3], pose2[:, :3]
+
+    t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.66
+
+
+    q_diff =  q_mul(pose1[:, 3:], q_conjugate(pose2[:, 3:]))
+
+    q_diff[:, 0] = torch.abs(q_diff[:, 0]) - 1
+
+    # Obtain the norm of the primary and dual part
+    rotation_mod = torch.norm(q_diff, dim = -1)
+
+    # The distance is the sum of the modules
+    distance = t_dist + rotation_mod
+
+    return torch.cat((distance, t_dist, rotation_mod)).view(distance.shape[0], 3)
 
 
 ##
@@ -54,6 +110,23 @@ def pose2dq(pose: torch.Tensor, device: str) -> torch.Tensor:
     # Shape comprobation
     assert pos.shape[-1] == 4
     assert orient.shape[-1] == 4
+
+
+
+
+
+
+
+
+# TODO: poner pos*orient que esta bien
+
+
+
+
+
+
+
+
 
     # From translation and orientation to DQ
     return torch.cat((orient, 0.5 * q_mul(orient, pos)), dim = -1)
