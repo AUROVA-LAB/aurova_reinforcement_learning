@@ -43,7 +43,7 @@ def main():
     env = gym.make(args_cli.task, cfg = env_cfg)
     
     # Filter models
-    path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/sb3/Isaac-Bimanual-Direct-reach-v0/"
+    path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train/logs/"
     dir = os.path.join(path_to_train, args_cli.model_dir)
     # dir2 = os.path.join(path_to_train, args_cli.model_dir2)
 
@@ -69,7 +69,7 @@ def main():
     # print(f"\n\n{idx + 1}. Loading model: " + model_name_)
 
     count = 0
-    count_limit = 1000 * args_cli.num_envs
+    count_limit = 10000 * args_cli.num_envs
     data = {
         "phase": obs["phase"],
         "obs": obs["policy"]
@@ -88,12 +88,19 @@ def main():
             data["phase"] = torch.cat((data["phase"], obs["phase"]), dim=-1)
             data["obs"] = torch.cat((data["obs"], obs["policy"]), dim = 0)
 
-            
+            print(data["phase"].shape)
+            print(data["obs"].shape)
+            print(count)
+            print("----------- \n")
+
             
             
             if count >= count_limit:
                 break
             count += 1
+
+    print(data["phase"].shape)
+    
 
     
     saving_path_obs = os.path.join(path_to_train, "obs.pt")

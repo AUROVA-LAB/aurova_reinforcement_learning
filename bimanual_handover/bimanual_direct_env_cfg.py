@@ -65,7 +65,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 275             # Maximum steps in an episode
+    max_steps = 200             # Maximum steps in an episode
     angle_scale = 8.5*pi/180.0    # Action angle scalation
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
@@ -98,6 +98,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     keys = ['UR5e', 'GEN3']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame']
+    seed = 69
 
 
 
@@ -242,7 +243,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                                  [-0.15,  0.15],
                                  [-0.15,  0.15],
                                  [-0.3,  0.3],
-                                 [-0.75,  0.75],
+                                 [-0.6,  0.6],
                                  [-0.3,  0.3]])
     
     # Which robot apply the sampling poses

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import torch
+import torch.nn as nn
 from collections.abc import Sequence
 import copy
 
@@ -21,6 +22,23 @@ from omni.isaac.lab.sensors import ContactSensor
 from omni.isaac.lab.markers import VisualizationMarkers
 from omni.isaac.lab.assets import RigidObject
 
+
+class FeedForwardNN(nn.Module):
+    def __init__(self):
+        super(FeedForwardNN, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(17, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
 '''
                     ############## IMPORTANT #################
    The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
@@ -37,6 +55,11 @@ class BimanualDirect(DirectRLEnv):
     # --- init function ---
     def __init__(self, cfg: BimanualDirectCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
+
+        self.model = FeedForwardNN()
+        self.model.load_state_dict(torch.load("/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/model.pth", weights_only=True))
+        self.model = self.model.to(self.device)
+        self.model.eval()
         
         # Initial poses sampled in reset for both robots
         self.reset_joint_positions = [torch.zeros((self.num_envs, 6+16)).to(self.device), torch.zeros((self.num_envs, 7+16)).to(self.device)]
@@ -123,7 +146,7 @@ class BimanualDirect(DirectRLEnv):
         self.err_aux = torch.zeros((self.num_envs, 3)).to(self.device)
         self.cont_err = torch.zeros(self.num_envs).to(self.device)
 
-        self.aux_info = [[0.0, 0.0, 0.0], 0.0]
+        self.aux_info = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0]
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -543,7 +566,8 @@ class BimanualDirect(DirectRLEnv):
 
         # Builds the dictionary
         observations = {"policy": obs, 
-                        "phase": self.obj_reached}
+                        "dist": self.aux_info[0],
+                        "phase":self.obj_reached.int()}
         
         # Updates markers
         if self.cfg.debug_markers:
@@ -581,8 +605,8 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
+        hand_obj_dist = cartesian_error(ee_pose, obj_pose, device)
+        hand_obj_dist_back = cartesian_error(ee_pose_bask, obj_pose, device)
 
         
 
@@ -597,7 +621,7 @@ class BimanualDirect(DirectRLEnv):
         #     print("---------------\n\n")
         
         # Dual quaternion distance between object and target pose
-        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+        obj_target_dist = cartesian_error(obj_pose, target_pose, device)
 
         # Distance between hand tips
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
@@ -621,7 +645,6 @@ class BimanualDirect(DirectRLEnv):
         bonus = self.obj_reached.clone().bool()
 
         if not self.obj_reached[0]:
-            hand_obj_dist[0, 1] = obj_dist[0]
             self.err_aux[0] += hand_obj_dist[0]
             self.cont_err[0] += 1
 
@@ -635,17 +658,46 @@ class BimanualDirect(DirectRLEnv):
             # if phase_2_flag:
             #     phase = 2
 
-            self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), self.obj_reached.int()]
+            # hand_obj_dist_ = dual_quaternion_error(ee_pose, obj_pose, device)
 
-            # print("DQ Distancia total: ", self.err_aux[0, 0])
-            # print("DQ Distancia translacion: ", self.err_aux[0, 1])
-            # print("DQ Distancia rotacion: ", self.err_aux[0, 2])
-            # print("DQ Contador: ", self.cont_err[0])
-            # print("-------")
+            # self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), hand_obj_dist_[0].cpu().numpy().tolist(), phase]
+
+
+
+        # Builds the tensor with all the observations in a single row tensor (N, 7+16)
+        obs = torch.cat(
+            (
+                self.GEN3_rot_ee_pose_r,
+                self.grasp_point_obj_pose_r,
+            ),
+            dim = -1
+        )
+
+        # In case of manipulation phase, add the hand joint positions
+        if self.cfg.phase == self.cfg.MANIPULATION:
+
+            # Obtains the joint positions for the hand
+            # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
+            hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+            
+            # Selects the hand joints to be observed
+            sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
+            
+            # Concatenates the mean of selected hand joint positions
+            obs = torch.cat(
+                (
+                    obs,
+                    sel_hand_joint.view(-1, 3,4).mean(dim = -1).view(-1, 3),
+                ),
+                dim = -1
+            )
 
         # Check it the object is reached (contact with the object) and set it
         self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
+        # self.obj_reached = self.model(obs).bool().squeeze(0)
         
+        
+
         # Reached flag after conditions
         new_bonus = self.obj_reached.clone().bool()
 
