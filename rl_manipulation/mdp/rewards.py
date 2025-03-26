@@ -20,8 +20,8 @@ def dual_quaternion_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str)
         - distance - torch.Tensor(N, 3): distance[:, 0] in dual quaternions, translation module[:, 1] and rotation module[:, 2].
     '''
     # Convert position and orientation (pose) to dual quaternion
-    pose1_dq = pose2dq(pose = pose1, device = device)
-    pose2_dq = pose2dq(pose = pose2, device = device)
+    pose1_dq = pose2dq(pose = pose1, device = device).float()
+    pose2_dq = pose2dq(pose = pose2, device = device).float()
 
     # Compute dual quaternion distance
     distance = dq_distance(pose2_dq, pose1_dq)

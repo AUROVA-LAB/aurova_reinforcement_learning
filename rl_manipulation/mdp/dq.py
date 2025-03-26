@@ -27,6 +27,8 @@ def q_mul(q1, q2):
     assert q2.shape[-1] == 4
     original_shape = q1.shape
 
+    q1 = q1.float()
+    q2 = q2.float()
     # Compute outer product
     terms = torch.bmm(q2.view(-1, 4, 1), q1.view(-1, 1, 4))
     w = terms[:, 0, 0] - terms[:, 1, 1] - terms[:, 2, 2] - terms[:, 3, 3]

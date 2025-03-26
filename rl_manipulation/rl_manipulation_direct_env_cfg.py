@@ -7,23 +7,23 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG
+from isaaclab_tasks.direct.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import Articulation
-from omni.isaac.lab.envs import DirectRLEnvCfg
-from omni.isaac.lab.scene import InteractiveSceneCfg
-from omni.isaac.lab.sim import SimulationCfg
-from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.utils.math import euler_xyz_from_quat
-from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
-from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
-from omni.isaac.lab.markers import VisualizationMarkersCfg
-from omni.isaac.lab.assets import RigidObjectCfg
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation
+from isaaclab.envs import DirectRLEnvCfg
+from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sim import SimulationCfg
+from isaaclab.utils import configclass
+from isaaclab.utils.math import euler_xyz_from_quat
+from isaaclab.sensors import CameraCfg, ContactSensorCfg
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.assets import RigidObjectCfg
 
-from omni.isaac.lab.managers import EventTermCfg, SceneEntityCfg
-from omni.isaac.lab.envs import mdp
+from isaaclab.managers import EventTermCfg, SceneEntityCfg
+from isaaclab.envs import mdp
 
 '''
                     ############## IMPORTANT #################
@@ -120,7 +120,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 275             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
-    translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
+    translation_scale = [0.02, 0.02, 0.02] # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
 
     # Variables to distinguish the phases
@@ -132,15 +132,17 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    num_actions = 6 + phase * 1          # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * (1)     # Number of observations per environment (overridden)
+    action_space = 6        # Number of actions per environment (overridden)
+    observation_space = 7 + 7     # Number of observations per environment (overridden)
+    state_space = 0
+
     euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
 
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = True        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
-    render_imgs = True          # Activate image rendering
+    render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -154,13 +156,15 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     UR5e = 0
     GEN3 = 1
     UR5e_3f = 2
+    UR5e_NOGRIP = 3
     
-    robot = UR5e_3f
+    robot = UR5e_NOGRIP
 
-    keys = ['UR5e', 'GEN3', 'UR5e_3f']     # Keys for the robots in simulation
+    keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame',
-               'tool0']
+               'tool0',
+               'wrist_3_link']
 
 
 
@@ -175,6 +179,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     robot_cfg_1: Articulation = UR5e_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e])
     robot_cfg_2: Articulation = GEN3_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[GEN3])
     robot_cfg_3: Articulation = UR5e_3f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_3f])
+    robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
+
     
 
     # Object
@@ -209,7 +215,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
-            "grasp_point_obj": sim_utils.UsdFileCfg(
+            "target_point": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -229,7 +235,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # camera
     camera_cfg = CameraCfg(
-        prim_path="/World/envs/env_.*/" + keys[robot] + "/camera_depth_frame/Camera",
+        prim_path="/World/envs/env_.*/" + keys[robot] + "/wrist_3_link/ur_gripper/camera_bottom_screw_frame/camera_link/camera_depth_frame/Camera",
         update_period=0.03,
         height=480,
         width=640,
@@ -245,13 +251,15 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Robot joint names
     joints = [['arm_shoulder_pan_joint', 'arm_shoulder_lift_joint', 'arm_elbow_joint', 'arm_wrist_1_joint', 'arm_wrist_2_joint', 'arm_wrist_3_joint'],
               ['arm_joint_1', 'arm_joint_2', 'arm_joint_3', 'arm_joint_4', 'arm_joint_5', 'arm_joint_6', 'arm_joint_7'],
+              ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'],
               ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']]
     
     # Hand joint names
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
             [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
              "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
-             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"]]
+             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"],
+             []]
 
     # Link names for the robots
     links = [['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
@@ -264,21 +272,24 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
               'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
               'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
               'finger_4_contact_14_link', 'finger_4_contact_15_tip_link'],
+    ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link'],
     ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link']]
 
     # Fingers tips for the robots
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
-                    ["tool0"]]
+                    ["tool0"],
+                    ['tool0']]
     
     # Displacement from the tips
-    tips_displacement = torch.tensor([0.03, -0.03, 0.0])
+    tips_displacement = [0.03, -0.03, 0.0]
 
     # All joint names
-    all_joints = [[], [], []]
+    all_joints = [[], [], [], []]
     all_joints[UR5e] = joints[UR5e] + hand_joints[UR5e]
     all_joints[GEN3] = joints[GEN3] + hand_joints[GEN3]
     all_joints[UR5e_3f] = joints[UR5e_3f] + hand_joints[UR5e_3f]
+    all_joints[UR5e_NOGRIP] = joints[UR5e_NOGRIP]
 
     m1 = 1.2218 / 140
 
@@ -289,44 +300,49 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     contact_sensors_dict = {}
 
     # Contact matrix for weight the contacts
-    contact_matrix = torch.tensor([[0.0]])
+    contact_matrix = [[0.0]]
 
 
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
-    ee_init_pose_quat = torch.tensor([[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
-                                      [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                                      [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]])
+    ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+                         [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
     
     # Obtain Euler angles from the quaternion
-    r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
-    euler = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim=-1)
+    r, p, y = euler_xyz_from_quat(torch.tensor(ee_init_pose_quat)[:, 3:])
+    
+    euler = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim=-1).numpy().tolist()
+    r = r.numpy().tolist()
+    p = p.numpy().tolist()
+    y = y.numpy().tolist()
 
     # Initial pose using Euler angles
-    ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
+    ee_init_pose = torch.cat((torch.tensor(ee_init_pose_quat)[:,:3], torch.tensor(euler)), dim = -1).numpy().tolist()
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = torch.tensor([[-0.15,  0.15],
-                                 [-0.15,  0.15],
-                                 [-0.15,  0.15],
-                                 [-0.3,  0.3],
-                                 [-0.3,  0.3],
-                                 [-0.3,  0.3]])
+    ee_pose_incs = [[-0.15,  0.15],
+                    [-0.15,  0.15],
+                    [-0.15,  0.15],
+                    [-0.3,  0.3],
+                    [-0.3,  0.3],
+                    [-0.3,  0.3]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False]
+    apply_range = [False, True, False, False]
 
 
 
     # ---- Object poses ----
     # Traslation respect to the end effector robot link frame for object spawning
-    obj_pos_trans = torch.tensor([0.0 - 0.075, -0.0335*2 - 0.075, 0.115])
+    obj_pos_trans = [0.0 - 0.075, -0.0335*2 - 0.075, 0.115]
 
     # Transform to quaternions
-    rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
-    rot_305_z_neg_quat = rot2tensor(rot_305_z_neg)
-    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos)
+    rot_45_z_neg_quat = rot2tensor(rot_45_z_neg).numpy().tolist()
+    rot_305_z_neg_quat = rot2tensor(rot_305_z_neg).numpy().tolist()
+    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
 
     # Aggregate rotations as quaternions
     rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
@@ -337,26 +353,31 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     obj_quat_trans[0], obj_quat_trans[1:] = rot_quat[-1].clone(), rot_quat[:3].clone()
     
     # Height limits for the object and the GEN3 robot
-    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.15 # = 0.45
+    object_height_limit = ee_init_pose_quat[0][2] + ee_pose_incs[0][0] - 0.15 # = 0.45
     gen3_height_limit = 0.1
     
     # Translation respect to the object link frame for object grasping point observation
-    grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.0])
-    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos)
+    grasp_obs_obj_pos_trans = [0.0, 0.0, 0.0]
+    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos).numpy().tolist()
 
     # Target position for the object -> origin GEN3 position with offset in X axis
-    target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
+    target_pose = [0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873]
     
+    rot_quat = None
+    obj_quat_trans = obj_quat_trans.numpy().tolist()
 
-    obj_pose = torch.tensor([-0.5, 0, 0.15, 1,0,0,0])
+
+
+
+    obj_pose = [-0.5, 0, 0.15, 1,0,0,0]
     # obj_pose = torch.cat((obj_pose, rot2tensor(a)))
 
-    obj_poses_incs = torch.tensor([[-0.15,  0.15],
-                                 [-0.15,  0.15],
-                                 [-0.0,  0.0],
-                                 [0.0,  0.0],
-                                 [0.0,  0.0],
-                                 [-pi,  pi]])
+    obj_poses_incs = [[-0.15,  0.15],
+                      [-0.15,  0.15],
+                      [-0.0,  0.0],
+                      [0.0,  0.0],
+                      [0.0,  0.0],
+                      [-pi,  pi]]
 
 
 
@@ -371,6 +392,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Bonus for reaching the target
     bonus_obj_reach = 300
+
+    rot_45_z_neg = None       # Negative 45 degrees rotation in Z axis 
+    rot_225_z_neg = None     # Negative 225 degrees rotation in Z axis 
+    rot_225_z_pos = None # Positive 225 degrees rotation in Z axis
+    rot_90_x_pos = None
 
 
 
@@ -389,24 +415,24 @@ def update_cfg(cfg, num_envs, device):
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
 
-    cfg.translation_scale = cfg.translation_scale.to(device)
+    cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
-    cfg.obj_pos_trans = cfg.obj_pos_trans.repeat(num_envs, 1).to(device)
-    cfg.obj_quat_trans = cfg.obj_quat_trans.repeat(num_envs, 1).to(device)
+    cfg.obj_pos_trans = torch.tensor(cfg.obj_pos_trans).repeat(num_envs, 1).to(device)
+    cfg.obj_quat_trans = torch.tensor(cfg.obj_quat_trans).repeat(num_envs, 1).to(device)
 
-    cfg.grasp_obs_obj_pos_trans = cfg.grasp_obs_obj_pos_trans.repeat(num_envs, 1).to(device)
-    cfg.grasp_obs_obj_quat_trans = cfg.grasp_obs_obj_quat_trans.repeat(num_envs, 1).to(device)
+    cfg.grasp_obs_obj_pos_trans = torch.tensor(cfg.grasp_obs_obj_pos_trans).repeat(num_envs, 1).to(device)
+    cfg.grasp_obs_obj_quat_trans = torch.tensor(cfg.grasp_obs_obj_quat_trans).repeat(num_envs, 1).to(device)
 
-    cfg.obj_pose = cfg.obj_pose.repeat(num_envs, 1).to(device)
-    cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
+    cfg.obj_pose = torch.tensor(cfg.obj_pose).repeat(num_envs, 1).to(device)
+    cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
 
-    cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
-    cfg.rot_305_z_neg_quat = cfg.rot_305_z_neg_quat.repeat(num_envs, 1).to(device)
-    cfg.rot_45_z_pos_quat = cfg.rot_45_z_pos_quat.repeat(num_envs, 1).to(device)
+    cfg.rot_45_z_neg_quat = torch.tensor(cfg.rot_45_z_neg_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_305_z_neg_quat = torch.tensor(cfg.rot_305_z_neg_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
 
-    cfg.tips_displacement = cfg.tips_displacement.repeat(num_envs, 1).to(device)
+    cfg.tips_displacement = torch.tensor(cfg.tips_displacement).repeat(num_envs, 1).to(device)
 
-    cfg.contact_matrix = cfg.contact_matrix.to(device)
+    cfg.contact_matrix = torch.tensor(cfg.contact_matrix).to(device)
     
     return cfg
 
