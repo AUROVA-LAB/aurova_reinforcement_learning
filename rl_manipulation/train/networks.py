@@ -14,7 +14,7 @@ class CustomMlpExtractor(MlpExtractor):
         super().__init__(feature_dim, net_arch, activation_fn, device)
 
         # Filter by phases and options
-        if phase == 1:
+        if True: #phase == 1:
             
             # Uses Option 1 arquitecture
             if option == 1:
@@ -99,7 +99,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         )
 
         # If the phase is MANIPULATION
-        if my_kwargs["phase"] == my_kwargs["MANIPULATION"]:
+        if True: # my_kwargs["phase"] == my_kwargs["MANIPULATION"]:
             if my_kwargs["option"] == 1:
                 
                 # Load pre-trained weights

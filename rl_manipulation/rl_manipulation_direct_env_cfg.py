@@ -118,16 +118,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 275             # Maximum steps in an episode
+    max_steps = 25             # Maximum steps in an episode
     angle_scale = 5*pi/180.0    # Action angle scalation
     translation_scale = [0.02, 0.02, 0.02] # Action translation scalation
-    hand_joint_scale = 0.075    # Hand joint scalation
 
-    # Variables to distinguish the phases
-    APPROACH = 0
-    MANIPULATION = 1
-
-    phase = MANIPULATION       # Phase of the task (0: approach, 1: manipulation)
+   
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
@@ -149,11 +144,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     seq_len = 3                 # Length of the sequence
 
-    channels = 3                # Number of channels
-    height = 480
-    width = 640
-
-    UR5e = 0
+    UR5e = 0                    # Robot options
     GEN3 = 1
     UR5e_3f = 2
     UR5e_NOGRIP = 3
@@ -182,30 +173,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
 
     
-
-    # Object
-    object_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/Object",
-
-        spawn=sim_utils.CylinderCfg(
-            # size=(0.035, 0.035, 0.45),
-            radius = 0.05,
-            height = 0.25,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
-            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.001),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
-        ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05], rot=[0.4849,  0.4849,  0.5146,  0.5146]),
-    )# 0.7071,  0.7071, -0.0012, -0.0012
-    # RigidObjectCfg: Configuration parameters for a rigid object.
-    #    spawn: Spawn configuration for the asset. --> Deciding which object type it is spawned
-    #       CylinderCfg: Configuration parameters for a Cylinder prim.
-    #          size: Size of the Cylinder.
-    #          rigid_props / mass_props / collision_props / visual_material: properties of the prim declaration
-    #    init_state: Initial state of the rigid object. --> Initial pose
-
     # Markers
     marker_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/myMarkers",
@@ -233,18 +200,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     #    env_spacing: Spacing between environments. --> Positions are automatically handled
     #    replicate_physics: Enable/disable replication of physics schemas when using the Cloner APIs. If True, the simulation will have the same asset instances (USD prims) in all the cloned environments.
     
-    # camera
-    camera_cfg = CameraCfg(
-        prim_path="/World/envs/env_.*/" + keys[robot] + "/wrist_3_link/ur_gripper/camera_bottom_screw_frame/camera_link/camera_depth_frame/Camera",
-        update_period=0.03,
-        height=480,
-        width=640,
-        data_types=["rgb", "distance_to_image_plane"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=3.86, focus_distance=400.0, horizontal_aperture=8.955, clipping_range=(0.1, 1.0e5)
-        ),
-        offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.0), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
-    )
 
 
     # ---- Joint information ----
@@ -280,9 +235,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
                     ["tool0"],
                     ['tool0']]
-    
-    # Displacement from the tips
-    tips_displacement = [0.03, -0.03, 0.0]
 
     # All joint names
     all_joints = [[], [], [], []]
@@ -291,22 +243,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     all_joints[UR5e_3f] = joints[UR5e_3f] + hand_joints[UR5e_3f]
     all_joints[UR5e_NOGRIP] = joints[UR5e_NOGRIP]
 
-    m1 = 1.2218 / 140
-
-
-
-    # ---- Collision information ----
-    # Dictionary of contact sensors configurations --> Updated later
-    contact_sensors_dict = {}
-
-    # Contact matrix for weight the contacts
-    contact_matrix = [[0.0]]
-
 
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
-    ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+    ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
@@ -335,71 +276,26 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
 
-    # ---- Object poses ----
-    # Traslation respect to the end effector robot link frame for object spawning
-    obj_pos_trans = [0.0 - 0.075, -0.0335*2 - 0.075, 0.115]
-
-    # Transform to quaternions
-    rot_45_z_neg_quat = rot2tensor(rot_45_z_neg).numpy().tolist()
-    rot_305_z_neg_quat = rot2tensor(rot_305_z_neg).numpy().tolist()
-    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
-
-    # Aggregate rotations as quaternions
-    rot_quat = torch.tensor((rot_45_z_neg*rot_90_x_pos).as_quat())
-
-    # In SCIPY, the real value (w) of a quaternion is at [-1] position, 
-    #    but for IsaacLab it needs to be in [0] position 
-    obj_quat_trans = torch.zeros((4))
-    obj_quat_trans[0], obj_quat_trans[1:] = rot_quat[-1].clone(), rot_quat[:3].clone()
-    
-    # Height limits for the object and the GEN3 robot
-    object_height_limit = ee_init_pose_quat[0][2] + ee_pose_incs[0][0] - 0.15 # = 0.45
-    gen3_height_limit = 0.1
-    
-    # Translation respect to the object link frame for object grasping point observation
-    grasp_obs_obj_pos_trans = [0.0, 0.0, 0.0]
-    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos).numpy().tolist()
-
-    # Target position for the object -> origin GEN3 position with offset in X axis
-    target_pose = [0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873]
-    
-    rot_quat = None
-    obj_quat_trans = obj_quat_trans.numpy().tolist()
-
-
-
-
-    obj_pose = [-0.5, 0, 0.15, 1,0,0,0]
-    # obj_pose = torch.cat((obj_pose, rot2tensor(a)))
-
-    obj_poses_incs = [[-0.15,  0.15],
-                      [-0.15,  0.15],
-                      [-0.0,  0.0],
-                      [0.0,  0.0],
-                      [0.0,  0.0],
-                      [-pi,  pi]]
+    # ---- Target poses ----
+    target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
+    target_poses_incs = [[-0.075,  0.25],
+                      [-0.25,  0.25],
+                      [-0.3,  0.225],
+                      [-2*pi/5,  2*pi/5],
+                      [-2*pi/5,  2*pi/5],
+                      [-2*pi/5,  2*pi/5]]
 
 
 
     # ---- Reward variables ----
     # reward scales
-    rew_scale_hand_obj: float= 1.0
-    rew_scale_obj_target: float= 12.0
+    rew_scale: float= 1.0
 
     # Position threshold for changing reach reward
-    rew_change_thres = 0.0235 # 0.018
-    obj_reach_target_thres = 0.01
+    distance_thres = 0.0235 # 0.018
 
     # Bonus for reaching the target
     bonus_obj_reach = 300
-
-    rot_45_z_neg = None       # Negative 45 degrees rotation in Z axis 
-    rot_225_z_neg = None     # Negative 225 degrees rotation in Z axis 
-    rot_225_z_pos = None # Positive 225 degrees rotation in Z axis
-    rot_90_x_pos = None
-
-
-
 
 
 # Function to update the variables in the configuration class
@@ -417,78 +313,7 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
-    cfg.obj_pos_trans = torch.tensor(cfg.obj_pos_trans).repeat(num_envs, 1).to(device)
-    cfg.obj_quat_trans = torch.tensor(cfg.obj_quat_trans).repeat(num_envs, 1).to(device)
-
-    cfg.grasp_obs_obj_pos_trans = torch.tensor(cfg.grasp_obs_obj_pos_trans).repeat(num_envs, 1).to(device)
-    cfg.grasp_obs_obj_quat_trans = torch.tensor(cfg.grasp_obs_obj_quat_trans).repeat(num_envs, 1).to(device)
-
-    cfg.obj_pose = torch.tensor(cfg.obj_pose).repeat(num_envs, 1).to(device)
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
-
-    cfg.rot_45_z_neg_quat = torch.tensor(cfg.rot_45_z_neg_quat).repeat(num_envs, 1).to(device)
-    cfg.rot_305_z_neg_quat = torch.tensor(cfg.rot_305_z_neg_quat).repeat(num_envs, 1).to(device)
-    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
-
-    cfg.tips_displacement = torch.tensor(cfg.tips_displacement).repeat(num_envs, 1).to(device)
-
-    cfg.contact_matrix = torch.tensor(cfg.contact_matrix).to(device)
-    
-    return cfg
-
-
-
-
-# Add the collision sensors to the configuration class according to the number of environments
-def update_collisions(cfg, num_envs):
-
-    # Contact between robot tips and object
-    tip_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_link_3",
-        update_period=0.001, 
-        history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Object" for i in range(num_envs)],
-    )
-
-    tip_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_link_3",
-        update_period=0.001, 
-        history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Object" for i in range(num_envs)],
-    )
-
-    tip_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_link_3",
-        update_period=0.001, 
-        history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Object" for i in range(num_envs)],
-    )
-
-    # Contact between robot 2 and the ground
-    robot_w_ground: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/.*_link",
-        update_period=0.001, 
-        history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = ["/World/ground/GroundPlane/CollisionPlane"],
-    )
-
-
-    # Dictionary of contact sensors configurations
-    cfg.contact_sensors_dict = {
-                                "tip_1_w_object": tip_1_w_object,
-                                "tip_2_w_object": tip_2_w_object,
-                                "tip_middle_w_object": tip_middle_w_object,
-
-                                "robot_w_ground": robot_w_ground
-                                }
-    
-    # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([0.65, 0.65, 0.65,
-                                        -2.0])
 
 
     return cfg
