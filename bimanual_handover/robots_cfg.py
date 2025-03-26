@@ -1,8 +1,8 @@
 """Configuration for the UR5e robot"""
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
-from omni.isaac.lab.assets import ArticulationCfg
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
 from math import pi
 ## 
 # Configuration
@@ -10,7 +10,7 @@ from math import pi
 
 GEN3_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/config/usd/gen3_4f.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/bimanual_handover/config/usd/gen3_4f.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
@@ -33,15 +33,15 @@ GEN3_4f_CFG = ArticulationCfg(
     actuators={
         "arm": ImplicitActuatorCfg(
             joint_names_expr = ["arm_.*"],
-            velocity_limit = 100.0,
-            effort_limit = 87.0,
+            velocity_limit_sim = 100.0,
+            effort_limit_sim = 87.0,
             stiffness = 800.0,
             damping = 40.0,
         ),
         "hand": ImplicitActuatorCfg(
             joint_names_expr=[".*_0"],
-            velocity_limit = 100.0,
-            effort_limit = 0.5,
+            velocity_limit_sim = 100.0,
+            effort_limit_sim = 0.5,
             stiffness = 3.0,
             damping = 0.1,
             friction = 0.01,
@@ -52,7 +52,7 @@ GEN3_4f_CFG = ArticulationCfg(
 
 UR5e_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/config/usd/ur5e_4f_ros2.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/bimanual_handover/config/usd/ur5e_4f_ros2.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
@@ -88,15 +88,15 @@ UR5e_4f_CFG = ArticulationCfg(
     actuators={
         "arm": ImplicitActuatorCfg(
             joint_names_expr = ["arm_.*"],
-            velocity_limit = 100.0,
-            effort_limit = 87.0,
+            velocity_limit_sim = 100.0,
+            effort_limit_sim = 87.0,
             stiffness = 800.0,
             damping = 40.0,
         ),
         "hand": ImplicitActuatorCfg(
             joint_names_expr=[".*_0"],
-            velocity_limit = 100.0,
-            effort_limit = 0.5,
+            velocity_limit_sim = 100.0,
+            effort_limit_sim = 0.5,
             stiffness = 3.0,
             damping = 0.1,
             friction = 0.01,

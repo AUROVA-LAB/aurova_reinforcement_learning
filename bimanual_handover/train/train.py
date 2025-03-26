@@ -17,7 +17,7 @@ import sys
 import torch
 import copy
 
-from omni.isaac.lab.app import AppLauncher
+from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Train an RL agent with Stable-Baselines3.")
@@ -57,19 +57,19 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecNormalize
 
-from omni.isaac.lab.envs import (
+from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
     DirectRLEnvCfg,
     ManagerBasedRLEnvCfg,
     multi_agent_to_single_agent,
 )
-from omni.isaac.lab.utils.dict import print_dict
-from omni.isaac.lab.utils.io import dump_pickle, dump_yaml
+from isaaclab.utils.dict import print_dict
+from isaaclab.utils.io import dump_pickle, dump_yaml
 
-import omni.isaac.lab_tasks  # noqa: F401
-from omni.isaac.lab_tasks.utils.hydra import hydra_task_config
-from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
+import isaaclab_tasks  # noqa: F401
+from isaaclab_tasks.utils.hydra import hydra_task_config
+from isaaclab_rl.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 from train_utils import AddNoiseObservation
 
 import wandb
@@ -79,7 +79,7 @@ from networks import *
 
 
 # directory for logging into
-path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train"
+path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/bimanual_handover/train"
 log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 run = wandb.init(project="bim_hand_dani_julio", name=log_dir.split("/")[-1], sync_tensorboard=True)
 
