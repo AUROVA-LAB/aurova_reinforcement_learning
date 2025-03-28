@@ -9,6 +9,11 @@ from .mdp.utils import compute_rewards, save_images_grid, update_seq
 from .mdp.rewards import dual_quaternion_error 
 from .rl_manipulation_direct_env_cfg import RLManipulationDirectCfg, update_cfg
 
+from .py_dq.src.dq import *
+from .py_dq.src.distances import *
+from .py_dq.src.lie import *
+from .py_dq.src.interpolators import *
+
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation
 from isaaclab.envs import DirectRLEnv
@@ -45,10 +50,13 @@ class RLManipulationDirect(DirectRLEnv):
         self.debug_target_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Poses for the object and GEN3 robot so they can match when performing the grasping
-        self.robot_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
-        self.target_pose_r = copy.deepcopy(self.robot_rot_ee_pose_r)
+        # self.robot_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        # self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
+        self.target_pose_r =  torch.tensor([0.0 ,0.0 ,0.0, 1.0 ,0.0 ,0.0 ,0.0]).to(self.device).repeat(self.num_envs, 1).float()
+        self.target_pose_r_lie =  torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
         
         self.obs_seq_robot_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, self.cfg.seq_len, 1).to(self.device).float()
+        self.obs_seq_robot_pose_r_lie = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
@@ -84,7 +92,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
 
-        # Obtain the ranges in which sample reset positions
+        # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + inc[0]), (i + inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
 
@@ -94,11 +102,39 @@ class RLManipulationDirect(DirectRLEnv):
             self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
             os.makedirs(self.output_dir, exist_ok=True)
 
-
+        # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
-        self.prev_dist_target = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
 
+        # Target reached flag
         self.target_reached = torch.zeros(self.num_envs).to(self.device).bool()
+
+        # --- Lie algebra ---
+        # List of mappings
+        map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno], [exp_stereo, log_stereo]],
+                [[identity_map, identity_map]],
+                [[identity_map, identity_map]],
+                [[identity_map, identity_map]],
+                [[identity_map, identity_map]]]
+
+        # List of conversions
+        conversions = [convert_dq, None, None, None, None]
+
+        # List of interpolators
+        interpolators = [ScLERP, None, None, None, None]
+
+        # Lis of distance functions
+        distances = [[dqLOAM_distance, geodesic_dist, double_geodesic_dist],
+                     [None],
+                     [None],
+                     [None],
+                     [None]]
+
+        # Assign the functions according to configuration
+        self.exp = map_list[cfg.representation][cfg.mapping][0]                 # Exponential mapping
+        self.log = map_list[cfg.representation][cfg.mapping][1]                 # Logarithmic mapping
+        self.convert = conversions[cfg.representation]                          # Conversion Lie group to IsaacLab representation
+        self.interpolator = interpolators[cfg.representation]                   # Interpolator function
+        self.dist_function = distances[cfg.representation][cfg.distance]        # Distance function
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -145,53 +181,16 @@ class RLManipulationDirect(DirectRLEnv):
     def _preprocess_actions(self, actions: torch.Tensor) -> torch.Tensor:
         '''
         In:
-            - actions - torch.Tensor: raw actions. --> rotation is in the form of a quaternion.
-                Format: [x, y, z, alpha, x_, y_, z_]:
-                    actions[:3]: translation.
-                    actions[3]: rotation angle of a quaternion.
-                    actions[4:]: rotation vector of a quaternion
+            - actions - torch.Tensor (N, m): incremental actions in the Lie algebra
 
         Out:
             - actions - torch.Tensor: preprocessed actions.
         '''
 
         # Clamp actions
-        actions = torch.clamp(actions, -1, 1)
+        actions = torch.clamp(actions, -self.cfg.action_scaling, self.cfg.action_scaling)
 
-        # Scale actions
-        actions[:, :3]  *= self.cfg.translation_scale
-
-        actions_quat = torch.zeros((self.num_envs, 7)).to(self.device)
-        actions_quat[:, :3] = actions[:, :3]
-
-    
-        if self.cfg.euler_flag:
-            actions[:, 3:6] *= self.cfg.angle_scale
-            
-            actions_quat[:, 3:7] = quat_from_euler_xyz(roll = actions[:, 3],
-                                                       pitch = actions[:, 4],
-                                                       yaw = actions[:, 5])
-
-        else:
-            # Scale angle and rotation vector
-            actions_quat[:, 3] *= self.cfg.angle_scale
-            actions_quat[:, 4:7] = torch.nn.functional.normalize(actions_quat[:, 4:7])
-
-            # Real part of the quaternion
-            w = torch.cos(actions_quat[:, 3]/2).unsqueeze(dim = 0).T
-            
-            # Imaginary part of the quaternion
-            v = actions_quat[:, 4:7]
-            sin_a = torch.sin(actions_quat[:, 3] / 2).unsqueeze(dim=0).T
-
-            # Build the quaternion
-            q = sin_a * v
-
-            # Reassign quaternion
-            actions_quat[:, 3:7] = torch.cat((w, q), dim = 1)     
-
-
-        return actions_quat
+        return actions
     
     
     # Obtain the end effector pose of the robot in the base frame
@@ -232,26 +231,26 @@ class RLManipulationDirect(DirectRLEnv):
     def perform_increment(self, actions):
         '''
         In: 
-            - idx - int(0,1): index of the robot.
-            - actions - torch.tensor(N, 7): the increment to be performed to the actual pose.
+            - actions - torch.tensor(N, m): the increment to be performed to the actual pose in the Lie algebra.
 
         Out:
             - None
         '''
 
 
-        # Obtains the poses
-        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
 
-        # Perform an increment on the robot end effector in the root frame
-        new_act_pos, new_act_quat = combine_frame_transforms(t01 = ee_pos_r, q01 = ee_quat_r,
-                                                             t12 = actions[:, 0:3], q12 = actions[:, 3:7])
-        self.reset_robot_poses_r = torch.cat((new_act_pos, new_act_quat), dim = -1)
+        # Perform increment in the algebra and exponential map
+        action_pose = self.exp(self.obs_seq_robot_pose_r_lie[:, -1] + actions)
 
+        # Convert to IsaacLab representation (translation, quaternion)
+        action_pose_lab = self.convert(action_pose)
 
         # Set the command for the IKDifferentialController
-        self.controller.set_command(self.reset_robot_poses_r)
+        self.controller.set_command(action_pose_lab)
                 
+        # Obtains the poses
+        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
+        
         # Get the actions for the robot. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
@@ -304,26 +303,6 @@ class RLManipulationDirect(DirectRLEnv):
                                                                           
                                                                           self.debug_target_pose_w[:,3:],),), 
                                                 marker_indices=marker_indices)
-        
-
-    # Method to filter collisions according to the force matrix
-    def filter_collisions(self):
-        '''
-        In:
-            - None
-        
-        Out:
-            - None
-        '''
-        pass
-
-        # Loop through all the contact sensors configuration for the indexes
-        # for idx, (key, __) in enumerate(self.cfg.contact_sensors_dict.items()):
-
-        #     # Obtain the matrix -> reshape it -> sum the last two dimensions -> 
-        #     #    -> if the value is greater than 0, there is force so  there is contact
-        #     self.contacts[:, idx] = torch.abs(self.scene.sensors[key].data.force_matrix_w).view(self.num_envs, -1, 3).sum(dim = (1,2), keepdim = True).squeeze((-2, -1)) > 0.0
-
 
 
     # Updates the poses of the object and robot so they can match when performing the grasp
@@ -336,7 +315,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        # # Obtain the pose of the GEN3 end effector in world frame
+        # --- Robot poses ---
+        # Obtain the pose of the GEN3 end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
 
         # Obtains the pose of the base of the GEN3 robot in the world frame
@@ -345,10 +325,20 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain the pose of the end effector in GEN3 root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
+        robot_rot_ee_pose_r = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
+        
+        # Build the group object
+        dq_pose_r = dq_from_tr(t = robot_rot_ee_pos_r, r = robot_rot_ee_quat_r)
 
-        self.robot_rot_ee_pose_r = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
+        # Transform to the Lie algebra
+        robot_rot_ee_pose_r_lie = self.log(dq_pose_r)
+
+        # Update sequences
+        self.obs_seq_robot_pose_r = update_seq(new_obs = robot_rot_ee_pose_r, seq = self.obs_seq_robot_pose_r)
+        self.obs_seq_robot_pose_r_lie = update_seq(new_obs = robot_rot_ee_pose_r_lie, seq = self.obs_seq_robot_pose_r_lie)
 
 
+        # --- Target pose ---
         # Obtain the pose for the target in the world frame
         grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                                   t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
@@ -365,36 +355,16 @@ class RLManipulationDirect(DirectRLEnv):
             - observations - dict: observations from the environment --> Needs to be with "policy" key. 
         '''
 
-        # Obtain boolean values for collisions
-        self.filter_collisions()
-
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
-
-        # Image rendering
-        if self.cfg.render_imgs:
-            
-            # Obtain images from the sensor
-            self.image_tensor = self.scene["camera"].data.output["rgb"][0, ..., :3]
-            self.image_tensor = torch.transpose(self.image_tensor, 0, -1)
-            self.image_tensor = torch.transpose(self.image_tensor, -2, -1)
-
-            # Function to save images (in utils)
-            if self.cfg.save_imgs:
-                save_images_grid(images = self.image_tensor,
-                                 subtitles = ["Camera"],
-                                 title = "RGB Image: Cam0",
-                                 filename = os.path.join(self.output_dir, "rgb", f"{self.count:04d}.jpg"))
-        
-        self.obs_seq_robot_pose_r = update_seq(new_obs = self.robot_rot_ee_pose_r, seq = self.obs_seq_robot_pose_r)
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
         obs = torch.cat(
             (
-                self.robot_rot_ee_pose_r, 
-                self.target_pose_r, 
+                self.obs_seq_robot_pose_r_lie, 
+                self.target_pose_r_lie.unsqueeze(1), 
             ),
-            dim = -1
+            dim = 1
         )
 
 
@@ -416,53 +386,31 @@ class RLManipulationDirect(DirectRLEnv):
 
         Out:
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
-        '''       
-        
+        '''  
+
         # ---- Distance computation ----
-        # Dual quaternion distance between UR5e and object
-        hand_obj_dist = dual_quaternion_error(self.robot_rot_ee_pose_r, self.target_pose_r, self.device)[:, 0]
+        traj = self.interpolator(self.obs_seq_robot_pose_r[:, -1], self.target_pose_r, 0.1)
 
-        # Reached flag pre-conditions
-        bonus = self.target_reached.clone().bool()
-
-        # Reached flag after conditions
-        new_bonus = self.target_reached.clone().bool()
-
-        # The bonus must be activated if the object is reached at this step
-        bonus = torch.logical_and(new_bonus, torch.logical_not(bonus))
-
-
-        # ---- Distance evaluation ----
-        # Obtains the distance according to the object reached flag
-        dist = hand_obj_dist * torch.logical_not(self.target_reached).int()
-        prev_dist = self.prev_dist * torch.logical_not(self.target_reached).int() + self.prev_dist_target * self.target_reached.int()
+        dist = self.dist_function(self.obs_seq_robot_pose_r[:, -1], traj[:, 1], self.device)
 
         # Obtains wether the agent is approaching or not
-        mod = 2*(dist < prev_dist).int() - 1
+        mod = 2*(dist < self.prev_dist).int() - 1
 
-        # Modifies scalation according to the contacts detected
-        rew_scale_hand_obj = self.cfg.rew_scale
+        # Target reached flag
+        self.target_reached = dist < self.cfg.distance_thres
 
 
         # ---- Distance reward ----
-        # Reward for the first phase --> Approaching (mod) hand-obj distance divided by wether the object is approaching with the palm
-        reward_1 = mod * rew_scale_hand_obj * torch.exp(-2*hand_obj_dist)
+        # Reward for the approaching
+        reward = mod * self.cfg.rew_scale * torch.exp(-2*dist)
         
-        # Reward for the second phase --> Object-target distance the target
-        # reward_2 = self.cfg.rew_scale_obj_target * torch.exp(-2*obj_target_dist)
-
 
         # ---- Reward composition ----
-        # Phase reward plus phase 1 bonuses
-        reward = reward_1 * torch.logical_not(self.target_reached) + self.cfg.bonus_obj_reach * bonus / 2
-
-        # Reward for reaching target
-        reward = reward#  + self.cfg.bonus_obj_reach * self.target_reached_target # * (contacts_w.sum(-1) > 0.0).int()
+        # Phase reward plus bonuses
+        reward = reward + self.cfg.tgt_obj_reached * self.target_reached
 
         # Update previous distances
-        self.prev_dist = hand_obj_dist
-        # self.prev_dist_target = obj_target_dist
-
+        self.prev_dist = dist
         
         return reward
     
@@ -583,18 +531,27 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset the robot to a random Euclidean position
         self.reset_robot_ee(env_ids = env_ids)
 
+        # Reset the sequences of poses
+        self.obs_seq_robot_pose_r[env_ids] = torch.repeat_interleave(self.reset_robot_poses_r, 
+                                                                     self.cfg.seq_len, 
+                                                                     dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+
+        self.obs_seq_robot_pose_r_lie[env_ids] = torch.repeat_interleave(self.log(dq_from_tr(t = self.reset_robot_poses_r[:, :3], 
+                                                                                             r = self.reset_robot_poses_r[:, 3:])), 
+                                                                        self.cfg.seq_len, 
+                                                                        dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+
         # --- Reset controller ---
         self.controller.reset()
         
-        # --- Reset object ---
-        # Sample a random position using the end effector ranges with the shape of all environmnets
+        # --- Reset target ---
+        # Sample a random pose for the target
         target_init_pose = sample_uniform(
             self.target_pose_ranges[0, :, 0],
             self.target_pose_ranges[0, :, 1],
             [self.num_envs, self.target_pose_ranges[0, :, 0].shape[0]],
             self.device,
         )
-        
 
         # Transforms Euler to quaternion
         quat = quat_from_euler_xyz(roll = target_init_pose[:, 3],
@@ -603,21 +560,18 @@ class RLManipulationDirect(DirectRLEnv):
         
         robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
 
-        obj_pos_w, obj_quat_w = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+        tgt_pos_w, tgt_quat_w = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                          t12 = target_init_pose[:, :3], q12 = quat)
 
-        
-        # Builds the new initial pose
-        self.target_pose_r = torch.cat((obj_pos_w, obj_quat_w), dim = -1)
+        # Builds the new initial pose for the target
+        self.target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
+        self.target_pose_r_lie[env_ids] = self.log(dq_from_tr(t = tgt_pos_w, r = tgt_quat_w))[env_ids]
 
-        # Updates the poses of the robot's end effector and the object in the reset
-        self.update_new_poses()
-
-        self.obs_seq_robot_pose_r[env_ids] = torch.repeat_interleave(self.reset_robot_poses_r, self.cfg.seq_len, dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
-
+        # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.prev_dist_target[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
+        # Updates the poses 
+        self.update_new_poses()
         

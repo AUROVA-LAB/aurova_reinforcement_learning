@@ -7,6 +7,8 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from .py_dq.src.lie import *
+
 from isaaclab_tasks.direct.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 
@@ -119,19 +121,34 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 25             # Maximum steps in an episode
-    angle_scale = 5*pi/180.0    # Action angle scalation
-    translation_scale = [0.02, 0.02, 0.02] # Action translation scalation
+    action_scaling = 0.1
 
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
     path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
 
-    action_space = 6        # Number of actions per environment (overridden)
-    observation_space = 7 + 7     # Number of observations per environment (overridden)
+    # --- Mapping configuration ---
+    DQ = 0
+    EULER = 1
+    QUAT = 2
+    MAT = 3
+    AXIS = 4
+
+    # Size of the Lie algebra
+    sizes = [[8, 6, 7, 12, 7], [6]*5]
+    
+    representation = DQ
+    mapping = 1
+    size = sizes[int(mapping != 0)][representation]
+    distance = 0
+
+
+    # --- Action / observation space ---
+    action_space = size   # Number of actions per environment (overridden)
+    observation_space = action_space*2                         # Number of observations per environment (overridden)
     state_space = 0
 
-    euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -272,7 +289,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                     [-0.3,  0.3]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, False]
+    apply_range = [False, True, False, True]
 
 
 
@@ -291,11 +308,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # reward scales
     rew_scale: float= 1.0
 
-    # Position threshold for changing reach reward
-    distance_thres = 0.0235 # 0.018
+    # Position threshold for ending the episode
+    distance_thres = 0.001
 
     # Bonus for reaching the target
-    bonus_obj_reach = 300
+    bonus_tgt_reached = 300
 
 
 # Function to update the variables in the configuration class
@@ -311,7 +328,7 @@ def update_cfg(cfg, num_envs, device):
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
 
-    cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
+    # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
 
