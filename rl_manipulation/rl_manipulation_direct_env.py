@@ -405,9 +405,9 @@ class RLManipulationDirect(DirectRLEnv):
         '''  
 
         # ---- Distance computation ----
-        traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
+        # traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
 
-        dist = self.dist_function(traj[:, 0], traj[:, 1])             # MAX DIST: 0.1545 (dqLOAM)
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group)            # MAX DIST: 0.1545 (dqLOAM)
                                                                       # MAX DIST: (dq_geodesic)
                                                                       # MAX VEL continous: 0.5 ó 0.0101
                                                                       # MAX VEL changing: 1.2104
@@ -425,8 +425,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist / self.cfg.dist_scale) + \
-                       self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
+        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+                    #    self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
 
 
         # ---- Reward composition ----

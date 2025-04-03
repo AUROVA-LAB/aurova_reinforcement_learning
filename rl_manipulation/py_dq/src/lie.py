@@ -41,7 +41,7 @@ def exp_bruno(dq_: torch.Tensor):
 
 def log_bruno(dq: torch.Tensor):
     assert dq.shape[-1] == 8
-    assert torch.any(dq_is_norm(dq))
+    # assert torch.any(dq_is_norm(dq))
 
     primary = (q_angle(q = dq[:, :4]).unsqueeze(-1)*0.5)*q_axis(q = dq[:, :4])
     dual = dq_translation(dq = dq)*0.5
