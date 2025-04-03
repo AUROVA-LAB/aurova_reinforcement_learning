@@ -156,7 +156,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     action_space = size   # Number of actions per environment (overridden)
-    observation_space = action_space * (seq_len)                         # Number of observations per environment (overridden)
+    observation_space = action_space # * (seq_len)                         # Number of observations per environment (overridden)
     state_space = 0
     
 

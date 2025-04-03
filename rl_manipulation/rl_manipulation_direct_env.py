@@ -381,8 +381,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
-
+        obs = self.obs_seq_robot_pose_r_lie_rel[:, -1]
+        
+        # obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -430,7 +431,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod*self.cfg.rew_scale_dist * dist
+        reward = -self.cfg.rew_scale_dist * dist
                     #    self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
 
 

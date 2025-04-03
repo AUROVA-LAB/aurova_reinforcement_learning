@@ -157,84 +157,84 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
 
-        self.mlp_extractor.policy_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
+    #     self.mlp_extractor.policy_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
         
-        self.mlp_extractor.value_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
+    #     self.mlp_extractor.value_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
         
 
 
-        # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
-        # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
+    #     # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
+    #     # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)
 
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
-        """
-        Forward pass in all the networks (actor and critic)
+    # def forward(self, obs: th.Tensor, deterministic: bool = False) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
+    #     """
+    #     Forward pass in all the networks (actor and critic)
 
-        :param obs: Observation
-        :param deterministic: Whether to sample or use deterministic actions
-        :return: action, value and log probability of the action
-        """
-        # Preprocess the observation if needed
-        obs = obs.view(obs.shape[0], self.seq_len, -1)
+    #     :param obs: Observation
+    #     :param deterministic: Whether to sample or use deterministic actions
+    #     :return: action, value and log probability of the action
+    #     """
+    #     # Preprocess the observation if needed
+    #     obs = obs.view(obs.shape[0], self.seq_len, -1)
         
-        if self.share_features_extractor:
+    #     if self.share_features_extractor:
 
-            latent_pi = self.mlp_extractor.value_net(obs[:, :-1])[1][0].squeeze(0)
-            latent_vf = self.mlp_extractor.policy_net(obs[:, :-1])[1][0].squeeze(0)
+    #         latent_pi = self.mlp_extractor.value_net(obs[:, :-1])[1][0].squeeze(0)
+    #         latent_vf = self.mlp_extractor.policy_net(obs[:, :-1])[1][0].squeeze(0)
 
-        else:
-            pi_features, vf_features = obs
-            latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
-        # Evaluate the values for the given observations        
-        values = self.value_net(latent_vf)
-        distribution = self._get_action_dist_from_latent(latent_pi)
-        actions = distribution.get_actions(deterministic=deterministic)
-        log_prob = distribution.log_prob(actions)
-        actions = actions.reshape((-1, *self.action_space.shape))  # type: ignore[misc]
+    #     else:
+    #         pi_features, vf_features = obs
+    #         latent_pi = self.mlp_extractor.forward_actor(pi_features)
+    #         latent_vf = self.mlp_extractor.forward_critic(vf_features)
+    #     # Evaluate the values for the given observations        
+    #     values = self.value_net(latent_vf)
+    #     distribution = self._get_action_dist_from_latent(latent_pi)
+    #     actions = distribution.get_actions(deterministic=deterministic)
+    #     log_prob = distribution.log_prob(actions)
+    #     actions = actions.reshape((-1, *self.action_space.shape))  # type: ignore[misc]
 
-        return actions, values, log_prob
+    #     return actions, values, log_prob
     
 
-    def predict_values(self, obs: PyTorchObs) -> th.Tensor:
-        """
-        Get the estimated values according to the current policy given the observations.
+    # def predict_values(self, obs: PyTorchObs) -> th.Tensor:
+    #     """
+    #     Get the estimated values according to the current policy given the observations.
 
-        :param obs: Observation
-        :return: the estimated values.
-        """
-        obs = obs.view(obs.shape[0], self.seq_len, -1)
+    #     :param obs: Observation
+    #     :return: the estimated values.
+    #     """
+    #     obs = obs.view(obs.shape[0], self.seq_len, -1)
 
-        latent_vf = self.mlp_extractor.forward_critic(obs)[1][0].squeeze(0)
+    #     latent_vf = self.mlp_extractor.forward_critic(obs)[1][0].squeeze(0)
 
-        return self.value_net(latent_vf)
+    #     return self.value_net(latent_vf)
 
 
-    def evaluate_actions(self, obs: PyTorchObs, actions: th.Tensor) -> tuple[th.Tensor, th.Tensor, Optional[th.Tensor]]:
-        """
-        Evaluate actions according to the current policy,
-        given the observations.
+    # def evaluate_actions(self, obs: PyTorchObs, actions: th.Tensor) -> tuple[th.Tensor, th.Tensor, Optional[th.Tensor]]:
+    #     """
+    #     Evaluate actions according to the current policy,
+    #     given the observations.
 
-        :param obs: Observation
-        :param actions: Actions
-        :return: estimated value, log likelihood of taking those actions
-            and entropy of the action distribution.
-        """
+    #     :param obs: Observation
+    #     :param actions: Actions
+    #     :return: estimated value, log likelihood of taking those actions
+    #         and entropy of the action distribution.
+    #     """
 
-        # Preprocess the observation if needed
-        # features = self.extract_features(obs)
-        obs = obs.view(obs.shape[0], self.seq_len, -1)
+    #     # Preprocess the observation if needed
+    #     # features = self.extract_features(obs)
+    #     obs = obs.view(obs.shape[0], self.seq_len, -1)
 
-        if self.share_features_extractor:
-            # latent_pi, latent_vf = self.mlp_extractor(obs)
-            latent_pi = self.mlp_extractor.value_net(obs[:, :-1])[1][0].squeeze(0)
-            latent_vf = self.mlp_extractor.policy_net(obs[:, :-1])[1][0].squeeze(0)
-        else:
-            pi_features, vf_features = obs
-            latent_pi = self.mlp_extractor.forward_actor(pi_features)
-            latent_vf = self.mlp_extractor.forward_critic(vf_features)
-        distribution = self._get_action_dist_from_latent(latent_pi)
-        log_prob = distribution.log_prob(actions)
-        values = self.value_net(latent_vf)
-        entropy = distribution.entropy()
-        return values, log_prob, entropy
+    #     if self.share_features_extractor:
+    #         # latent_pi, latent_vf = self.mlp_extractor(obs)
+    #         latent_pi = self.mlp_extractor.value_net(obs[:, :-1])[1][0].squeeze(0)
+    #         latent_vf = self.mlp_extractor.policy_net(obs[:, :-1])[1][0].squeeze(0)
+    #     else:
+    #         pi_features, vf_features = obs
+    #         latent_pi = self.mlp_extractor.forward_actor(pi_features)
+    #         latent_vf = self.mlp_extractor.forward_critic(vf_features)
+    #     distribution = self._get_action_dist_from_latent(latent_pi)
+    #     log_prob = distribution.log_prob(actions)
+    #     values = self.value_net(latent_vf)
+    #     entropy = distribution.entropy()
+    #     return values, log_prob, entropy
