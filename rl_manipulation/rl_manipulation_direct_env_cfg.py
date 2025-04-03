@@ -335,7 +335,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     distance_thres = 0.016
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 300
+    bonus_tgt_reached = 10
 
 
 # Function to update the variables in the configuration class
