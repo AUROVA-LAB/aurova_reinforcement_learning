@@ -407,10 +407,15 @@ class RLManipulationDirect(DirectRLEnv):
         # ---- Distance computation ----
         # traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
 
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group)            # MAX DIST: 0.1545 (dqLOAM)
-                                                                      # MAX DIST: (dq_geodesic)
-                                                                      # MAX VEL continous: 0.5 ó 0.0101
-                                                                      # MAX VEL changing: 1.2104
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group)      
+                                                                                    # MAX DIST (interp   ): 0.1545    (dqLOAM)
+                                                                                    # MAX DIST (no interp): 1.545     (dqLOAM)
+                                                                                    # MAX DIST (interp   ): 0.126     (dq_geodesic)
+                                                                                    # MAX DIST (no interp): 1.26      (dq_geodesic)
+                                                                                    # MAX DIST (interp   ): 0.09628   (double_dq_geodesic)
+                                                                                    # MAX DIST (no interp): 0.9628    (double_dq_geodesic)
+                                                                                    # MAX VEL continous: 0.5 ó 0.0101
+                                                                                    # MAX VEL changing: 1.2104
         
         # ---- Velocity computation ----
         vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
@@ -425,7 +430,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = -self.cfg.rew_scale_dist * dist
                     #    self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
 
 
