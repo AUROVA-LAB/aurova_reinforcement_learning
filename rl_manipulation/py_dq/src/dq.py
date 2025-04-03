@@ -73,7 +73,7 @@ def q_axis(q: torch.Tensor):
     res = torch.zeros((q.shape[0], 3)).to(q.device)
     idx = torch.abs(torch.sin(q_angle(q = q))) > 1e-6
 
-    res[idx] = q[:, 1:] / torch.sin(q_angle(q = q).unsqueeze(-1) / 2)[idx]
+    res[idx] = (q[:, 1:] / torch.sin(q_angle(q = q).unsqueeze(-1) / 2))[idx]
 
     return res
 
