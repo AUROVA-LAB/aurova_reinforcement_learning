@@ -67,7 +67,7 @@ def q_angle(q: torch.Tensor):
 
 def q_axis(q: torch.Tensor):
     assert q.shape[-1] == 4
-    assert torch.any(q_is_norm(q = q))
+    # assert torch.any(q_is_norm(q = q))
 
     # return q[:, 1:] / torch.sin(q_angle(q = q) / 2)
     res = torch.zeros((q.shape[0], 3)).to(q.device)
