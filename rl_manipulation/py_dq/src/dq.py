@@ -127,7 +127,7 @@ def q_inn_prod(q1: torch.Tensor, q2: torch.Tensor):
     assert q1.shape[-1] == 3
     assert q2.shape[-1] == 3
 
-    return q1[:, 0] * q2[:, 0] + q1[:, 1] * q2[:, 1] + q1[:, 2] * q2[:, 2] + q1[:, 3] * q2[:, 3]
+    return q1[:, 0] * q2[:, 0] + q1[:, 1] * q2[:, 1] + q1[:, 2] * q2[:, 2]# + q1[:, 3] * q2[:, 3]
 
 
 
