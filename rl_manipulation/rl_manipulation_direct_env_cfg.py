@@ -120,9 +120,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 25             # Maximum steps in an episode
-    action_scaling = 0.1
+    max_steps = 60              # Maximum steps in an episode
 
+    seq_len = 3                 # Length of the sequence
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
@@ -141,13 +141,24 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     representation = DQ
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
-    distance = 0
+    size_group = sizes[0][representation]
+    distance = 1
+
+    scalings = [[[1, 1], [0.01, 0.001]],
+                [[1, 1], [None, None]],
+                [[1, 1], [None, None]],
+                [[1, 1], [None, None]],
+                [[1, 1], [None, None]]]
+
+    action_scaling = scalings[representation][mapping]
+
 
 
     # --- Action / observation space ---
     action_space = size   # Number of actions per environment (overridden)
-    observation_space = action_space*2                         # Number of observations per environment (overridden)
+    observation_space = action_space * (seq_len)                         # Number of observations per environment (overridden)
     state_space = 0
+    
 
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -159,7 +170,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     velocity_limit = 10         # Velocity limit for robots' end effector
 
-    seq_len = 3                 # Length of the sequence
 
     UR5e = 0                    # Robot options
     GEN3 = 1
@@ -296,20 +306,33 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.075,  0.25],
-                      [-0.25,  0.25],
-                      [-0.3,  0.225],
-                      [-2*pi/5,  2*pi/5],
-                      [-2*pi/5,  2*pi/5],
-                      [-2*pi/5,  2*pi/5]]
+                         [-0.25,  0.25],
+                         [-0.3,  0.225],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5]]
+    # target_poses_incs = [[-0.008,  0.008],
+    #                      [-0.008,  0.008],
+    #                      [-0.008,  0.008],
+    #                      [-0.12,  0.12],
+    #                      [-0.12,  0.12],
+    #                      [-0.12,  0.12]]
+    apply_range_tgt = True
 
 
 
     # ---- Reward variables ----
     # reward scales
-    rew_scale: float= 1.0
+    rew_scale_dist: float= 1.0
+    rew_scale_vel: float= 0.4
+
+    dist_scale = 0.1545
+    vel_scale = 1.2104
+
+
 
     # Position threshold for ending the episode
-    distance_thres = 0.001
+    distance_thres = 0.016
 
     # Bonus for reaching the target
     bonus_tgt_reached = 300

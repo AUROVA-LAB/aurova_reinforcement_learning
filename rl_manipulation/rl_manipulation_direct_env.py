@@ -53,10 +53,10 @@ class RLManipulationDirect(DirectRLEnv):
         # self.robot_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         # self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.target_pose_r =  torch.tensor([0.0 ,0.0 ,0.0, 1.0 ,0.0 ,0.0 ,0.0]).to(self.device).repeat(self.num_envs, 1).float()
-        self.target_pose_r_lie =  torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
+        self.target_pose_r_group =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
         
-        self.obs_seq_robot_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, self.cfg.seq_len, 1).to(self.device).float()
-        self.obs_seq_robot_pose_r_lie = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
+        self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
+        self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
@@ -94,7 +94,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
-        self.target_pose_ranges = torch.tensor([[ [(i + inc[0]), (i + inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
+        self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
 
 
         # Create output directory to save images
@@ -117,7 +117,14 @@ class RLManipulationDirect(DirectRLEnv):
                 [[identity_map, identity_map]]]
 
         # List of conversions
-        conversions = [convert_dq, None, None, None, None]
+        conversions = [[convert_dq_to_Lab, dq_from_tr], 
+                       [None, None], 
+                       [None, None], 
+                       [None, None], 
+                       [None, None]]
+        
+        diff_operators = [dq_diff, None, None, None, None]
+        mul_operators = [dq_mul, None, None, None, None]
 
         # List of interpolators
         interpolators = [ScLERP, None, None, None, None]
@@ -128,15 +135,26 @@ class RLManipulationDirect(DirectRLEnv):
                      [None],
                      [None],
                      [None]]
+        
+        identities = [[1,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+                      [None],
+                      [None],
+                      [None],
+                      [None]]
 
         # Assign the functions according to configuration
         self.exp = map_list[cfg.representation][cfg.mapping][0]                 # Exponential mapping
         self.log = map_list[cfg.representation][cfg.mapping][1]                 # Logarithmic mapping
-        self.convert = conversions[cfg.representation]                          # Conversion Lie group to IsaacLab representation
+        self.convert_to_Lab = conversions[cfg.representation][0]                # Conversion Lie group to IsaacLab representation
+        self.convert_to_group = conversions[cfg.representation][1]              # Conversion IsaacLab representation to Lie group     
         self.interpolator = interpolators[cfg.representation]                   # Interpolator function
         self.dist_function = distances[cfg.representation][cfg.distance]        # Distance function
+        self.diff_operator = diff_operators[cfg.representation]
+        self.mul_operator = mul_operators[cfg.representation]
     
+        self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
     
+
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
     def _setup_scene(self, ):
         '''
@@ -188,7 +206,8 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Clamp actions
-        actions = torch.clamp(actions, -self.cfg.action_scaling, self.cfg.action_scaling)
+        actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+        actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
 
         return actions
     
@@ -240,10 +259,11 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # Perform increment in the algebra and exponential map
-        action_pose = self.exp(self.obs_seq_robot_pose_r_lie[:, -1] + actions)
+        action_pose = self.exp(self.obs_seq_robot_pose_r_lie_rel[:, -1] + actions)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
 
         # Convert to IsaacLab representation (translation, quaternion)
-        action_pose_lab = self.convert(action_pose)
+        action_pose_lab = self.convert_to_Lab(action_pose)
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(action_pose_lab)
@@ -318,6 +338,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Robot poses ---
         # Obtain the pose of the GEN3 end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
+        vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
 
         # Obtains the pose of the base of the GEN3 robot in the world frame
         robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
@@ -325,17 +346,18 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain the pose of the end effector in GEN3 root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
-        robot_rot_ee_pose_r = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
         
         # Build the group object
-        dq_pose_r = dq_from_tr(t = robot_rot_ee_pos_r, r = robot_rot_ee_quat_r)
+        self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
         # Transform to the Lie algebra
-        robot_rot_ee_pose_r_lie = self.log(dq_pose_r)
+        robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+        robot_rot_ee_pose_r_lie_rel = self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r))
 
         # Update sequences
-        self.obs_seq_robot_pose_r = update_seq(new_obs = robot_rot_ee_pose_r, seq = self.obs_seq_robot_pose_r)
-        self.obs_seq_robot_pose_r_lie = update_seq(new_obs = robot_rot_ee_pose_r_lie, seq = self.obs_seq_robot_pose_r_lie)
+        self.obs_seq_robot_pose_r_lie_rel = update_seq(new_obs = robot_rot_ee_pose_r_lie_rel, 
+                                                       seq = self.obs_seq_robot_pose_r_lie_rel)
+        self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
 
 
         # --- Target pose ---
@@ -359,13 +381,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = torch.cat(
-            (
-                self.obs_seq_robot_pose_r_lie, 
-                self.target_pose_r_lie.unsqueeze(1), 
-            ),
-            dim = 1
-        )
+        obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
 
 
         # Builds the dictionary
@@ -389,9 +405,16 @@ class RLManipulationDirect(DirectRLEnv):
         '''  
 
         # ---- Distance computation ----
-        traj = self.interpolator(self.obs_seq_robot_pose_r[:, -1], self.target_pose_r, 0.1)
+        traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
 
-        dist = self.dist_function(self.obs_seq_robot_pose_r[:, -1], traj[:, 1], self.device)
+        dist = self.dist_function(traj[:, 0], traj[:, 1])             # MAX DIST: 0.1545 (dqLOAM)
+                                                                      # MAX DIST: (dq_geodesic)
+                                                                      # MAX VEL continous: 0.5 ó 0.0101
+                                                                      # MAX VEL changing: 1.2104
+        
+        # ---- Velocity computation ----
+        vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
+
 
         # Obtains wether the agent is approaching or not
         mod = 2*(dist < self.prev_dist).int() - 1
@@ -402,12 +425,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod * self.cfg.rew_scale * torch.exp(-2*dist)
-        
+        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist / self.cfg.dist_scale) + \
+                       self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
+
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + self.cfg.tgt_obj_reached * self.target_reached
+        reward = reward +  self.target_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
@@ -530,16 +554,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Reset the robot to a random Euclidean position
         self.reset_robot_ee(env_ids = env_ids)
+        
 
-        # Reset the sequences of poses
-        self.obs_seq_robot_pose_r[env_ids] = torch.repeat_interleave(self.reset_robot_poses_r, 
-                                                                     self.cfg.seq_len, 
-                                                                     dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
-
-        self.obs_seq_robot_pose_r_lie[env_ids] = torch.repeat_interleave(self.log(dq_from_tr(t = self.reset_robot_poses_r[:, :3], 
-                                                                                             r = self.reset_robot_poses_r[:, 3:])), 
-                                                                        self.cfg.seq_len, 
-                                                                        dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+        self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
 
         # --- Reset controller ---
         self.controller.reset()
@@ -565,13 +582,19 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Builds the new initial pose for the target
         self.target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
-        self.target_pose_r_lie[env_ids] = self.log(dq_from_tr(t = tgt_pos_w, r = tgt_quat_w))[env_ids]
+        self.target_pose_r_group[env_ids] = self.convert_to_group(tgt_pos_w, tgt_quat_w)[env_ids]
 
         # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
+
+        obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+
+        self.obs_seq_robot_pose_r_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
+                                                                             self.cfg.seq_len, 
+                                                                             dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+
         # Updates the poses 
-        self.update_new_poses()
-        
+        self.update_new_poses()        
