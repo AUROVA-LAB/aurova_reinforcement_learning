@@ -120,7 +120,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 60              # Maximum steps in an episode
+    max_steps = 100              # Maximum steps in an episode
 
     seq_len = 3                 # Length of the sequence
    
@@ -144,7 +144,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 1
 
-    scalings = [[[1, 1], [0.01, 0.001]],
+    scalings = [[[1, 1], [0.02, 0.002]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
@@ -291,23 +291,23 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((torch.tensor(ee_init_pose_quat)[:,:3], torch.tensor(euler)), dim = -1).numpy().tolist()
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = [[-0.15,  0.15],
-                    [-0.15,  0.15],
-                    [-0.15,  0.15],
+    ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
                     [-0.3,  0.3],
-                    [-0.3,  0.3]]
+                    [-0.5,  0.5],
+                    [-0.5,  0.5],
+                    [-0.5,  0.5]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, True]
+    apply_range = [False, True, False, False]
 
 
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.075,  0.25],
-                         [-0.25,  0.25],
-                         [-0.3,  0.225],
+                         [-0.25,   0.25],
+                         [-0.3,   0.225],
                          [-2*pi/5,  2*pi/5],
                          [-2*pi/5,  2*pi/5],
                          [-2*pi/5,  2*pi/5]]
