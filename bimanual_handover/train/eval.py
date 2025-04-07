@@ -89,8 +89,8 @@ def main():
         while simulation_app.is_running():
             with torch.inference_mode():
                 # Generate action
-                action, __ = model.predict(obs["policy"].cpu().numpy(), deterministic = True)
-                # action2, __ = model2.predict(obs["policy"].cpu().numpy(), deterministic = True)
+                # action, __ = model.predict(obs["policy"].cpu().numpy(), deterministic = True)
+                action, __ = model2.predict(obs["policy"].cpu().numpy(), deterministic = True)
                 
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor((action)))
@@ -110,7 +110,7 @@ def main():
                 #     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
                 
                 traj["distances"][-1].append(obs["dist"])
-                traj["phase"][-1].append(obs["phase"])
+                # traj["phase"][-1].append(obs["phase"])
 
                 # Reset condition
                 if terminated.item() or truncated.item():
@@ -119,12 +119,12 @@ def main():
                     # print(traj["phase"][-1])
                     
                     traj["distances"].append([])
-                    traj["phase"].append([])
+                    # traj["phase"].append([])
                     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
 
                     ep+=1
 
-                    break
+                    # break
         
         # Compute mean reward
         mean_rew = torch.mean(r).item()

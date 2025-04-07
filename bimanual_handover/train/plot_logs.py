@@ -62,7 +62,7 @@ def plot_results(event_files):
 )
     plt.gca().xaxis.get_offset_text().set_fontsize(20)  # or whatever size you want
     plt.rc('font', size=20)
-    plt.legend(fontsize='xx-large')
+    plt.legend(fontsize=20)
     plt.grid()
     plt.show()
 

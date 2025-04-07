@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from collections.abc import Sequence
 import copy
+import random
 
 from .mdp.utils import compute_rewards, save_images_grid
 from .mdp.rewards import dual_quaternion_error, cartesian_error, SE3_error
@@ -370,7 +371,20 @@ class BimanualDirect(DirectRLEnv):
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
     def _apply_action(self) -> None:
+
+        q_inc = quat_from_euler_xyz(roll = torch.tensor([0.0]).repeat(self.num_envs), pitch = torch.tensor([0.1]).repeat(self.num_envs), yaw = torch.tensor([0.0]).repeat(self.num_envs)).to(self.device)
         
+        a,b = combine_frame_transforms(t01 = self.reset_joint_positions[self.cfg.UR5e][:, :3], q01 = self.reset_joint_positions[self.cfg.UR5e][:, 3:7],
+                                       t12 = torch.zeros((self.num_envs, 3)).to(self.device), q12 = q_inc.repeat(self.num_envs, 1))
+        
+        
+        self.reset_joint_positions[self.cfg.UR5e][:, 0] += self.dir[0]*0.0005
+        self.reset_joint_positions[self.cfg.UR5e][:, 1] += self.dir[1]*0.00015
+        self.reset_joint_positions[self.cfg.UR5e][:, 2] += self.dir[2]*0.00015
+        self.reset_joint_positions[self.cfg.UR5e][:, 3] += self.dir[3]*0.0005
+        self.reset_joint_positions[self.cfg.UR5e][:, 4] += self.dir[4]*0.0007
+        self.reset_joint_positions[self.cfg.UR5e][:, 5] += self.dir[5]*0.00175
+
         # Applies joint actions to the robots 
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.reset_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
@@ -605,8 +619,8 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = cartesian_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = cartesian_error(ee_pose_bask, obj_pose, device)
+        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
 
         
 
@@ -621,7 +635,7 @@ class BimanualDirect(DirectRLEnv):
         #     print("---------------\n\n")
         
         # Dual quaternion distance between object and target pose
-        obj_target_dist = cartesian_error(obj_pose, target_pose, device)
+        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
 
         # Distance between hand tips
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
@@ -648,19 +662,19 @@ class BimanualDirect(DirectRLEnv):
             self.err_aux[0] += hand_obj_dist[0]
             self.cont_err[0] += 1
 
-            # phase_0_flag = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0]).item()
-            # phase_2_flag = (contacts_w[:, :-1].sum(-1) > 0.4).item()
+            phase_0_flag = torch.logical_and(tips_dist > obj_dist, hand_obj_dist_back[:,0] > hand_obj_dist[:,0]).item()
+            phase_2_flag = (contacts_w[:, :-1].sum(-1) > 0.4).item()
 
-            # phase = 1
+            phase = 1
 
-            # if phase_0_flag:
-            #     phase = 0
-            # if phase_2_flag:
-            #     phase = 2
+            if phase_0_flag:
+                phase = 0
+            if phase_2_flag:
+                phase = 2
 
-            # hand_obj_dist_ = dual_quaternion_error(ee_pose, obj_pose, device)
+            hand_obj_dist_ = dual_quaternion_error(ee_pose, obj_pose, device)
 
-            # self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), hand_obj_dist_[0].cpu().numpy().tolist(), phase]
+            self.aux_info = [hand_obj_dist[0].cpu().numpy().tolist(), hand_obj_dist_[0].cpu().numpy().tolist(), phase]
 
 
 
@@ -903,5 +917,9 @@ class BimanualDirect(DirectRLEnv):
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
         self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+
+        self.dir = torch.randint(low = -1,high = 1,size=(6,)).to(self.device)*-2-1
+
+        
 
         
