@@ -144,7 +144,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 1
 
-    scalings = [[[1, 1], [0.02, 0.002]],
+    scalings = [[[1, 1], [0.03, 0.003]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
@@ -332,10 +332,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.016
+    distance_thres = 0.2
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 10
+    bonus_tgt_reached = 20
 
 
 # Function to update the variables in the configuration class
