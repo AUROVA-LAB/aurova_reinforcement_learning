@@ -8,7 +8,7 @@ from __future__ import annotations
 import torch
 from .dq import dq_distance, q_mul, q_conjugate
 
-from isaaclab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
 
 
 # Compute error as a dual quaternion distance

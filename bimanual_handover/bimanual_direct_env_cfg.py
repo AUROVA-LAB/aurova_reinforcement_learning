@@ -16,23 +16,23 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from isaaclab_tasks.direct.aurova_reinforcement_learning.bimanual_handover.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 # from aux import *
 
-# source/isaaclab_tasks/isaaclab_tasks
+# source/omni.isaac.lab_tasks/omni.isaac.lab_tasks
 
-import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
-from isaaclab.envs import DirectRLEnvCfg
-from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sim import SimulationCfg
-from isaaclab.utils import configclass
-from isaaclab.utils.math import euler_xyz_from_quat
-from isaaclab.sensors import CameraCfg, ContactSensorCfg
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.assets import RigidObjectCfg
+import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.envs import DirectRLEnvCfg
+from omni.isaac.lab.scene import InteractiveSceneCfg
+from omni.isaac.lab.sim import SimulationCfg
+from omni.isaac.lab.utils import configclass
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.lab.markers import VisualizationMarkersCfg
+from omni.isaac.lab.assets import RigidObjectCfg
 
 
 

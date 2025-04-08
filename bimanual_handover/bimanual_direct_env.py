@@ -9,17 +9,17 @@ from .mdp.utils import compute_rewards, save_images_grid
 from .mdp.rewards import dual_quaternion_error, quat_error
 from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
 
-import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
-from isaaclab.envs import DirectRLEnv
-from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
-from isaaclab.utils.math import sample_uniform
-from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
-from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from isaaclab.utils.math import quat_from_euler_xyz
-from isaaclab.sensors import ContactSensor
-from isaaclab.markers import VisualizationMarkers
-from isaaclab.assets import RigidObject
+import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.envs import DirectRLEnv
+from omni.isaac.lab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
+from omni.isaac.lab.utils.math import sample_uniform
+from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
+from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms
+from omni.isaac.lab.utils.math import quat_from_euler_xyz
+from omni.isaac.lab.sensors import ContactSensor
+from omni.isaac.lab.markers import VisualizationMarkers
+from omni.isaac.lab.assets import RigidObject
 
 
 

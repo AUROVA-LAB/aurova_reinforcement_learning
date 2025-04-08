@@ -14,17 +14,17 @@ from .py_dq.src.distances import *
 from .py_dq.src.lie import *
 from .py_dq.src.interpolators import *
 
-import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
-from isaaclab.envs import DirectRLEnv
-from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
-from isaaclab.utils.math import sample_uniform
-from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
-from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from isaaclab.utils.math import quat_from_euler_xyz
-from isaaclab.sensors import ContactSensor, Camera
-from isaaclab.markers import VisualizationMarkers
-from isaaclab.assets import RigidObject
+import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.envs import DirectRLEnv
+from omni.isaac.lab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
+from omni.isaac.lab.utils.math import sample_uniform
+from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
+from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms
+from omni.isaac.lab.utils.math import quat_from_euler_xyz
+from omni.isaac.lab.sensors import ContactSensor, Camera
+from omni.isaac.lab.markers import VisualizationMarkers
+from omni.isaac.lab.assets import RigidObject
 
 '''
                     ############## IMPORTANT #################

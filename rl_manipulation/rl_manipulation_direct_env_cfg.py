@@ -9,23 +9,23 @@ from scipy.spatial.transform import Rotation
 
 from .py_dq.src.lie import *
 
-from isaaclab_tasks.direct.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 
-import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
-from isaaclab.envs import DirectRLEnvCfg
-from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sim import SimulationCfg
-from isaaclab.utils import configclass
-from isaaclab.utils.math import euler_xyz_from_quat
-from isaaclab.sensors import CameraCfg, ContactSensorCfg
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.assets import RigidObjectCfg
+import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.envs import DirectRLEnvCfg
+from omni.isaac.lab.scene import InteractiveSceneCfg
+from omni.isaac.lab.sim import SimulationCfg
+from omni.isaac.lab.utils import configclass
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.lab.markers import VisualizationMarkersCfg
+from omni.isaac.lab.assets import RigidObjectCfg
 
-from isaaclab.managers import EventTermCfg, SceneEntityCfg
-from isaaclab.envs import mdp
+from omni.isaac.lab.managers import EventTermCfg, SceneEntityCfg
+from omni.isaac.lab.envs import mdp
 
 '''
                     ############## IMPORTANT #################
@@ -155,9 +155,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = size   # Number of actions per environment (overridden)
-    observation_space = action_space # * (seq_len)                         # Number of observations per environment (overridden)
-    state_space = 0
+    num_actions = size   # Number of actions per environment (overridden)
+    num_observations = num_actions # * (seq_len)                         # Number of observations per environment (overridden)
+    # state_space = 0
     
 
 
