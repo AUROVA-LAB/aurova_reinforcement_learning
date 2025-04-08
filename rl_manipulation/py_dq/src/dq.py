@@ -60,7 +60,8 @@ def q_angle(q: torch.Tensor):
     q_re, q_im = torch.split(q, [1, 3], dim=-1)
     norm = torch.linalg.norm(q_im, dim=-1).unsqueeze(dim=-1)
     # angle = 2.0 * torch.atan2(norm, q_re)
-    angle = 2*torch.acos(q[:, 0])
+    # angle = 2*torch.acos(q[:, 0])
+    angle = 2*torch.acos(torch.round(q[:, 0], decimals =5))
 
     # return wrap_angle(angle)
     return angle
