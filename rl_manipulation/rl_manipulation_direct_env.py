@@ -50,13 +50,14 @@ class RLManipulationDirect(DirectRLEnv):
         self.debug_target_pose_w = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
 
         # Poses for the object and GEN3 robot so they can match when performing the grasping
-        # self.robot_rot_ee_pose_r = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
-        # self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 1,0,0,0]).to(self.device).repeat(self.num_envs, 1)
         self.target_pose_r =  torch.tensor([0.0 ,0.0 ,0.0, 1.0 ,0.0 ,0.0 ,0.0]).to(self.device).repeat(self.num_envs, 1).float()
         self.target_pose_r_group =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
+        self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
         
-        self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
-        self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
+        # self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
+        # self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
+        self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
+        self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
@@ -259,8 +260,9 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # Perform increment in the algebra and exponential map
-        action_pose = self.exp(self.obs_seq_robot_pose_r_lie_rel[:, -1] + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
@@ -351,13 +353,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
         # Transform to the Lie algebra
-        robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
-        robot_rot_ee_pose_r_lie_rel = self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r))
+        self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r))
 
-        # Update sequences
-        self.obs_seq_robot_pose_r_lie_rel = update_seq(new_obs = robot_rot_ee_pose_r_lie_rel, 
-                                                       seq = self.obs_seq_robot_pose_r_lie_rel)
-        self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
 
 
         # --- Target pose ---
@@ -381,7 +379,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = self.obs_seq_robot_pose_r_lie_rel[:, -1]
+        # obs = self.obs_seq_robot_pose_r_lie_rel[:, -1]
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1)
+
         
         # obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
 
@@ -419,7 +419,7 @@ class RLManipulationDirect(DirectRLEnv):
                                                                                     # MAX VEL changing: 1.2104
         
         # ---- Velocity computation ----
-        vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
+        # vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
 
 
         # Obtains wether the agent is approaching or not
@@ -563,6 +563,7 @@ class RLManipulationDirect(DirectRLEnv):
         
 
         self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
+        self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
 
         # --- Reset controller ---
         self.controller.reset()
@@ -589,6 +590,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Builds the new initial pose for the target
         self.target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
         self.target_pose_r_group[env_ids] = self.convert_to_group(tgt_pos_w, tgt_quat_w)[env_ids]
+        self.target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[env_ids]
 
         # --- Reset previous values ---
         # Reset previous distances
@@ -598,9 +600,12 @@ class RLManipulationDirect(DirectRLEnv):
 
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
 
-        self.obs_seq_robot_pose_r_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
-                                                                             self.cfg.seq_len, 
-                                                                             dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+        self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
+        
+
+        # self.obs_seq_robot_pose_r_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
+        #                                                                      self.cfg.seq_len, 
+        #                                                                      dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
 
         # Updates the poses 
-        self.update_new_poses()        
+        self.update_new_poses()  
