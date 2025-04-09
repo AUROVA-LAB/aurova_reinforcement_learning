@@ -431,7 +431,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = -self.cfg.rew_scale_dist * dist
+        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
                     #    self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
 
 

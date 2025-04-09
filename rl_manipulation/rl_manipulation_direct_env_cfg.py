@@ -142,7 +142,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
 
     scalings = [[[1, 1], [0.03, 0.003]],
                 [[1, 1], [None, None]],
@@ -335,7 +335,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     distance_thres = 0.2
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 20
+    bonus_tgt_reached = 100
 
 
 # Function to update the variables in the configuration class
