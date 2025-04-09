@@ -408,7 +408,7 @@ class RLManipulationDirect(DirectRLEnv):
         # ---- Distance computation ----
         # traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
 
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group)      
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group).squeeze(0)      
                                                                                     # MAX DIST (interp   ): 0.1545    (dqLOAM)
                                                                                     # MAX DIST (no interp): 1.545     (dqLOAM)
                                                                                     # MAX DIST (interp   ): 0.126     (dq_geodesic)
