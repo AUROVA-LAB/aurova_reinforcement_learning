@@ -612,7 +612,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Builds the new initial pose for the target
         self.target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
-        self.target_pose_r_group[env_ids] = self.convert_to_group(tgt_pos_w, tgt_quat_w)[env_ids]
+
+        self.target_pose_r_group[env_ids] = self.convert_to_group(target_init_pose[:, :3], quat)[env_ids]
         self.target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[env_ids]
 
         # --- Reset previous values ---
