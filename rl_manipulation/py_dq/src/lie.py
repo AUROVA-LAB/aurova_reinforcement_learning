@@ -17,6 +17,20 @@ def identity_map(x: torch.Tensor):
 
 
 
+def dq_adjoint(v: torch.Tensor, dq: torch.Tensor):
+    assert v.shape[-1] == 6
+    assert dq.shape[-1] == 8
+
+    device = dq.device
+    
+    v = torch.cat((torch.zeros(v.shape[0], 1).to(device), v[:, :3],
+                   torch.zeros(v.shape[0], 1).to(device), v[:, 3:]), dim = -1)
+    
+    adj = dq_mul(dq1 = dq, dq2 = dq_mul(dq1 = v, dq2 = dq_conjugate(dq = dq)))
+
+    return torch.cat((adj[:, 1:4], adj[:, 5:]), dim = -1)
+
+
 
 def exp_bruno(dq_: torch.Tensor):
 
