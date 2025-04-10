@@ -460,7 +460,6 @@ class RLManipulationDirect(DirectRLEnv):
         # ---- Reward composition ----
         # Phase reward plus bonuses
         reward = reward +  self.target_reached * self.cfg.bonus_tgt_reached
-        print(reward)
 
         # Update previous distances
         self.prev_dist = dist
