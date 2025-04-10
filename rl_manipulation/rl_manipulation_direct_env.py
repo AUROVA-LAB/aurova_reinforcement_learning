@@ -268,12 +268,12 @@ class RLManipulationDirect(DirectRLEnv):
         # print("LOG DIFF: ", self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r)))
         # print("Lie Pose1: ", self.robot_rot_ee_pose_r_lie_rel)
 
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
  
         # print("Lie Pose2: ", action_pose)
  
-        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        # action_pose = dq_normalize(action_pose)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = dq_normalize(action_pose)
  
         # print("Res pose: ", torch.round(action_pose ,decimals = 4))
 
