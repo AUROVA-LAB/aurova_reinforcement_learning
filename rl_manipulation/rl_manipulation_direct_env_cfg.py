@@ -144,7 +144,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 0
 
-    scalings = [[[1, 1], [0.03, 0.003]],
+    scalings = [[[1, 1], [0.025, 0.0025]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
                 [[1, 1], [None, None]],
@@ -156,7 +156,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     num_actions = size   # Number of actions per environment (overridden)
-    num_observations = num_actions*2 # * (seq_len)                         # Number of observations per environment (overridden)
+    num_observations = num_actions # * (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 

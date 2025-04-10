@@ -57,7 +57,8 @@ class RLManipulationDirect(DirectRLEnv):
         # self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
         # self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
-        self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
+        self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 0,0,0]).to(self.device).repeat(self.num_envs, 1).float()
+
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
@@ -260,8 +261,28 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # Perform increment in the algebra and exponential map
+        # print("\n\n\n")
+        # print("Initial Pose: ", torch.round(self.pose_group_r, decimals = 4))
+        # print("Target: ", self.target_pose_r_group)
+        # print("DIFF: ", self.diff_operator(self.target_pose_r_group, self.pose_group_r))
+        # print("LOG DIFF: ", self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r)))
+        # print("Lie Pose1: ", self.robot_rot_ee_pose_r_lie_rel)
+
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+ 
+        # print("Lie Pose2: ", action_pose)
+ 
         # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = dq_normalize(action_pose)
+ 
+        # print("Res pose: ", torch.round(action_pose ,decimals = 4))
+
+        # print("\n")
+        # print("TRANS 1: ", dq_translation(self.pose_group_r))
+        # print("TRANS 2: ", dq_translation(action_pose))
+        # print("\n\n\n")
+        
+        # raise
 
 
         # Convert to IsaacLab representation (translation, quaternion)
@@ -354,7 +375,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r))
+        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
 
 
@@ -379,8 +401,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        # obs = self.obs_seq_robot_pose_r_lie_rel[:, -1]
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1)
+        obs = self.robot_rot_ee_pose_r_lie_rel
+        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.target_pose_r_lie), dim = -1)
 
         
         # obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
@@ -601,7 +623,6 @@ class RLManipulationDirect(DirectRLEnv):
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
 
         self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
-        
 
         # self.obs_seq_robot_pose_r_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
         #                                                                      self.cfg.seq_len, 
@@ -609,3 +630,6 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Updates the poses 
         self.update_new_poses()  
+
+
+        
