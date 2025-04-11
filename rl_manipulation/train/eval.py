@@ -1,6 +1,6 @@
 import argparse
 
-from isaaclab.app import AppLauncher
+from omni.isaac.lab.app import AppLauncher
 
 # Add argparse arguments
 parser = argparse.ArgumentParser(description="UR5e RL environment")
@@ -23,7 +23,7 @@ simulation_app = app_launcher.app
 """Rest everything follows"""
 
 import torch
-from isaaclab_tasks.utils import parse_env_cfg
+from omni.isaac.lab_tasks.utils import parse_env_cfg
 import gymnasium as gym
 import os
 from stable_baselines3 import PPO
@@ -42,7 +42,7 @@ def main():
     env = gym.make(args_cli.task, cfg = env_cfg)
     
     # Filter models
-    path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+    path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
     dir = os.path.join(path_to_train, args_cli.model_dir)
 
@@ -57,7 +57,7 @@ def main():
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         
-        model_name_ = "model_198656000_steps.zip"
+        model_name_ = "model_69632000_steps.zip"
 
         # Accumulated reward for all the episodes
         r = torch.zeros((args_cli.num_envs))
@@ -80,6 +80,10 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor(action))
                 
+
+
+
+
                 # Accumulate reward
                 # r += rew.cpu()
                 
