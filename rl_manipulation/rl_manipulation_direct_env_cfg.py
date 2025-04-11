@@ -332,7 +332,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.2
+    distance_thres = 0.08
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
