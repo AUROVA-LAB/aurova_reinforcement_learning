@@ -14,6 +14,10 @@ from .py_dq.src.distances import *
 from .py_dq.src.lie import *
 from .py_dq.src.interpolators import *
 
+from .py_dq.src.quat_trans_lie import *
+from .py_dq.src.matrix_lie import *
+from .py_dq.src.euler import *
+
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
 from omni.isaac.lab.envs import DirectRLEnv
@@ -55,7 +59,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
         
         # self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
-        # self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
+        self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 0,0,0]).to(self.device).repeat(self.num_envs, 1).float()
 
@@ -112,37 +116,35 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Lie algebra ---
         # List of mappings
-        map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno], [exp_stereo, log_stereo]],
-                [[identity_map, identity_map]],
-                [[identity_map, identity_map]],
-                [[identity_map, identity_map]],
-                [[identity_map, identity_map]]]
+        map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],       [exp_stereo, log_stereo]],
+                    [[identity_map, identity_map], [identity_map, identity_map]],
+                    [[identity_map, identity_map], [exp_quat_jil, log_quat_jil], [exp_quat_cayley, log_quat_cayley], [exp_quat_stereo, log_quat_stereo]],
+                    [[identity_map, identity_map], [exp_mat, log_mat]]]
 
         # List of conversions
         conversions = [[convert_dq_to_Lab, dq_from_tr], 
-                       [None, None], 
-                       [None, None], 
-                       [None, None], 
-                       [None, None]]
+                       [convert_euler_to_Lab, from_quat_to_euler], 
+                       [convert_quat_trans_to_Lab, identity_map], 
+                       [convert_homo_to_Lab, homo_from_mat_trans_LAB]]
         
-        diff_operators = [dq_diff, None, None, None, None]
-        mul_operators = [dq_mul, None, None, None, None]
+        diff_operators = [dq_diff, euler_diff, q_trans_diff, mat_diff]
+        mul_operators = [dq_mul, euler_mul, q_trans_mul, mat_mul]
 
         # List of interpolators
-        interpolators = [ScLERP, None, None, None, None]
+        interpolators = [ScLERP, None, None, None]
 
         # Lis of distance functions
         distances = [[dqLOAM_distance, geodesic_dist, double_geodesic_dist],
-                     [None],
-                     [None],
-                     [None],
-                     [None]]
+                     [geodesic_dist],
+                     [geodesic_dist],
+                     [geodesic_dist]]
         
         identities = [[1,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
-                      [None],
-                      [None],
-                      [None],
-                      [None]]
+                      [0.0, 0.0, 0.0,   0.0, 0.0, 0.0],
+                      [0.0, 0.0, 0.0,   1.0, 0.0, 0.0, 0.0],
+                      [1.0, 0.0, 0.0, 0.0,   0.0, 1.0, 0.0, 0.0,   0.0, 0.0, 1.0, 0.0,   0.0, 0.0, 0.0, 1.0]]
+        
+        normalizes = [dq_normalize, euler_normalize, norm_quat, norm_mat]
 
         # Assign the functions according to configuration
         self.exp = map_list[cfg.representation][cfg.mapping][0]                 # Exponential mapping
@@ -153,6 +155,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.dist_function = distances[cfg.representation][cfg.distance]        # Distance function
         self.diff_operator = diff_operators[cfg.representation]
         self.mul_operator = mul_operators[cfg.representation]
+        self.normalize = normalizes[cfg.representation]
     
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
     
@@ -273,7 +276,7 @@ class RLManipulationDirect(DirectRLEnv):
         # print("Lie Pose2: ", action_pose)
  
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = dq_normalize(action_pose)
+        action_pose = self.normalize(action_pose)
  
         # print("Res pose: ", torch.round(action_pose ,decimals = 4))
 
@@ -378,6 +381,8 @@ class RLManipulationDirect(DirectRLEnv):
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
+        self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
+
 
 
         # --- Target pose ---
@@ -430,7 +435,7 @@ class RLManipulationDirect(DirectRLEnv):
         # ---- Distance computation ----
         # traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
 
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group).squeeze(0)      
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)    
                                                                                     # MAX DIST (interp   ): 0.1545    (dqLOAM)
                                                                                     # MAX DIST (no interp): 1.545     (dqLOAM)
                                                                                     # MAX DIST (interp   ): 0.126     (dq_geodesic)
@@ -439,7 +444,7 @@ class RLManipulationDirect(DirectRLEnv):
                                                                                     # MAX DIST (no interp): 0.9628    (double_dq_geodesic)
                                                                                     # MAX VEL continous: 0.5 ó 0.0101
                                                                                     # MAX VEL changing: 1.2104
-        
+
         # ---- Velocity computation ----
         # vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
 
@@ -586,6 +591,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
         self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
+
+        self.obs_seq_vel_lie[env_ids] = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()[env_ids]
 
         # --- Reset controller ---
         self.controller.reset()

@@ -18,7 +18,7 @@ from omni.isaac.lab.envs import DirectRLEnvCfg
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.sim import SimulationCfg
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.utils.math import euler_xyz_from_quat, matrix_from_quat
 from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.markers import VisualizationMarkersCfg
@@ -133,10 +133,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     EULER = 1
     QUAT = 2
     MAT = 3
-    AXIS = 4
 
     # Size of the Lie algebra
-    sizes = [[8, 6, 7, 12, 7], [6]*5]
+    sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
     mapping = 1
@@ -144,11 +143,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 0
 
-    scalings = [[[1, 1], [0.03, 0.003]],
-                [[1, 1], [None, None]],
-                [[1, 1], [None, None]],
-                [[1, 1], [None, None]],
-                [[1, 1], [None, None]]]
+    scalings = [[[1, 1], [0.03,  0.003]],
+                [[1, 1], [0.008,  0.03]],
+                [[1, 1], [0.006, 0.03]],
+                [[1, 1], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
 
@@ -332,7 +330,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.08
+    distance_thres = 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
