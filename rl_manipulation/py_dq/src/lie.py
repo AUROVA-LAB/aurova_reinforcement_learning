@@ -11,12 +11,6 @@ def convert_dq_to_Lab(x: torch.Tensor):
     return torch.cat((t, r), dim = -1)
 
 
-
-def identity_map(x: torch.Tensor):
-    return x
-
-
-
 def dq_adjoint(v: torch.Tensor, dq: torch.Tensor):
     assert v.shape[-1] == 6
     assert dq.shape[-1] == 8
@@ -67,7 +61,7 @@ def log_bruno(dq: torch.Tensor):
 
 def rotation_matrix_from_quaternion(q: torch.Tensor):
     assert q.shape[-1] == 4
-    assert torch.any(q_is_norm(q = q))
+    # assert torch.any(q_is_norm(q = q))
 
     # First row of the rotation matrix
     r00 = 2 * (q[:, 0] * q[:, 0] + q[:, 1] * q[:, 1]) - 1
@@ -135,7 +129,7 @@ def log_stereo_t(t: torch.Tensor, r:torch.Tensor):
 
 
     R = rotation_matrix_from_quaternion(q = r) 
-    print("R: ", R)
+    # print("R: ", R)
 
     a = torch.cat(((R[:, 2,1] - R[:, 1, 2]), 
                    (R[:, 0,2] - R[:, 2, 0]), 
@@ -143,16 +137,16 @@ def log_stereo_t(t: torch.Tensor, r:torch.Tensor):
 
 
     theta = 2* torch.acos(r[:, 0]) # q_angle(q = r)
-    print("THETA: ", theta)
+    # print("THETA: ", theta)
     w = theta / (1+2 * torch.sin(theta)) * a
-    print("W: ", w)
-    print((1+2 * torch.sin(theta)))
-    print(a)
+    # print("W: ", w)
+    # print((1+2 * torch.sin(theta)))
+    # print(a)
     V = get_V_matrix(w = w, theta = theta)
 
     V_ = 1 / V # get_inv_V_matrix(w = w, theta = theta)
-    print("V: ", V)
-    print("V_: ", V_)
+    # print("V: ", V)
+    # print("V_: ", V_)
 
     return V_ * t, V
 
@@ -174,7 +168,7 @@ def exp_stereo(dq_:torch.Tensor):
     assert dq_.shape[-1] == 6
     # assert V.shape[-1] == 3
 
-    q_p = exp_stereo_q(q_ = dq_[:, :3])    
+    q_p = exp_stereo_q(q_ = dq_[:, :3])  
 
     return dq_from_tr(t = dq_[:, 3:], r = q_p)
 
@@ -215,14 +209,14 @@ def exp_cayley(dq_: torch.Tensor):
 
 
 
-# t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(2,1)
-# r1 = torch.tensor([[3.3840e-06, -3.8268e-01, -9.2388e-01,  2.1003e-06]]).repeat(2,1)
+# t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]])
+# r1 = torch.tensor([[3.3840e-06, -3.8268e-01, -9.2388e-01,  2.1003e-06]])
 
 # t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
-# r2 = torch.tensor([[0.2521, 0.0346, 0.9422,  -0.2179]])*1
+# r2 = torch.tensor([[0.2521, 0.0346, 0.9422,  -0.2179]])
 
-# # t2 = torch.tensor([[0.0, -0.0,  0.01,  0.0]]).repeat(2,1)
-# # r2 = torch.tensor([[0.4999, 0.0174, 0.0,  -0.0]]).repeat(2,1)
+# t2 = torch.tensor([[-0.0,  0.01,  0.0]])
+# r2 = torch.tensor([[0.4999, -0.866, 0.0,  -0.0]])
 
 
 # dq1 = dq_from_tr(t = t1, r = r1)
@@ -234,21 +228,28 @@ def exp_cayley(dq_: torch.Tensor):
 # print("DQ: ", q)
 
 
-# x_q = dq_mul(dq1 = dq_conjugate(x), dq2 = q)
+# x_q = dq_diff(dq1 =x, dq2 = q)
 # x_q = dq_normalize(x_q)
 
-# l_ = log_stereo(dq = x_q)
+# print("DIFF: ", x_q.round(decimals = 4))
+
+# l_ = log_cayley(dq = x_q)
 # # l_ = torch.cat((torch.zeros((l_.shape[0], 1)), l_[:, :3],
 # #                 torch.zeros((l_.shape[0], 1)), l_[:, 3:]), dim = -1)
 
 # # l_ = dq_mul(dq1 = x, dq2 = l_)
 # # l_ = torch.cat((l_[:, 1:4], l_[:, 5:]), dim = -1)
 
-# b = exp_stereo(dq_ = l_)
+# b = exp_cayley(dq_ = l_)
+
+# print("DIFF: ", b.round(decimals = 4))
+# print("PRE Logaritmico: ", l_.round(decimals = 4))
+
 
 # b = dq_mul(x, b)
 # b = dq_normalize(b)
 
 # print("Logaritmico: ", l_.round(decimals = 6))
 # print("Exponencial: ", b.round(decimals = 6))
+# print("\n\n\n\n\n\n")
 
