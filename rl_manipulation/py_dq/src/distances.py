@@ -3,9 +3,9 @@ from .dq import *
 from .lie import *
 
 
-# === DISTANCES =================================================================================
+# === DQ DISTANCES =================================================================================
 
-def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor) -> torch.Tensor:
+def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
     '''
     Calculates the screw motion parameters between dual quaternion representations of the given poses pose_pred/real.
     The difference of two dual quaternions results the pure dual quaternion if the originals represent the same frame in space.
@@ -21,8 +21,8 @@ def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor) -> torch.Tenso
     res[:, 0] = torch.abs(res[:, 0]) - 1
 
     # Obtain the norm of the primary and dual part
-    translation_mod = torch.norm(res[:, 4:], dim = -1).unsqueeze(0)
-    rotation_mod = torch.norm(res[:, :4], dim = -1).unsqueeze(0)
+    translation_mod = torch.norm(res[:, 4:], dim = -1)
+    rotation_mod = torch.norm(res[:, :4], dim = -1)
 
     # The distance is the sum of the modules
     distance = translation_mod + rotation_mod
@@ -31,17 +31,18 @@ def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor) -> torch.Tenso
     return distance
 
 
+# === Lie DISTANCES =================================================================================
 
-def geodesic_dist(dq1: torch.Tensor, dq2: torch.Tensor) -> torch.Tensor:
+def geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
 
-    log_diff = log_bruno(dq = dq_mul(dq1 = dq_conjugate(dq = dq1), dq2 = dq2))
+    log_diff = log_fc(diff_fc(x1, x2))
 
     return torch.norm(log_diff, dim = -1)
 
 
-def double_geodesic_dist(dq1: torch.Tensor, dq2: torch.Tensor) -> torch.Tensor:
+def double_geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
 
-    log_dq1 = log_bruno(dq = dq1)
-    log_dq2 = log_bruno(dq = dq2)
+    log_x1 = log_fc(x1)
+    log_x2 = log_fc(x2)
 
-    return q_inn_prod(q1 = log_dq1[:, :3], q2 = log_dq2[:, :3]) + q_inn_prod(q1 = log_dq1[:, 3:], q2 = log_dq2[:, 3:])
+    return q_inn_prod(q1 = log_x1[:, :3], q2 = log_x2[:, :3]) + q_inn_prod(q1 = log_x1[:, 3:], q2 = log_x2[:, 3:])
