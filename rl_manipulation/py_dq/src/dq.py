@@ -96,7 +96,7 @@ def q_normalize(q: torch.Tensor):
 
     norm = q_norm(q = q)
     assert not torch.any(torch.isclose(norm, torch.zeros_like(norm, device=q.device)))  # check for singularities
-    return  q#torch.div(q, norm[:, None])  # q_norm = q / ||q||
+    return  q/norm.unsqueeze(-1)#torch.div(q, norm[:, None])  # q_norm = q / ||q||
 
 
 def q_conjugate(q: torch.Tensor):
@@ -119,6 +119,17 @@ def q_is_pure(q: torch.Tensor):
     assert q.shape[-1] == 4
 
     return torch.isclose(q[:, 0], torch.zeros(q.shape[0], device=q.device))
+
+
+def q_diff(q1: torch.Tensor, q2: torch.Tensor):
+    assert q1.shape[-1] == 4
+    assert q2.shape[-1] == 4
+    # assert torch.any(q_is_norm(q1))
+    # assert torch.any(q_is_norm(q2))
+
+    return q_mul(q1 = q_conjugate(q = q1), q2 = q2)
+
+
 
 
 # ======== PURE QUATERNIONS =======================================================================
