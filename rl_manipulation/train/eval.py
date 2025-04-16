@@ -57,7 +57,7 @@ def main():
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         
-        model_name_ = "model_69632000_steps.zip"
+        model_name_ = "model_60928000_steps.zip"
 
         # Accumulated reward for all the episodes
         r = torch.zeros((args_cli.num_envs))
@@ -80,7 +80,7 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor(action))
                 
-
+                print(rew)
 
 
 
