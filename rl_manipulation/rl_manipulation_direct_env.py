@@ -61,7 +61,7 @@ class RLManipulationDirect(DirectRLEnv):
         # self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
         self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
-        self.robot_rot_ee_pose_r_lie = torch.tensor([0,0,0, 0,0,0]).to(self.device).repeat(self.num_envs, 1).float()
+        self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
 
 
         # Indexes for: robot joints, hand joints, all joints
@@ -124,7 +124,7 @@ class RLManipulationDirect(DirectRLEnv):
         # List of conversions
         conversions = [[convert_dq_to_Lab, dq_from_tr], 
                        [convert_euler_to_Lab, from_quat_to_euler], 
-                       [convert_quat_trans_to_Lab, identity_map], 
+                       [convert_quat_trans_to_Lab, identity_map_conversion], 
                        [convert_homo_to_Lab, homo_from_mat_trans_LAB]]
         
         diff_operators = [dq_diff, euler_diff, q_trans_diff, mat_diff]
@@ -211,8 +211,19 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Clamp actions
-        actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
-        actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+        if self.cfg.representation == self.cfg.MAT and self.cfg.mapping == 0:
+            actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+            actions[:, 4:7] = torch.clamp(actions[:, 4:7], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+            actions[:, 8:11] = torch.clamp(actions[:, 8:11], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+
+            actions[:, 3] = torch.clamp(actions[:,3], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            actions[:, 7] = torch.clamp(actions[:, 7], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            actions[:, 11] = torch.clamp(actions[:, 11], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+
+
+        else:
+            actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+            actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
 
         return actions
     
