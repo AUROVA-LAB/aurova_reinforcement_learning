@@ -45,6 +45,9 @@ if __name__ == "__main__":
         
         for m in range(map):
             for d in range(dist):
+                if repr == "DQ" and m == 0 and d == 2:
+                    continue
+
                 modify_cfg(repr, m, d)
 
                 print("--- RUN: ", repr, " ", m, " ", d)
