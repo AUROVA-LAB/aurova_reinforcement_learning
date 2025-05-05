@@ -143,10 +143,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 0
 
-    scalings = [[[1, 1], [0.03,  0.003]],
-                [[1, 1], [0.008,  0.03]],
-                [[1, 1], [0.006, 0.03]],
-                [[1, 1], [0.03,  0.006]]]
+    scalings = [[[0.01, 0.001], [0.03,  0.003]],
+                [[0.007, 0.02], [0.008,  0.03]],
+                [[0.006, 0.025], [0.006, 0.03]],
+                [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
 
