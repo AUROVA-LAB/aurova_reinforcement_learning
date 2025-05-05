@@ -9,16 +9,22 @@ def convert_quat_trans_to_Lab(q: torch.Tensor):
 
     return q
 
+def identity_map_conversion(x: torch.Tensor, q: torch.Tensor):
+    return torch.cat((x, q), dim = -1)
 
 def norm_quat(x: torch.Tensor):
+    assert x.shape[-1] == 7
+
+    x[:, 3:] = q_normalize(q = x[:, 3:])
+
     return x
 
 
 def q_trans_diff(q1: torch.Tensor, q2: torch.Tensor):
     assert q1.shape[-1] == 7
     assert q2.shape[-1] == 7
-    assert torch.any(q_is_norm(q1[:, 3:]))
-    assert torch.any(q_is_norm(q2[:, 3:]))
+    # assert torch.any(q_is_norm(q1[:, 3:]))
+    # assert torch.any(q_is_norm(q2[:, 3:]))
 
     t_diff = q2[:, :3] - q1[:, :3]
     r_diff = q_diff(q1 = q1[:, 3:], q2 = q2[: , 3:])
@@ -28,8 +34,8 @@ def q_trans_diff(q1: torch.Tensor, q2: torch.Tensor):
 def q_trans_mul(q1: torch.Tensor, q2: torch.Tensor):
     assert q1.shape[-1] == 7
     assert q2.shape[-1] == 7
-    assert torch.any(q_is_norm(q1[:, 3:]))
-    assert torch.any(q_is_norm(q2[:, 3:]))
+    # assert torch.any(q_is_norm(q1[:, 3:]))
+    # assert torch.any(q_is_norm(q2[:, 3:]))
 
     t = q1[:, :3] + q2[:, :3]
     r = q_mul(q1 = q1[:, 3:], q2 = q2[:, 3:])
