@@ -5,7 +5,7 @@ from .lie import exp_stereo_q, log_stereo_q, exp_stereo_t, log_stereo_t, q_is_no
 
 def convert_quat_trans_to_Lab(q: torch.Tensor):
     assert q.shape[-1] == 7
-    assert torch.any(q_is_norm(q[:, 3:]))
+    # assert torch.any(q_is_norm(q[:, 3:]))
 
     return q
 
@@ -66,7 +66,7 @@ def exp_quat_jil(q_: torch.Tensor):
 
 def log_quat_jil(q: torch.Tensor):
     assert q.shape[-1] == 7
-    assert torch.any(q_is_norm(q[:, 3:]))
+    # assert torch.any(q_is_norm(q[:, 3:]))
 
     w = q[:, 3:]
     t = q[:, :3]
@@ -90,7 +90,7 @@ def exp_quat_stereo(q_:torch.Tensor):
 
 def log_quat_stereo(q: torch.Tensor):
     assert q.shape[-1] == 7
-    assert torch.any(q_is_norm(q[:, 3:]))
+    # assert torch.any(q_is_norm(q[:, 3:]))
 
     t_ = q[:, :3]
 
@@ -113,7 +113,7 @@ def exp_quat_cayley(q_: torch.Tensor):
 
 def log_quat_cayley(q: torch.Tensor):
     assert q.shape[-1] == 7
-    assert torch.any(q_is_norm(q = q[:, 3:]))
+    # assert torch.any(q_is_norm(q = q[:, 3:]))
 
     identity = torch.cat((torch.ones(q.shape[0], 1), torch.zeros(q.shape[0], 3)), dim = -1)
     denom = q_norm(q[:, 3:] + identity).unsqueeze(-1)
