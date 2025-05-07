@@ -172,14 +172,7 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
         },
     ),
     actuators={
-        "arm": ImplicitActuatorCfg(
-            joint_names_expr = ["elbow_joint",
-                                "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
-            velocity_limit = 100.0,
-            effort_limit = 87.0,
-            stiffness = 800.0,
-            damping = 40.0,
-        ),
+        
         "shoulder_pan": ImplicitActuatorCfg(
             joint_names_expr = ["shoulder_pan_joint"],
             velocity_limit = 100.0,
@@ -205,11 +198,24 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
             joint_names_expr = ["wrist_1_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 19.4826, # 9.4776
-            damping = 28.9458, # 1.0331
+            stiffness = 9.4776,
+            damping = 1.0331
         ),
+        "wrist_2": ImplicitActuatorCfg(
+            joint_names_expr = ["wrist_2_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 384.5534,
+            damping = 8.2002
+        ),
+        "wrist_3": ImplicitActuatorCfg(
+            joint_names_expr = ["wrist_3_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 89.3253,
+            damping = 7.4152,
+        ),
+        
 
     },
-# --- Best params  shoulder_lift_joint :  {'distance': tensor(0.0199, device='cuda:0'), 'damping': tensor(29.7188, device='cuda:0'), 'stiffness': tensor(1114.5306, device='cuda:0')}
-
 )

@@ -163,7 +163,7 @@ class RLManipulationDirect(DirectRLEnv):
 
 
 
-        path = "./source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/rosbags_yaml/wrist_1_joint_+.yaml"
+        path = "./source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/rosbags_yaml/all_+.yaml"
 
         with open(path, "r") as f:
             data = yaml.safe_load(f)
@@ -173,7 +173,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.joint_list = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
                            "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
-        self.idx = self.joint_list.index(self.id)
+        # self.idx = self.joint_list.index(self.id)
         self.count = torch.zeros(self.num_envs).to(self.device).int()
         self.end = torch.zeros(self.num_envs).to(self.device).bool()
 
@@ -362,16 +362,20 @@ class RLManipulationDirect(DirectRLEnv):
 
         joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
         
-
-        self.curr_pos = torch.cat((self.curr_pos, joint_pos[:, self.idx].unsqueeze(dim = -1)), dim = -1)
-
-        joint_pos[:, self.idx] = self.joint_pos[:, -1]
+        print(self.curr_pos)
+        self.curr_pos = torch.cat((self.curr_pos, joint_pos), dim = -1).view(self.num_envs, -1, 6)
+        
+        joint_pos = self.joint_pos[-1, :]
         joint_pos_ = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
 
-        self.end = torch.isclose(self.joint_pos[:, -1], joint_pos_[:, self.idx], rtol = 5e-5, atol = 5e-5)
+        self.end = torch.isclose(self.joint_pos[-1, :], joint_pos_, rtol = 5e-5, atol = 5e-5).all(dim = -1)
         self.count += self.end.int()
     
         # Applies joint actions to the robot
+        print(joint_pos)
+        print(self.joint_pos)
+        print(self.joint_pos[-1, :])
+        print(joint_pos.shape)
         self.scene.articulations[self.cfg.keys[self.cfg.robot]].set_joint_position_target(joint_pos, joint_ids=self._all_joints_idx)
 
 
@@ -647,27 +651,25 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset method from DirectRLEnv
         super()._reset_idx(env_ids)
 
-        update = False
-        if not self.first_reset:
+        # update = False
+        # if not self.first_reset:
             
-            for i in range(self.num_envs):
-                distance = self.evaluate_trajectories(i)
+        #     for i in range(self.num_envs):
+        #         distance = self.evaluate_trajectories(i)
 
-                if distance < self.best_params["distance"]:
-                    damp = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[i, self._robot_joints_idx]
-                    stiff = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[i, self._robot_joints_idx]
+        #         if distance < self.best_params["distance"]:
+        #             damp = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[i, self._robot_joints_idx]
+        #             stiff = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[i, self._robot_joints_idx]
 
-                    self.best_params = {"distance": distance,
-                                        "damping": damp[self.idx],
-                                        "stiffness": stiff[self.idx]}
+        #             self.best_params = {"distance": distance,
+        #                                 "damping": damp[self.idx],
+        #                                 "stiffness": stiff[self.idx]}
                     
-                    update = True
+        #             update = True
                     
-                # self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[:, self._robot_joints_idx]
-                # self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[:, self._robot_joints_idx]
         
-        if update: 
-            print("--- Best params ", self.joint_list[self.idx], ": ", self.best_params)
+        # if update: 
+        #     print("--- Best params ", self.joint_list[self.idx], ": ", self.best_params)
 
         
         # Reset the count
@@ -736,7 +738,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses() 
 
         joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
-        self.curr_pos = joint_pos[0, self.idx].repeat(self.num_envs, 1).to(self.device).float()
+        self.curr_pos = joint_pos
 
 
         
