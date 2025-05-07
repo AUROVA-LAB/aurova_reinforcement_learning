@@ -4,6 +4,7 @@ import os
 import torch
 from collections.abc import Sequence
 import copy
+import yaml
 
 from .mdp.utils import compute_rewards, save_images_grid, update_seq
 from .mdp.rewards import dual_quaternion_error 
@@ -158,6 +159,31 @@ class RLManipulationDirect(DirectRLEnv):
         self.normalize = normalizes[cfg.representation]
     
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
+
+
+
+
+        path = "./source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/rosbags_yaml/wrist_1_joint_+.yaml"
+
+        with open(path, "r") as f:
+            data = yaml.safe_load(f)
+
+        self.joint_pos = torch.tensor(data["data"]).repeat(self.num_envs, 1).to(self.device).float()
+        self.id = data["id"]
+
+        self.joint_list = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                           "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+        self.idx = self.joint_list.index(self.id)
+        self.count = torch.zeros(self.num_envs).to(self.device).int()
+        self.end = torch.zeros(self.num_envs).to(self.device).bool()
+
+        self.first_reset = True
+
+        self.best_params = {"distance": torch.inf,
+                            "stiffness": 0.0,
+                            "damping": 0.0}
+
+
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -334,8 +360,19 @@ class RLManipulationDirect(DirectRLEnv):
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
     def _apply_action(self) -> None:
 
+        joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
+        
+
+        self.curr_pos = torch.cat((self.curr_pos, joint_pos[:, self.idx].unsqueeze(dim = -1)), dim = -1)
+
+        joint_pos[:, self.idx] = self.joint_pos[:, -1]
+        joint_pos_ = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
+
+        self.end = torch.isclose(self.joint_pos[:, -1], joint_pos_[:, self.idx], rtol = 5e-5, atol = 5e-5)
+        self.count += self.end.int()
+    
         # Applies joint actions to the robot
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].set_joint_position_target(self.actions, joint_ids=self._all_joints_idx)
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].set_joint_position_target(joint_pos, joint_ids=self._all_joints_idx)
 
 
     # Update the position of the markers with debug purposes
@@ -502,7 +539,14 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached)
+        
+        if self.end.all():
+            terminated = torch.tensor([True]).repeat(self.num_envs).to(self.device)
+        else:
+            terminated = torch.tensor([False]).repeat(self.num_envs).to(self.device)
+
+
+        # terminated =  torch.logical_or(time_out, self.target_reached)
 
         return truncated, terminated
     
@@ -576,6 +620,20 @@ class RLManipulationDirect(DirectRLEnv):
         self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
 
 
+    def evaluate_trajectories(self, idx):
+        original_len = self.joint_pos.shape[-1]
+        
+        original_indices = torch.linspace(0, 1, steps = original_len)
+        target_indices = torch.linspace(0, 1, steps = self.count[idx].item())
+
+        new_indices = (target_indices * (original_len-1)).int()
+
+        original_values_interp = self.joint_pos[0, new_indices]
+        idx_values = self.curr_pos[idx, :self.count[idx].item()]
+        
+        return torch.norm(original_values_interp - idx_values)
+
+
     # Resets the simulation --> Overrides method of DirectRLEnv
     def _reset_idx(self, env_ids: Sequence[int] | None):
         '''
@@ -589,8 +647,35 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset method from DirectRLEnv
         super()._reset_idx(env_ids)
 
+        update = False
+        if not self.first_reset:
+            
+            for i in range(self.num_envs):
+                distance = self.evaluate_trajectories(i)
+
+                if distance < self.best_params["distance"]:
+                    damp = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[i, self._robot_joints_idx]
+                    stiff = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[i, self._robot_joints_idx]
+
+                    self.best_params = {"distance": distance,
+                                        "damping": damp[self.idx],
+                                        "stiffness": stiff[self.idx]}
+                    
+                    update = True
+                    
+                # self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[:, self._robot_joints_idx]
+                # self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[:, self._robot_joints_idx]
+        
+        if update: 
+            print("--- Best params ", self.joint_list[self.idx], ": ", self.best_params)
+
+        
         # Reset the count
-        self.count = 0
+        self.count = torch.zeros(self.num_envs).to(self.device).int()
+        self.end = torch.zeros(self.num_envs).to(self.device).bool()
+        
+        self.first_reset = False
+
 
         # --- Reset the robot ---
         # Reset the robot first to the default joint position so the IK is easier to compute afterwards
@@ -648,7 +733,10 @@ class RLManipulationDirect(DirectRLEnv):
         #                                                                      dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
 
         # Updates the poses 
-        self.update_new_poses()  
+        self.update_new_poses() 
+
+        joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
+        self.curr_pos = joint_pos[0, self.idx].repeat(self.num_envs, 1).to(self.device).float()
 
 
         

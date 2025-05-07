@@ -173,13 +173,43 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
     ),
     actuators={
         "arm": ImplicitActuatorCfg(
-            joint_names_expr = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+            joint_names_expr = ["elbow_joint",
                                 "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
             stiffness = 800.0,
             damping = 40.0,
         ),
+        "shoulder_pan": ImplicitActuatorCfg(
+            joint_names_expr = ["shoulder_pan_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 1375.3032, # 800.0,
+            damping = 39.7259 #40.0,
+        ),
+        "shoiulder_lift": ImplicitActuatorCfg(
+            joint_names_expr = ["shoulder_lift_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 1114.5306, 
+            damping = 29.7188,
+        ),
+        "elbow": ImplicitActuatorCfg(
+            joint_names_expr = ["elbow_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 565.5358, 
+            damping = 105.8098,
+        ),
+        "wrist_1": ImplicitActuatorCfg(
+            joint_names_expr = ["wrist_1_joint"],
+            velocity_limit = 100.0,
+            effort_limit = 87.0,
+            stiffness = 19.4826, # 9.4776
+            damping = 28.9458, # 1.0331
+        ),
+
     },
+# --- Best params  shoulder_lift_joint :  {'distance': tensor(0.0199, device='cuda:0'), 'damping': tensor(29.7188, device='cuda:0'), 'stiffness': tensor(1114.5306, device='cuda:0')}
 
 )

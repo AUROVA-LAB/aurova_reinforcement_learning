@@ -65,24 +65,24 @@ rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positi
 
 @configclass
 class EventCfg:
-  robot_physics_material = EventTermCfg(
-      func=mdp.randomize_rigid_body_material,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("UR5e_3f", body_names=".*"),
-          "static_friction_range": (0.7, 1.3),
-          "dynamic_friction_range": (1.0, 1.0),
-          "restitution_range": (1.0, 1.0),
-          "num_buckets": 250,
-      },
-  )
+#   robot_physics_material = EventTermCfg(
+#       func=mdp.randomize_rigid_body_material,
+#       mode="reset",
+#       params={
+#           "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", body_names=".*"),
+#           "static_friction_range": (0.7, 1.3),
+#           "dynamic_friction_range": (1.0, 1.0),
+#           "restitution_range": (1.0, 1.0),
+#           "num_buckets": 250,
+#       },
+#   )
   robot_joint_stiffness_and_damping = EventTermCfg(
       func=mdp.randomize_actuator_gains,
       mode="reset",
       params={
-          "asset_cfg": SceneEntityCfg("UR5e_3f", joint_names=".*"),
-          "stiffness_distribution_params": (0.75, 1.5),
-          "damping_distribution_params": (0.3, 3.0),
+          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names="wrist_1_joint"),
+          "stiffness_distribution_params": (1, 1),
+          "damping_distribution_params": (1, 1),
           "operation": "scale",
           "distribution": "log_uniform",
       },
@@ -99,23 +99,23 @@ class EventCfg:
 #       },
 #   )
 
-  body_mass = EventTermCfg(
-      func = mdp.randomize_rigid_body_mass,
-      mode = "reset",
-      params = {
-          "asset_cfg": SceneEntityCfg("object"),
-          "mass_distribution_params": (0.5, 1.5),
-          "operation": "scale",
-          "distribution": "uniform",
-          "recompute_inertia": False,
-      }
-  )
+#   body_mass = EventTermCfg(
+#       func = mdp.randomize_rigid_body_mass,
+#       mode = "reset",
+#       params = {
+#           "asset_cfg": SceneEntityCfg("object"),
+#           "mass_distribution_params": (0.5, 1.5),
+#           "operation": "scale",
+#           "distribution": "uniform",
+#           "recompute_inertia": False,
+#       }
+#   )
 
 # Configuration class for the environment
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
 
-    # events: EventCfg = EventCfg()
+    events: EventCfg = EventCfg()
     
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
@@ -137,7 +137,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = DQ
+    representation = MAT
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
@@ -297,7 +297,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                     [-0.5,  0.5]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, False]
+    apply_range = [False, False, False, False]
 
 
 
