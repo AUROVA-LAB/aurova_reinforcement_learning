@@ -117,7 +117,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Lie algebra ---
         # List of mappings
         map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],       [exp_stereo, log_stereo]],
-                    [[identity_map, identity_map], [identity_map, identity_map]],
+                    [[identity_map, identity_map],],
                     [[identity_map, identity_map], [exp_quat_jil, log_quat_jil], [exp_quat_cayley, log_quat_cayley], [exp_quat_stereo, log_quat_stereo]],
                     [[identity_map, identity_map], [exp_mat, log_mat]]]
 

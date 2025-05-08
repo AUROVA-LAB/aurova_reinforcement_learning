@@ -68,13 +68,20 @@ def log_quat_jil(q: torch.Tensor):
     assert q.shape[-1] == 7
     # assert torch.any(q_is_norm(q[:, 3:]))
 
+    device = q.device
+
     w = q[:, 3:]
     t = q[:, :3]
 
     re_w = w[:, 0]
     im_w = w[:, 1:]
 
-    w = 2 * (torch.acos(re_w) / torch.norm(im_w, dim = -1)).unsqueeze(-1) * im_w
+    norm = torch.norm(im_w, dim = -1)
+
+    w = 2 * (torch.acos(re_w) / norm).unsqueeze(-1) * im_w
+    idx_0 = torch.isclose(norm, torch.zeros_like(norm).to(device))
+
+    w[idx_0] = torch.zeros_like(w)[idx_0]
 
     return torch.cat((t, w), dim = -1) 
 
@@ -83,39 +90,47 @@ def log_quat_jil(q: torch.Tensor):
 def exp_quat_stereo(q_:torch.Tensor):
     assert q_.shape[-1] == 6
 
+    device = q_.device
+
     q_p = exp_stereo_q(q_ = q_[:, 3:])    
     q_p = q_normalize(q = q_p)
 
-    return torch.cat((q_[:, :3], q_p), dim = -1)
+    return torch.cat((q_[:, :3], q_p), dim = -1).to(device)
 
 def log_quat_stereo(q: torch.Tensor):
     assert q.shape[-1] == 7
     # assert torch.any(q_is_norm(q[:, 3:]))
 
+    device = q.device
+
     t_ = q[:, :3]
 
-    return torch.cat((t_, log_stereo_q(q = q[:, 3:])), dim = -1)
+    return torch.cat((t_, log_stereo_q(q = q[:, 3:])), dim = -1).to(device)
 
 
 
 def exp_quat_cayley(q_: torch.Tensor):
     assert q_.shape[-1] == 6
     
+    device = q_.device
+
     t = q_[:, :3]
-    q_ = torch.cat((torch.zeros(q_.shape[0], 1), q_[:, 3:]), dim = -1)
+    q_ = torch.cat((torch.zeros(q_.shape[0], 1).to(device), q_[:, 3:]), dim = -1).to(device)
     
-    identity = torch.cat((torch.ones(q_.shape[0], 1), torch.zeros(q_.shape[0], 3)), dim = -1)
+    identity = torch.cat((torch.ones(q_.shape[0], 1), torch.zeros(q_.shape[0], 3)), dim = -1).to(device)
     denom = q_norm(identity - q_[:, 3:]).unsqueeze(-1)
 
     res = q_mul(q1 = (identity + q_), q2 = q_conjugate(identity - q_) / (denom*denom) )
     
-    return torch.cat((t, q_normalize(res)), dim = -1)
+    return torch.cat((t, q_normalize(res)), dim = -1).to(device)
 
 def log_quat_cayley(q: torch.Tensor):
     assert q.shape[-1] == 7
     # assert torch.any(q_is_norm(q = q[:, 3:]))
 
-    identity = torch.cat((torch.ones(q.shape[0], 1), torch.zeros(q.shape[0], 3)), dim = -1)
+    device = q.device
+
+    identity = torch.cat((torch.ones(q.shape[0], 1), torch.zeros(q.shape[0], 3)), dim = -1).to(device)
     denom = q_norm(q[:, 3:] + identity).unsqueeze(-1)
 
     res = q_mul(q1 = q[:, 3:] - identity, q2 = q_conjugate(q[:, 3:] + identity) / (denom*denom) )

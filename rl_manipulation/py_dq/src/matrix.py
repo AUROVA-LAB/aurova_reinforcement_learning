@@ -39,7 +39,7 @@ def mat_diff(m1: torch.Tensor, m2: torch.Tensor):
     assert m1.shape[-1] == m2.shape[-1]
     assert m1.shape[-1] == 16
 
-    return torch.matmul(torch.inverse(m1.view(-1, 4, 4)), m2.view(-1, 4, 4)).view(-1, 16)
+    return torch.matmul(m2.view(-1, 4, 4), torch.inverse(m1.view(-1, 4, 4))).view(-1, 16)
 
 def mat_mul(m1: torch.Tensor, m2: torch.Tensor):
     assert m1.shape[-1] == m2.shape[-1]

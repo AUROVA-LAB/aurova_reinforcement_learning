@@ -43,8 +43,12 @@ def log_mat(mat: torch.tensor):
     S = torch.stack((S[:, 0, 0], S[:, 1, 1], S[:, 2, 2]), dim = -1)
     n = S / (3 - torch.vmap(torch.trace)(mat))[:, None]
 
+    idx_3 = torch.isclose(torch.vmap(torch.trace)(mat), 3*torch.ones((mat.shape[-1])).to(device))
+
     R = torch.stack((mat[:, 0, 0], mat[:, 1, 1], mat[:, 2, 2]), dim = -1)
     log[idx_pi] = (n * torch.sqrt(0.5*(1 + R)))[idx_pi]
+    log[idx_3] = torch.zeros_like(log)[idx_3]
+
 
     return torch.cat((log, t), dim = -1)
 
@@ -87,9 +91,9 @@ def exp_mat(mat_: torch.tensor):
 # t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(2,1)
 
 
-# r2 = torch.tensor([[-0.8705,  0.1751,  0.4600,
-#                     -0.0447,  0.9026, -0.4281,
-#                     -0.4901, -0.3932, -0.7779]])
+# r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
+#                     -0.0000, -0.5000,  0.8660,
+#                      0.0000, -0.8660, -0.5000]])
 # t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
 
 
