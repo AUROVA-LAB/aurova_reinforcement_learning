@@ -37,20 +37,27 @@ def modify_cfg(representation, mapping, distance):
 
 
 if __name__ == "__main__":
-    possib_repr = ["QUAT", "MAT"]
-    possib_map =  [4, 2]
-    possib_dist = [1, 1]
+    possib_repr = ["DQ", "EULER", "QUAT", "MAT"]
+    possib_map =  [1, 1, 3, 1]
+    possib_dist = [3, 1, 1, 1]
 
     for repr, map, dist in zip(possib_repr, possib_map, possib_dist):
         
         for m in range(map):
             for d in range(dist):
-                if repr == "DQ" and m == 0 and d == 2:
-                    continue
+                
+                m_ = m
+                if repr == "DQ":
+                    m_ += 2
+                
+                if repr == "QUAT":
+                    m_ += 1
+                if repr == "MAT":
+                    m_ += 1
 
-                modify_cfg(repr, m, d)
+                modify_cfg(repr, m_, d)
 
-                print("--- RUN: ", repr, " ", m, " ", d)
+                print("--- RUN: ", repr, " ", m_, " ", d)
                 subprocess.run(command, shell = True, check = True)
 
 
