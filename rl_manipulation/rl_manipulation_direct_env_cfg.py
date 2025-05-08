@@ -137,15 +137,15 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = DQ
-    mapping = 0
+    representation = QUAT
+    mapping = 3
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
 
-    scalings = [[[0.01, 0.001], [0.03,  0.003]],
-                [[0.007, 0.02], [0.008,  0.03]],
-                [[0.006, 0.025], [0.006, 0.03]],
+    scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
+                [[0.007, 0.02]],
+                [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
