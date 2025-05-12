@@ -49,6 +49,11 @@ def log_mat(mat: torch.tensor):
     log[idx_pi] = (n * torch.sqrt(0.5*(1 + R)))[idx_pi]
     log[idx_3] = torch.zeros_like(log)[idx_3]
 
+    print("log: ", log)
+    a = log.cpu().numpy().tolist()
+    if torch.nan in a:
+        raise
+
 
     return torch.cat((log, t), dim = -1)
 
@@ -79,6 +84,12 @@ def exp_mat(mat_: torch.tensor):
     exp = torch.stack((r1, r2, r3), dim = 1)
     idx_0 = torch.abs(theta) < 1e-6
     exp[idx_0] = torch.eye(3).to(device).repeat(mat_.shape[0], 1, 1)[idx_0]
+
+    print("exp: ", exp)
+
+    a = exp.cpu().numpy().tolist()
+    if torch.nan in a:
+        raise
 
     return homo_from_mat_trans(t = mat_[:, 3:], r = exp.view(-1, 9))
 
