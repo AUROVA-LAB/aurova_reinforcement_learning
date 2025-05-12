@@ -51,7 +51,8 @@ def log_mat(mat: torch.tensor):
 
     print("log: ", log)
     a = log.cpu().numpy().tolist()
-    if torch.nan in a:
+    
+    if [torch.nan, torch.nan, torch.nan] in a:
         raise
 
 
@@ -88,7 +89,7 @@ def exp_mat(mat_: torch.tensor):
     print("exp: ", exp)
 
     a = exp.cpu().numpy().tolist()
-    if torch.nan in a:
+    if [torch.nan, torch.nan, torch.nan] in a:
         raise
 
     return homo_from_mat_trans(t = mat_[:, 3:], r = exp.view(-1, 9))
