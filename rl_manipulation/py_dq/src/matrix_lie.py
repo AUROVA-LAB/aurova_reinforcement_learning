@@ -27,14 +27,17 @@ def log_mat(mat: torch.tensor):
     mat = mat.view(-1, 4, 4)
     t = mat[:, :-1, -1]
     mat = mat[:, :-1, :-1]
-
-    theta = torch.acos(0.5 * (torch.vmap(torch.trace)(mat) - 1))
+    
+    theta = torch.acos(torch.round(0.5 * (torch.vmap(torch.trace)(mat) - 1), decimals = 4))
+    trace = 0.5 * (torch.vmap(torch.trace)(mat) - 1)
 
     log = (theta / (2*torch.sin(theta)) * torch.stack([mat[:, 2,1] - mat[:, 1,2], 
                                                        mat[:, 0,2] - mat[:, 2,0],
                                                        mat[:, 1,0] - mat[:, 0,1]])).transpose(0,1)
-    idx_0 = torch.abs(theta) < 1e-6
+
+    idx_0 = torch.isclose(theta, torch.tensor(0.0).float())
     idx_pi = torch.isclose(theta, torch.tensor(math.pi))
+    idx_mpi = torch.isclose(theta, torch.tensor(-math.pi))
 
 
     log[idx_0] = torch.zeros_like(log)[idx_0]
@@ -46,15 +49,10 @@ def log_mat(mat: torch.tensor):
     idx_3 = torch.isclose(torch.vmap(torch.trace)(mat), 3*torch.ones((mat.shape[0])).to(device))
 
     R = torch.stack((mat[:, 0, 0], mat[:, 1, 1], mat[:, 2, 2]), dim = -1)
-    log[idx_pi] = (n * torch.sqrt(0.5*(1 + R)))[idx_pi]
+
+    log[idx_pi] = (n)[idx_pi]
+    log[idx_mpi] = (n)[idx_mpi]
     log[idx_3] = torch.zeros_like(log)[idx_3]
-
-    print("log: ", log)
-    a = log.cpu().numpy().tolist()
-    
-    if [torch.nan, torch.nan, torch.nan] in a:
-        raise
-
 
     return torch.cat((log, t), dim = -1)
 
@@ -86,11 +84,6 @@ def exp_mat(mat_: torch.tensor):
     idx_0 = torch.abs(theta) < 1e-6
     exp[idx_0] = torch.eye(3).to(device).repeat(mat_.shape[0], 1, 1)[idx_0]
 
-    print("exp: ", exp)
-
-    a = exp.cpu().numpy().tolist()
-    if [torch.nan, torch.nan, torch.nan] in a:
-        raise
 
     return homo_from_mat_trans(t = mat_[:, 3:], r = exp.view(-1, 9))
 
