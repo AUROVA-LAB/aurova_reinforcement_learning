@@ -43,7 +43,7 @@ def log_mat(mat: torch.tensor):
     S = torch.stack((S[:, 0, 0], S[:, 1, 1], S[:, 2, 2]), dim = -1)
     n = S / (3 - torch.vmap(torch.trace)(mat))[:, None]
 
-    idx_3 = torch.isclose(torch.vmap(torch.trace)(mat), 3*torch.ones((mat.shape[-1])).to(device))
+    idx_3 = torch.isclose(torch.vmap(torch.trace)(mat), 3*torch.ones((mat.shape[0])).to(device))
 
     R = torch.stack((mat[:, 0, 0], mat[:, 1, 1], mat[:, 2, 2]), dim = -1)
     log[idx_pi] = (n * torch.sqrt(0.5*(1 + R)))[idx_pi]
