@@ -55,10 +55,14 @@ if __name__ == "__main__":
                 if repr == "MAT":
                     m_ += 1
 
-                modify_cfg(repr, m_, d)
+                modify_cfg("MAT", 0, 1)
 
-                print("--- RUN: ", repr, " ", m_, " ", d)
+                print("--- RUN: ", "MAT", " ", 0, " ", 1)
                 subprocess.run(command, shell = True, check = True)
+                
+                raise
+            raise
+        raise
 
 
 
