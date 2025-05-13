@@ -171,49 +171,54 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
             "wrist_3_joint": -pi/4,
         },
     ),
+
+    # Best params:  {'distance': tensor(34.8215, device='cuda:0'), 
+    #           'damping': tensor([49.0432, 36.6490, 60.8989,  1.2644,  7.0457,  6.1012], device='cuda:0'), 
+    #           'stiffness': tensor([2255.1541,  597.0469,  656.7890,    6.1423,  444.1543,  161.5248], device='cuda:0')}
+    
     actuators={
         
         "shoulder_pan": ImplicitActuatorCfg(
             joint_names_expr = ["shoulder_pan_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 1375.3032, # 800.0,
-            damping = 39.7259 #40.0,
+            stiffness = 2255.1541,# 1375.3032, # 800.0,
+            damping = 49.0432# 39.7259 #40.0,
         ),
         "shoiulder_lift": ImplicitActuatorCfg(
             joint_names_expr = ["shoulder_lift_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 1114.5306, 
-            damping = 29.7188,
+            stiffness = 597.0469, # 1114.5306, 
+            damping = 36.6490# 29.7188,
         ),
         "elbow": ImplicitActuatorCfg(
             joint_names_expr = ["elbow_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 565.5358, 
-            damping = 105.8098,
+            stiffness = 656.7890, #565.5358, 
+            damping = 60.8989# 105.8098,
         ),
         "wrist_1": ImplicitActuatorCfg(
             joint_names_expr = ["wrist_1_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 9.4776,
-            damping = 1.0331
+            stiffness = 6.1423, #9.4776,
+            damping = 1.2644# 1.0331
         ),
         "wrist_2": ImplicitActuatorCfg(
             joint_names_expr = ["wrist_2_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 384.5534,
-            damping = 8.2002
+            stiffness = 444.1543, #384.5534,
+            damping = 7.0457# 8.2002
         ),
         "wrist_3": ImplicitActuatorCfg(
             joint_names_expr = ["wrist_3_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 89.3253,
-            damping = 7.4152,
+            stiffness = 161.5248, #89.3253,
+            damping = 6.1012# 7.4152,
         ),
         
 
