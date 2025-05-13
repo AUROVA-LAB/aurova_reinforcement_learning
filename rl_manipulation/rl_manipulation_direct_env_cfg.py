@@ -80,7 +80,7 @@ class EventCfg:
       func=mdp.randomize_actuator_gains,
       mode="reset",
       params={
-          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names="wrist_3_joint"),
+          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names=".*"),
           "stiffness_distribution_params": (1,1),
           "damping_distribution_params": (1,1),
           "operation": "scale",
