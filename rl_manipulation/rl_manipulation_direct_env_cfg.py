@@ -71,8 +71,8 @@ class EventCfg:
       params={
           "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", body_names=".*"),
           "static_friction_range": (0.7, 1.3),
-          "dynamic_friction_range": (0.2, 1.2),
-          "restitution_range": (0.2, 1.2),
+          "dynamic_friction_range": (0.7, 1.2),
+          "restitution_range": (0.7, 1.2),
           "num_buckets": 250,
       },
   )
