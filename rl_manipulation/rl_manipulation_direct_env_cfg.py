@@ -69,10 +69,10 @@ class EventCfg:
       func=mdp.randomize_rigid_body_material,
       mode="reset",
       params={
-          "asset_cfg": SceneEntityCfg("UR5e_3f", body_names=".*"),
+          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", body_names=".*"),
           "static_friction_range": (0.7, 1.3),
-          "dynamic_friction_range": (1.0, 1.0),
-          "restitution_range": (1.0, 1.0),
+          "dynamic_friction_range": (0.2, 1.2),
+          "restitution_range": (0.2, 1.2),
           "num_buckets": 250,
       },
   )
@@ -80,9 +80,9 @@ class EventCfg:
       func=mdp.randomize_actuator_gains,
       mode="reset",
       params={
-          "asset_cfg": SceneEntityCfg("UR5e_3f", joint_names=".*"),
+          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names=".*"),
           "stiffness_distribution_params": (0.75, 1.5),
-          "damping_distribution_params": (0.3, 3.0),
+          "damping_distribution_params": (0.75, 1.5),
           "operation": "scale",
           "distribution": "log_uniform",
       },
@@ -99,23 +99,23 @@ class EventCfg:
 #       },
 #   )
 
-  body_mass = EventTermCfg(
-      func = mdp.randomize_rigid_body_mass,
-      mode = "reset",
-      params = {
-          "asset_cfg": SceneEntityCfg("object"),
-          "mass_distribution_params": (0.5, 1.5),
-          "operation": "scale",
-          "distribution": "uniform",
-          "recompute_inertia": False,
-      }
-  )
+#   body_mass = EventTermCfg(
+#       func = mdp.randomize_rigid_body_mass,
+#       mode = "reset",
+#       params = {
+#           "asset_cfg": SceneEntityCfg("object"),
+#           "mass_distribution_params": (0.5, 1.5),
+#           "operation": "scale",
+#           "distribution": "uniform",
+#           "recompute_inertia": False,
+#       }
+#   )
 
 # Configuration class for the environment
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
 
-    # events: EventCfg = EventCfg()
+    events: EventCfg = EventCfg()
     
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
@@ -137,8 +137,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = MAT
-    mapping = 1
+    representation = DQ
+    mapping = 0
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 0
@@ -330,7 +330,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.08 # 0.03
+    distance_thres = 0.05 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
