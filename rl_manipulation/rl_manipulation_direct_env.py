@@ -168,7 +168,7 @@ class RLManipulationDirect(DirectRLEnv):
         with open(path, "r") as f:
             data = yaml.safe_load(f)
 
-        self.joint_pos = torch.tensor(data["data"]).repeat(self.num_envs, 1).to(self.device).float()
+        self.joint_pos = torch.tensor(data["data"]).repeat(self.num_envs, 1, 1).to(self.device).float()
         self.id = data["id"]
 
         self.joint_list = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
@@ -360,23 +360,17 @@ class RLManipulationDirect(DirectRLEnv):
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
     def _apply_action(self) -> None:
 
-        joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
+        curr_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
         
-        print(self.curr_pos)
-        self.curr_pos = torch.cat((self.curr_pos, joint_pos), dim = -1).view(self.num_envs, -1, 6)
+        self.curr_pos = torch.cat((self.curr_pos, curr_pos), dim = -2)
         
-        joint_pos = self.joint_pos[-1, :]
-        joint_pos_ = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
+        target_pos = self.joint_pos[:, -1, :]
 
-        self.end = torch.isclose(self.joint_pos[-1, :], joint_pos_, rtol = 5e-5, atol = 5e-5).all(dim = -1)
-        self.count += self.end.int()
+        self.end = torch.isclose(self.joint_pos[:, -1, :], curr_pos, rtol = 5e-5, atol = 5e-5).all(dim = -1)
+        self.count += torch.logical_not(self.end).int()
     
         # Applies joint actions to the robot
-        print(joint_pos)
-        print(self.joint_pos)
-        print(self.joint_pos[-1, :])
-        print(joint_pos.shape)
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].set_joint_position_target(joint_pos, joint_ids=self._all_joints_idx)
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].set_joint_position_target(target_pos, joint_ids=self._all_joints_idx)
 
 
     # Update the position of the markers with debug purposes
@@ -625,7 +619,7 @@ class RLManipulationDirect(DirectRLEnv):
 
 
     def evaluate_trajectories(self, idx):
-        original_len = self.joint_pos.shape[-1]
+        original_len = self.joint_pos.shape[-2]
         
         original_indices = torch.linspace(0, 1, steps = original_len)
         target_indices = torch.linspace(0, 1, steps = self.count[idx].item())
@@ -651,25 +645,28 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset method from DirectRLEnv
         super()._reset_idx(env_ids)
 
-        # update = False
-        # if not self.first_reset:
+        update = False
+        if not self.first_reset:
             
-        #     for i in range(self.num_envs):
-        #         distance = self.evaluate_trajectories(i)
+            for i in range(self.num_envs):
+                distance = self.evaluate_trajectories(i)
 
-        #         if distance < self.best_params["distance"]:
-        #             damp = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[i, self._robot_joints_idx]
-        #             stiff = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[i, self._robot_joints_idx]
+                if distance < self.best_params["distance"]:
+                    damp = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_damping[i, self._robot_joints_idx]
+                    stiff = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_stiffness[i, self._robot_joints_idx]
 
-        #             self.best_params = {"distance": distance,
-        #                                 "damping": damp[self.idx],
-        #                                 "stiffness": stiff[self.idx]}
+                    self.best_params = {"distance": distance,
+                                        "damping": damp,
+                                        "stiffness": stiff}
                     
-        #             update = True
-                    
+                    update = True
+    # Best params:  {'distance': tensor(34.8215, device='cuda:0'), 
+    #           'damping': tensor([49.0432, 36.6490, 60.8989,  1.2644,  7.0457,  6.1012], device='cuda:0'), 
+    #           'stiffness': tensor([2255.1541,  597.0469,  656.7890,    6.1423,  444.1543,  161.5248], device='cuda:0')}
+    
         
-        # if update: 
-        #     print("--- Best params ", self.joint_list[self.idx], ": ", self.best_params)
+        if update: 
+            print("--- Best params: ", self.best_params)
 
         
         # Reset the count
