@@ -49,7 +49,7 @@ if __name__ == "__main__":
                 modify_cfg(repr, m, d)
 
                 print("--- RUN: ", repr, " ", m, " ", d)
-                # subprocess.run(command, shell = True, check = True)
+                subprocess.run(command, shell = True, check = True)
                 
 
 
