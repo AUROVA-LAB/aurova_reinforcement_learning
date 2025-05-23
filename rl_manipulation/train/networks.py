@@ -101,6 +101,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         )
 
         self.seq_len = my_kwargs["seq_len"]
+        self.size = my_kwargs["size"]
 
         # If the phase is MANIPULATION
         # if True: # my_kwargs["phase"] == my_kwargs["MANIPULATION"]:
@@ -157,9 +158,9 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
 
-        self.mlp_extractor.policy_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
+        self.mlp_extractor.policy_net = nn.LSTM(input_size = self.size, hidden_size = 64, batch_first = True)
         
-        self.mlp_extractor.value_net = nn.LSTM(input_size = 6, hidden_size = 64, batch_first = True)
+        self.mlp_extractor.value_net = nn.LSTM(input_size = self.size, hidden_size = 64, batch_first = True)
         
 
 

@@ -152,7 +152,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # Add environment arguments to the arguments for the policy
-    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "path": env_cfg.path_to_pretrained, "seq_len": env_cfg.seq_len}
+    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "path": env_cfg.path_to_pretrained, "seq_len": env_cfg.seq_len, "size": env_cfg.size}
     agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
 
     # create agent from stable baselines
