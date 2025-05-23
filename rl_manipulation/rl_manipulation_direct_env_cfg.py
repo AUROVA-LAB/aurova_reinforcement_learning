@@ -115,14 +115,14 @@ class EventCfg:
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
 
-    events: EventCfg = EventCfg()
+    # events: EventCfg = EventCfg()
     
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 100              # Maximum steps in an episode
+    max_steps = 130              # Maximum steps in an episode
 
-    seq_len = 3                 # Length of the sequence
+    seq_len = 5                 # Length of the sequence
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
@@ -138,7 +138,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 0
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 0
@@ -154,7 +154,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     num_actions = size   # Number of actions per environment (overridden)
-    num_observations = num_actions # * (seq_len)                         # Number of observations per environment (overridden)
+    num_observations = num_actions * (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 
