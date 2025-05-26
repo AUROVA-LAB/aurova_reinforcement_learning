@@ -122,7 +122,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 130              # Maximum steps in an episode
 
-    seq_len = 5                 # Length of the sequence
+    seq_len = 2                 # Length of the sequence
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
@@ -154,7 +154,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     num_actions = size   # Number of actions per environment (overridden)
-    num_observations = num_actions * (seq_len)                         # Number of observations per environment (overridden)
+    num_observations = num_actions #* (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 

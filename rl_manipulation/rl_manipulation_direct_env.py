@@ -431,8 +431,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        # obs = self.robot_rot_ee_pose_r_lie_rel
-        obs = self.obs_seq_pose_lie_rel.view(self.num_envs, -1)
+        obs = self.robot_rot_ee_pose_r_lie_rel
+        # obs = self.obs_seq_pose_lie_rel.view(self.num_envs, -1)
 
         
         # obs = self.obs_seq_robot_pose_r_lie_rel.view(self.num_envs, -1)
