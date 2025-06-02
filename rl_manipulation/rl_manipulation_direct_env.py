@@ -68,9 +68,12 @@ class RLManipulationDirect(DirectRLEnv):
         self.obs_seq_pose_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
         # self.robot_rot_ee_pose_r_lie_seq = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
 
+        self.hand_joints_pos = torch.zeros((self.num_envs, len(self.cfg.hand_joints[self.cfg.robot]))).float().to(self.device)
+        self.hand_pose = torch.zeros((self.num_envs)).float().to(self.device)
 
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
+        self._hand_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.hand_joints[self.cfg.robot])[0]
         self._all_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.all_joints[self.cfg.robot])[0]
 
         # IK Controller
@@ -198,6 +201,9 @@ class RLManipulationDirect(DirectRLEnv):
         elif self.cfg.robot == self.cfg.UR5e_NOGRIP:
             self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_4)
 
+        # Add object
+        self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
+
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
@@ -324,7 +330,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Get the actions for the robot. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.actions = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
+        self.actions[:, :6] = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
         
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -336,12 +342,22 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
 
+
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
+
+        grip_pos = self.cfg.open
+        idx = (grip_action > 0.0).bool()
+
+        grip_pos[idx] = self.cfg.close[idx]
+
+        self.actions[:, 6:] = grip_pos
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -388,6 +404,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Robot poses ---
         # Obtain the pose of the GEN3 end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
+        self.hand_joints_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
 
         # Obtains the pose of the base of the GEN3 robot in the world frame
@@ -412,9 +429,26 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
-        grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-                                                                                  t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
-        self.debug_target_pose_w = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
+        tgt_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, :, :7].squeeze(-2)
+        tgt_pos_rot_w, tgt_or_rot_w = combine_frame_transforms(t01 = tgt_pose_w[:, :3], q01 = tgt_pose_w[:, 3:],
+                                                               t12 = torch.zeros_like(tgt_pose_w[:, :3]), q12 = self.cfg.rot_45_z_pos_quat)
+        self.debug_target_pose_w = torch.cat((tgt_pos_rot_w, tgt_or_rot_w), dim = -1)
+
+        grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+                                                                                  t02 = self.debug_target_pose_w[:, :3], q02 = self.debug_target_pose_w[:, 3:])
+
+
+        self.target_pose_r = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
+        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r, grasp_point_obj_quat_r)
+        self.target_pose_r_lie = self.log(self.target_pose_r_group)
+
+        obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+
+        self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel)
+
+        # --- Hand pose ---
+        self.hand_pose = self.hand_joints_pos[:, 0] / self.cfg.m[0]
+
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -480,23 +514,9 @@ class RLManipulationDirect(DirectRLEnv):
         # Target reached flag
         self.target_reached = dist < self.cfg.distance_thres
 
-        bool_vel = (self.obs_seq_vel_lie < 0.0).int()
-        
-        diff_vel = bool_vel[:, self.seq_idx[0]] - bool_vel[:, self.seq_idx[1]]
-        is_diff_vel = (diff_vel != 0).int()
-        vel_mod = is_diff_vel.sum(-2).sum(-1) / (self.cfg.seq_len - 1) + 1
-
-        mod *= torch.pow(vel_mod.float(), -mod)
-
-        # print(self.obs_seq_vel_lie)
-        # print(bool_vel)
-        # print(bool_vel[:, self.seq_idx[0]])
-        # print("---")
-
         # ---- Distance reward ----
         # Reward for the approaching
         reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
-                    #    self.cfg.rew_scale_vel*(1 - torch.exp(-2*vel_dist / self.cfg.vel_scale))
 
 
         # ---- Reward composition ----
@@ -648,11 +668,6 @@ class RLManipulationDirect(DirectRLEnv):
                                     pitch = target_init_pose[:, 4],
                                     yaw = target_init_pose[:, 5])
         
-        # aa = torch.tensor([[-0.4329, -0.0009,  0.1967,  0.2940, -0.4766, -0.8255, -0.0700]]).to(self.device)
-        # # aa = torch.tensor([[-0.3539,  0.0888,  0.2101, -0.0669, -0.5682, -0.7918,  0.2140]]).to(self.device)
-        # target_init_pose[:, :3] = aa[:, :3]
-        # quat = aa[:, 3:]
-        
 
         robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
 
@@ -678,8 +693,11 @@ class RLManipulationDirect(DirectRLEnv):
         self.obs_seq_pose_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
                                                                      self.cfg.seq_len, 
                                                                      dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
-
         
+
+        # Writes the new object position to the simulation
+        self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((tgt_pos_w, 
+                                                                                         tgt_quat_w), dim = -1), env_ids = env_ids)
 
         # Updates the poses 
         self.update_new_poses()  

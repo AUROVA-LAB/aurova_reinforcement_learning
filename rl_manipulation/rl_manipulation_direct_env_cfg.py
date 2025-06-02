@@ -9,6 +9,8 @@ from scipy.spatial.transform import Rotation
 
 from .py_dq.src.lie import *
 
+import copy
+
 from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
 from .mdp.utils import compute_rewards, save_images_grid
 
@@ -57,7 +59,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     return rot_tensor_quat
 
 # Rotations respecto to the end effector robot link frame for object spawning
-rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
 rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
 rot_45_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1]))
 rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
@@ -153,8 +155,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    num_actions = size   # Number of actions per environment (overridden)
-    num_observations = num_actions #* (seq_len)                         # Number of observations per environment (overridden)
+    num_actions = size + 1  # Number of actions per environment (overridden)
+    num_observations = num_actions  #* (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 
@@ -174,15 +176,35 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     UR5e_3f = 2
     UR5e_NOGRIP = 3
     
-    robot = UR5e_NOGRIP
+    robot = UR5e_3f
 
     keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame',
                'tool0',
                'wrist_3_link']
+    
+    grip_theta_max = [1.2218, 1.5708]
+    m = [grip_theta_max[0]/140, grip_theta_max[1]/100]
 
+    def_pos = [0.0, 0.0496, 0.0, -0.0523]
 
+    open = [def_pos[1], 
+            def_pos[0], def_pos[0],
+            def_pos[2],
+            def_pos[1], def_pos[1],
+            def_pos[3],
+            def_pos[2], def_pos[2],
+            def_pos[3], def_pos[3]]
+    close = copy.deepcopy(open)
+    close[0] = 0.8
+    close[4] = 0.8
+    close[5] = 0.8
+
+    close[-1] = -0.8
+    close[-2] = -0.8
+    close[-5] = -0.8
+    
 
     # ---- Configurations ----
     # Simulation
@@ -225,6 +247,27 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     #    env_spacing: Spacing between environments. --> Positions are automatically handled
     #    replicate_physics: Enable/disable replication of physics schemas when using the Cloner APIs. If True, the simulation will have the same asset instances (USD prims) in all the cloned environments.
     
+    # Object
+    object_cfg: RigidObjectCfg = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/Cuboid",
+
+        spawn=sim_utils.CuboidCfg(
+            size=(0.035, 0.45, 0.035),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+                                                            contact_offset=0.001),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+    )
+    # RigidObjectCfg: Configuration parameters for a rigid object.
+    #    spawn: Spawn configuration for the asset. --> Deciding which object type it is spawned
+    #       CuboidCfg: Configuration parameters for a cuboid prim.
+    #          size: Size of the cuboid.
+    #          rigid_props / mass_props / collision_props / visual_material: properties of the prim declaration
+    #    init_state: Initial state of the rigid object. --> Initial pose
+
 
 
     # ---- Joint information ----
@@ -236,9 +279,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # Hand joint names
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
-            [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
-             "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
-             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"],
+            [['robotiq_finger_middle_joint_1', 'robotiq_palm_finger_1_joint', 'robotiq_palm_finger_2_joint', 'robotiq_finger_middle_joint_2',  'robotiq_finger_1_joint_1', 'robotiq_finger_2_joint_1', 'robotiq_finger_middle_joint_3', 'robotiq_finger_1_joint_2',  'robotiq_finger_2_joint_2', 'robotiq_finger_1_joint_3', 'robotiq_finger_2_joint_3'],
              []]
 
     # Link names for the robots
@@ -303,12 +344,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.075,  0.25],
-                         [-0.25,   0.25],
-                         [-0.3,   0.225],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5]]
+    target_poses_incs = [[-0.25,  0.25],
+                         [-0.25,  0.25],
+                         [-0.48,   -0.48],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-pi,  pi]]
     # target_poses_incs = [[-0.008,  0.008],
     #                      [-0.008,  0.008],
     #                      [-0.008,  0.008],
@@ -316,6 +357,17 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     #                      [-0.12,  0.12],
     #                      [-0.12,  0.12]]
     apply_range_tgt = True
+
+    # Rotations respecto to the end effector robot link frame for object spawning
+    # rot_45_z_pos = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+    # rot_225_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 225 degrees rotation in Z axis 
+    # rot_225_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1])) # Positive 225 degrees rotation in Z axis
+    # rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+
+    # Transform to quaternions
+    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
+    # rot_225_z_neg_quat = rot2tensor(rot_225_z_neg).numpy().tolist()
+    # rot_225_z_pos_quat = rot2tensor(rot_225_z_pos).numpy().tolist()
 
 
 
@@ -352,6 +404,10 @@ def update_cfg(cfg, num_envs, device):
     # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+    cfg.open = torch.tensor(cfg.open).repeat(num_envs, 1).to(device)
+    cfg.close = torch.tensor(cfg.close).repeat(num_envs, 1).to(device)
+
+    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
 
 
     return cfg
