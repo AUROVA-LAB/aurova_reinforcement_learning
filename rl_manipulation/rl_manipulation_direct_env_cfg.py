@@ -197,13 +197,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
             def_pos[2], def_pos[2],
             def_pos[3], def_pos[3]]
     close = copy.deepcopy(open)
-    close[0] = 0.58
-    close[4] = 0.58
-    close[5] = 0.58
+    close[0] = 0.65
+    close[4] = 0.65
+    close[5] = 0.65
 
-    close[-1] = -0.58
-    close[-2] = -0.58
-    close[-5] = -0.58
+    close[-1] = -0.65
+    close[-2] = -0.65
+    close[-5] = -0.65
     
 
     # ---- Configurations ----
@@ -234,6 +234,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            "target_point2": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
         }
     )
     # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
@@ -252,7 +257,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.07, 0.3, 0.07),
+            size=(0.06, 0.3, 0.06),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -350,6 +355,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-pi,  pi]]
+    
+    target_poses_incs2 = [[-0.25,  0.25],
+                         [-0.25,  0.25],
+                         [-0.3,   0.225],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5]]
     # target_poses_incs = [[-0.008,  0.008],
     #                      [-0.008,  0.008],
     #                      [-0.008,  0.008],
