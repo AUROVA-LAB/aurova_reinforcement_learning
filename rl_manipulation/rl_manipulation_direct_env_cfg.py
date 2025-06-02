@@ -122,7 +122,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 130              # Maximum steps in an episode
+    max_steps = 250              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -140,7 +140,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 2
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
@@ -197,13 +197,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
             def_pos[2], def_pos[2],
             def_pos[3], def_pos[3]]
     close = copy.deepcopy(open)
-    close[0] = 0.8
-    close[4] = 0.8
-    close[5] = 0.8
+    close[0] = 0.58
+    close[4] = 0.58
+    close[5] = 0.58
 
-    close[-1] = -0.8
-    close[-2] = -0.8
-    close[-5] = -0.8
+    close[-1] = -0.58
+    close[-2] = -0.58
+    close[-5] = -0.58
     
 
     # ---- Configurations ----
@@ -252,7 +252,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.035, 0.45, 0.035),
+            size=(0.07, 0.3, 0.07),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -383,9 +383,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     distance_thres = 0.05 # 0.08 # 0.03
+    height_thres = 0.5
+
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
+    bonus_lifting = 30
 
 
 # Function to update the variables in the configuration class
