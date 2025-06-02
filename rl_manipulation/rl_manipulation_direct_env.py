@@ -489,7 +489,7 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # Obtains wether the agent is approaching or not
-        is_hand_open = self.hand_pose < 30.0
+        is_hand_open = torch.logical_xor(self.hand_pose < 30.0, self.target_reached)
         pre_mod = torch.logical_and(dist < self.prev_dist, is_hand_open)
         mod = (2*(pre_mod).int() - 1).float()
 
