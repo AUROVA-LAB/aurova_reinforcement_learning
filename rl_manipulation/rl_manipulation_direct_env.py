@@ -529,7 +529,7 @@ class RLManipulationDirect(DirectRLEnv):
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.target_reached = torch.logical_or(contacts_w > 1.0, self.target_reached)
+        self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
         self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
@@ -542,7 +542,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
+        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached
 
 
         # Reward for lifting
@@ -573,7 +573,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.height_reached)
+        terminated = torch.logical_or(time_out, self.target_reached)
 
         return truncated, terminated
     
