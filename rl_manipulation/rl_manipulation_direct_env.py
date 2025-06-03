@@ -259,8 +259,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         else:
             actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
-            actions[:, 3:-1] = torch.clamp(actions[:, 3:-1], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
-            actions[:, -1] = torch.clamp(actions[:, -1], -self.cfg.grip_scaling, self.cfg.grip_scaling)
+            actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            # actions[:, 3:-1] = torch.clamp(actions[:, 3:-1], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            # actions[:, -1] s= torch.clamp(actions[:, -1], -self.cfg.grip_scaling, self.cfg.grip_scaling)
 
         return actions
     
@@ -309,8 +310,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        grip_action = actions[:, -1]
-        actions = actions[:, :-1]
+        # grip_action = actions[:, -1]
+        # actions = actions[:, :-1]
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
@@ -333,9 +334,9 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # --- Update gripper position ---
-        actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        # actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        # self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -488,8 +489,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.filter_collisions()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        # obs = self.robot_rot_ee_pose_r_lie_rel
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
+        obs = self.robot_rot_ee_pose_r_lie_rel
+        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
         # obs = self.obs_seq_pose_lie_rel.view(self.num_envs, -1)
 
         
