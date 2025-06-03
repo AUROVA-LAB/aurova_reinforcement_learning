@@ -149,6 +149,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
+    grip_scaling = 1
 
     action_scaling = scalings[representation][mapping]
 
@@ -204,6 +205,14 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     close[-1] = -0.65
     close[-2] = -0.65
     close[-5] = -0.65
+
+    moving_joints_gripper = [0.0, 
+                             0.0, m[0], 
+                             m[0],
+                             m[0], 0.0,
+                             0.0,
+                             0.0, 0.0,
+                             0.0, 0.0]
     
 
     # ---- Configurations ----
@@ -257,7 +266,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.06, 0.3, 0.06),
+            size=(0.07, 0.3, 0.09),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -351,7 +360,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.25,  0.25],
                          [-0.25,  0.25],
-                         [-0.48,   -0.48],
+                         [-0.44,   -0.44],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-pi,  pi]]
@@ -399,8 +408,14 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 100
+    bonus_tgt_reached = 200
     bonus_lifting = 30
+
+
+    # Contacts
+    contact_sensors_dict = {}
+    contact_matrix = {}
+
 
 
 # Function to update the variables in the configuration class
@@ -424,5 +439,55 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
 
+    cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
+
+    cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
+
+
+    return cfg
+
+
+
+# Add the collision sensors to the configuration class according to the number of environments
+def update_collisions(cfg, num_envs):
+
+
+
+
+    # Contact between robot 2 finger pads and object
+    finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_contact.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_contact.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+    finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_contact.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+    )
+
+
+
+    # Dictionary of contact sensors configurations
+    cfg.contact_sensors_dict = {"finger_middle_w_object": finger_middle_w_object,
+                                "finger_1_w_object": finger_1_w_object,
+                                "finger_2_w_object": finger_2_w_object,
+                                }
+    
+    # Updated contact matrix
+    cfg.contact_matrix = torch.tensor([0.65, 0.65, 0.65,])
 
     return cfg

@@ -7,7 +7,7 @@ import copy
 
 from .mdp.utils import compute_rewards, save_images_grid, update_seq
 from .mdp.rewards import dual_quaternion_error 
-from .rl_manipulation_direct_env_cfg import RLManipulationDirectCfg, update_cfg
+from .rl_manipulation_direct_env_cfg import RLManipulationDirectCfg, update_cfg, update_collisions
 
 from .py_dq.src.dq import *
 from .py_dq.src.distances import *
@@ -111,6 +111,14 @@ class RLManipulationDirect(DirectRLEnv):
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
 
+        # Obtain the number of contact sensors per environment
+        self.num_contacts = 0
+        for __ in self.cfg.contact_sensors_dict:
+            self.num_contacts += 1
+
+        # Variable to store contacts between prims
+        self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
@@ -212,6 +220,11 @@ class RLManipulationDirect(DirectRLEnv):
         elif self.cfg.robot == self.cfg.UR5e_NOGRIP:
             self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_4)
 
+        # Correct collision sensors 
+        self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
+        for idx, sensor_cfg in self.cfg.contact_sensors_dict.items():
+            self.scene.sensors[idx] = ContactSensor(sensor_cfg)
+
         # Add object
         self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
 
@@ -246,7 +259,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         else:
             actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
-            actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            actions[:, 3:-1] = torch.clamp(actions[:, 3:-1], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            actions[:, -1] = torch.clamp(actions[:, -1], -self.cfg.grip_scaling, self.cfg.grip_scaling)
 
         return actions
     
@@ -295,6 +309,9 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
+
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
@@ -313,7 +330,13 @@ class RLManipulationDirect(DirectRLEnv):
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
         self.actions[:, :6] = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
-        
+
+
+        # --- Update gripper position ---
+        actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
@@ -324,8 +347,6 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
-        grip_action = actions[:, -1]
-        actions = actions[:, :-1]
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
@@ -333,12 +354,6 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
 
-        grip_pos = self.cfg.open
-        idx = (grip_action > 0.0).bool()
-
-        grip_pos[idx] = self.cfg.close[idx]
-
-        self.actions[:, 6:] = grip_pos
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -370,6 +385,24 @@ class RLManipulationDirect(DirectRLEnv):
                                                                           self.debug_target_pose_w[:, 3:],
                                                                           self.debug_target_pose_w2[:, 3:]),), 
                                                 marker_indices=marker_indices)
+
+
+    # Method to filter collisions according to the force matrix
+    def filter_collisions(self):
+        '''
+        In:
+            - None
+        
+        Out:
+            - None
+        '''
+
+        # Loop through all the contact sensors configuration for the indexes
+        for idx, (key, __) in enumerate(self.cfg.contact_sensors_dict.items()):
+
+            # Obtain the matrix -> reshape it -> sum the last two dimensions -> 
+            #    -> if the value is greater than 0, there is force so  there is contact
+            self.contacts[:, idx] = torch.abs(self.scene.sensors[key].data.force_matrix_w).view(self.num_envs, -1, 3).sum(dim = (1,2), keepdim = True).squeeze((-2, -1)) > 0.0
 
 
     # Updates the poses of the object and robot so they can match when performing the grasp
@@ -450,6 +483,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
+
+        # Obtain boolean values for collisions
+        self.filter_collisions()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
         # obs = self.robot_rot_ee_pose_r_lie_rel
@@ -479,27 +515,24 @@ class RLManipulationDirect(DirectRLEnv):
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''  
 
-        # ---- Distance computation ----
-        # traj = self.interpolator(self.pose_group_r, self.target_pose_r_group, 0.1)
-
         dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)    
 
-        # ---- Velocity computation ----
-        # vel_dist =  torch.norm(self.obs_seq_vel_lie[:, :-1] - self.obs_seq_vel_lie[:, 1:], dim=-1).mean(dim = -1)
-
+        # --- Contacts ---
+        contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
+        
+        
 
         # Obtains wether the agent is approaching or not
-        is_hand_open = torch.logical_xor(self.hand_pose < 30.0, self.target_reached)
-        pre_mod = torch.logical_and(dist < self.prev_dist, is_hand_open)
-        mod = (2*(pre_mod).int() - 1).float()
+        mod = (2*(dist < self.prev_dist).int() - 1).float()
 
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
+        self.target_reached = torch.logical_or(contacts_w > 1.0, self.target_reached)
         self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
+
 
         # ---- Distance reward ----
         # Reward for the approaching
@@ -508,7 +541,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached
+        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
 
 
         # Reward for lifting
@@ -707,6 +740,9 @@ class RLManipulationDirect(DirectRLEnv):
         # Writes the new object position to the simulation
         self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((tgt_pos_w, 
                                                                                          tgt_quat_w), dim = -1)[env_ids], env_ids = env_ids)
+        
+        self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
+
 
         # Updates the poses 
         self.update_new_poses()  
