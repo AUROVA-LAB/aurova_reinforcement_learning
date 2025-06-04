@@ -310,8 +310,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        # grip_action = actions[:, -1]
-        # actions = actions[:, :-1]
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
@@ -334,9 +334,9 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # --- Update gripper position ---
-        # actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        # self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper * self.target_reached + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -542,7 +542,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached
+        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
 
 
         # Reward for lifting
@@ -573,7 +573,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached)
+        terminated = torch.logical_or(time_out, self.height_reached)
 
         return truncated, terminated
     

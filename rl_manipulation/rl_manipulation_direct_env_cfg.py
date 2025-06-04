@@ -156,8 +156,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    num_actions = size # + 1  # Number of actions per environment (overridden)
-    num_observations = num_actions  #* (seq_len)                         # Number of observations per environment (overridden)
+    num_actions = size + 1  # Number of actions per environment (overridden)
+    num_observations = size  #* (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 
@@ -266,7 +266,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.07, 0.3, 0.09),
+            size=(0.055, 0.3, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -358,12 +358,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.25,  0.25],
-                         [-0.25,  0.25],
+    target_poses_incs = [[-0.175,  0.175],
+                         [-0.175,  0.175],
                          [-0.44,   -0.44],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
-                         [-pi,  pi]]
+                         [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.25,  0.25],
                          [-0.25,  0.25],
@@ -403,7 +403,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.08 # 0.03
     height_thres = 0.5
 
 
