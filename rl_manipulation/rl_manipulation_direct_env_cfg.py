@@ -59,7 +59,8 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     return rot_tensor_quat
 
 # Rotations respecto to the end effector robot link frame for object spawning
-rot_45_z_pos = Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))        # Positive 45 degrees rotation in Z axis 
+rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
 rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
 rot_45_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1]))
 rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
@@ -122,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 250              # Maximum steps in an episode
+    max_steps = 300              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -149,7 +150,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
-    grip_scaling = 1
+    grip_scaling = 2
 
     action_scaling = scalings[representation][mapping]
 
@@ -387,6 +388,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Transform to quaternions
     rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
+    rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
     # rot_225_z_neg_quat = rot2tensor(rot_225_z_neg).numpy().tolist()
     # rot_225_z_pos_quat = rot2tensor(rot_225_z_pos).numpy().tolist()
 
@@ -438,6 +440,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.close = torch.tensor(cfg.close).repeat(num_envs, 1).to(device)
 
     cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
 
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
 
@@ -488,6 +491,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([0.65, 0.65, 0.65,])
+    cfg.contact_matrix = torch.tensor([1.0, 1.0, 1.0,])
 
     return cfg
