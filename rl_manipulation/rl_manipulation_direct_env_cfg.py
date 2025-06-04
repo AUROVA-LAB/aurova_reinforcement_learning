@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 300              # Maximum steps in an episode
+    max_steps = 150              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
