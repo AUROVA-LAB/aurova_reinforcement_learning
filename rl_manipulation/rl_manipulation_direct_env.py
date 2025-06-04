@@ -513,8 +513,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.filter_collisions()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = self.robot_rot_ee_pose_r_lie_rel
-        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
+        # obs = self.robot_rot_ee_pose_r_lie_rel
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
         # obs = self.obs_seq_pose_lie_rel.view(self.num_envs, -1)
 
         
