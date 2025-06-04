@@ -492,7 +492,7 @@ class RLManipulationDirect(DirectRLEnv):
         
 
         # --- Hand pose ---
-        self.hand_pose = torch.round(self.hand_joints_pos[:, 0] / self.cfg.m[0], decimals = 0)
+        self.hand_pose = torch.round(self.hand_joints_pos[:, 0] / self.cfg.m[0], decimals = 0) / 140.0
 
 
 
