@@ -336,7 +336,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper * self.target_reached + actual_gripper_pos
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper * self.target_reached.unsqueeze(-1) + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
