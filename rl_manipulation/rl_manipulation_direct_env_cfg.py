@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 225              # Maximum steps in an episode
+    max_steps = 250              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -267,7 +267,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/Cuboid",
 
         spawn=sim_utils.CuboidCfg(
-            size=(0.055, 0.3, 0.08),
+            size=(0.045, 0.3, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -405,7 +405,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.03 # 0.08 # 0.03
+    distance_thres = 0.08 # 0.08 # 0.03
     height_thres = 0.8
 
 
@@ -491,6 +491,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2.0, 2.0, 2.0,])
+    cfg.contact_matrix = torch.tensor([3.0, 2.0, 2.0,])
 
     return cfg
