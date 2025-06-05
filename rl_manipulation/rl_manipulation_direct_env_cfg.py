@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 150              # Maximum steps in an episode
+    max_steps = 225              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -150,7 +150,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
-    grip_scaling = 2
+    grip_scaling = 1.5
 
     action_scaling = scalings[representation][mapping]
 
@@ -212,8 +212,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                              m[0],
                              m[0], 0.0,
                              0.0,
-                             0.0, 0.0,
-                             0.0, 0.0]
+                             0.0, -m[0],
+                             -m[0], -m[0]]
     
 
     # ---- Configurations ----
@@ -271,7 +271,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.001),
+                                                            contact_offset=0.0075),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
@@ -359,8 +359,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.175,  0.175],
-                         [-0.175,  0.175],
+    target_poses_incs = [[-0.2,  0.2],
+                         [-0.2,  0.2],
                          [-0.44,   -0.44],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
@@ -406,11 +406,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     distance_thres = 0.03 # 0.08 # 0.03
-    height_thres = 0.5
+    height_thres = 0.8
 
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 200
+    bonus_tgt_reached = 300
     bonus_lifting = 30
 
 
@@ -491,6 +491,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([1.0, 1.0, 1.0,])
+    cfg.contact_matrix = torch.tensor([2.0, 2.0, 2.0,])
 
     return cfg

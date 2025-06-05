@@ -340,7 +340,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper * torch.logical_not(self.target_reached).unsqueeze(-1) + actual_gripper_pos
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -475,7 +475,7 @@ class RLManipulationDirect(DirectRLEnv):
         obs_rel = self.diff_operator(target_pose_r_group, self.pose_group_r)
         obs_rel_180 = self.diff_operator(target_pose_r_group_180, self.pose_group_r)
 
-        sel_obs = (dist < dist_180).int().unsqueeze(-1) 
+        sel_obs = (dist_180 < dist).int().unsqueeze(-1) 
         self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel * sel_obs + obs_rel_180 * torch.logical_not(sel_obs))
 
         self.target_pose_r = target_pose_r * sel_obs + target_pose_r_180 * torch.logical_not(sel_obs)
@@ -548,12 +548,12 @@ class RLManipulationDirect(DirectRLEnv):
         
 
         # Obtains wether the agent is approaching or not
-        mod = (2*(dist < self.prev_dist).int() - 1).float()
+        mod = (2*(dist < self.prev_dist).int() - 1).float() * 5
 
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.target_reached = torch.logical_or(contacts_w > 2.0, self.target_reached)
+        self.target_reached = torch.logical_or(contacts_w > 3.0, self.target_reached)
         self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
