@@ -196,13 +196,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
         
-        self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
-        self.teacher_model.policy.eval()
+        # self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
+        # self.teacher_model.policy.eval()
 
-        self.student_action = self.actions.clone()
-        self.teacher_action = self.actions.clone()
+        # self.student_action = self.actions.clone()
+        # self.teacher_action = self.actions.clone()
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
