@@ -32,6 +32,9 @@ from omni.isaac.lab.assets import RigidObject
 
 from numpy import pi
 
+from stable_baselines3 import PPO
+
+
 '''
                     ############## IMPORTANT #################
    The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
@@ -191,6 +194,14 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_group = torch.tensor(self.identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
+
+        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        
+        self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
+        self.teacher_model.policy.eval()
+
+        self.student_action = self.actions.clone()
+        self.teacher_action = self.actions.clone()
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -315,7 +326,7 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         grip_action = actions[:, -1]
-        actions = actions[:, :-1]
+        # actions = actions[:, :-1]
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
@@ -340,7 +351,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        # self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -355,7 +366,11 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
-
+        self.student_action = actions.clone()
+        
+        teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
+        actions = self._preprocess_actions(teacher_action)
+        
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
 
