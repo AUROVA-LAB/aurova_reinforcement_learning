@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 250              # Maximum steps in an episode
+    max_steps = 175              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -157,8 +157,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    num_actions = size + 1  # Number of actions per environment (overridden)
-    num_observations = size + 1 #* (seq_len)                         # Number of observations per environment (overridden)
+    num_actions = size  # Number of actions per environment (overridden)
+    num_observations = size #* (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 
@@ -268,9 +268,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
         spawn=sim_utils.CuboidCfg(
             size=(0.045, 0.3, 0.08),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = True),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
-            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = False,
                                                             contact_offset=0.0075),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
@@ -405,7 +405,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.08 # 0.08 # 0.03
+    distance_thres = 0.05 # 0.08 # 0.03
     height_thres = 0.8
 
 
