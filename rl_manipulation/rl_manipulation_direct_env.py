@@ -374,7 +374,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
-        self.student_action = actions.clone()
+        # self.student_action = actions.clone()
         
         # teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
         # actions = self._preprocess_actions(teacher_action, gripper = False)
