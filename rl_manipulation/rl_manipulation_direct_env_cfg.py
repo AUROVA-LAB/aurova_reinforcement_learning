@@ -410,8 +410,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 150
-    bonus_lifting = 500
+    bonus_tgt_reached = 300
+    bonus_lifting = 300
 
 
     # Contacts
@@ -491,6 +491,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([0.85, 0.85, 0.85,])
+    cfg.contact_matrix = torch.tensor([2,2,2,])
 
     return cfg
