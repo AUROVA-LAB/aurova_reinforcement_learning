@@ -62,7 +62,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 rot_45_z_pos = Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))        # Positive 45 degrees rotation in Z axis 
 rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
 rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1]))
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))
 rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
 
 
@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 175              # Maximum steps in an episode
+    max_steps = 500              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -146,7 +146,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 1
 
-    scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
+    scalings = [[[0.01, 0.001], [0.07,  0.003], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
@@ -268,9 +268,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
         spawn=sim_utils.CuboidCfg(
             size=(0.045, 0.3, 0.08),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = True),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
-            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = False,
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
                                                             contact_offset=0.0075),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
@@ -361,9 +361,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,  0.2],
-                         [-0.35,   0.225],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
+                         [-0.35,   -0.35],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0],
                          [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.25,  0.25],

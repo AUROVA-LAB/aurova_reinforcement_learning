@@ -196,7 +196,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
         
         self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
         self.teacher_model.policy.eval()
@@ -442,14 +442,35 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
+        # Obtains the pose of the base of the GEN3 robot in the world frame
+        robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
+        
+        # --- Target pose ---
+        # Obtain the pose for the target in the world frame
+        tgt_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, :, :7].squeeze(-2)
+
+        grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+                                                                                  t02 = tgt_pose_w[:, :3], q02 = tgt_pose_w[:, 3:])
+
+        grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = grasp_point_obj_pos_r, q01 = grasp_point_obj_quat_r,
+                                                                                         t12 = self.z_displ, q12 = self.cfg.rot_45_z_pos_quat)
+        
+
+        tgt_pos_rot_w, tgt_rot_rot_w  = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+                                                                 t12 = grasp_point_obj_pos_r_rot, q12 = grasp_point_obj_quat_r_rot)
+        
+
+        self.debug_target_pose_w = torch.cat((tgt_pos_rot_w, tgt_rot_rot_w), dim = -1)
+
+        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
+        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
+        self.target_pose_r_lie = self.log(self.target_pose_r_group)
 
         # --- Robot poses ---
         # Obtain the pose of the GEN3 end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
         vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
 
-        # Obtains the pose of the base of the GEN3 robot in the world frame
-        robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
 
         # Obtain the pose of the end effector in GEN3 root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
@@ -458,68 +479,16 @@ class RLManipulationDirect(DirectRLEnv):
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
-        tgt_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, :, :7].squeeze(-2)
-        
-
-        grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-                                                                                  t02 = tgt_pose_w[:, :3], q02 = tgt_pose_w[:, 3:])
-        
-        grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = grasp_point_obj_pos_r, q01 = grasp_point_obj_quat_r,
-                                                                                         t12 = self.z_displ.to(self.device), q12 = self.cfg.rot_45_z_pos_quat)
-        
-        # grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180 = combine_frame_transforms(t01 = grasp_point_obj_pos_r_rot, q01 = grasp_point_obj_quat_r_rot,
-        #                                                                                   t12 = torch.zeros_like(grasp_point_obj_pos_r_rot), q12 = self.cfg.rot_180_z_pos_quat)
-        
-        
-
-        
-
-
-        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
-        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
-        self.target_pose_r_lie = self.log(self.target_pose_r_group)
-
-        # target_pose_r_180 = torch.cat((grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180), dim = -1)
-        # target_pose_r_group_180 = self.convert_to_group(grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180)
-        # target_pose_r_lie_180 = self.log(target_pose_r_group_180)
-
-
-        # dist = self.dist_function(self.pose_group_r, target_pose_r_group, self.log, self.diff_operator)
-        # dist_180 = self.dist_function(self.pose_group_r, target_pose_r_group_180, self.log, self.diff_operator)    
-
-        obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        # obs_rel_180 = self.diff_operator(target_pose_r_group_180, self.pose_group_r)
-
-        # sel_obs = (dist_180 < dist).int().unsqueeze(-1) 
-        self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel)# * sel_obs + obs_rel_180 * torch.logical_not(sel_obs))
-
-        # self.target_pose_r = target_pose_r#   * sel_obs + target_pose_r_180 * torch.logical_not(sel_obs)
-        # self.target_pose_r_group = target_pose_r_group#   * sel_obs + target_pose_r_group_180 * torch.logical_not(sel_obs)
-        # self.target_pose_r_lie = target_pose_r_lie#   * sel_obs + target_pose_r_lie_180 * torch.logical_not(sel_obs)
-
-
-
-        tgt_pos_rot_w, tgt_or_rot_w = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-                                                               t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
-        
-
-        self.debug_target_pose_w = torch.cat((tgt_pos_rot_w, tgt_or_rot_w), dim = -1)
-        # self.debug_target_pose_w2 = torch.cat((tgt_pos_rot_w_180, tgt_or_rot_w_180), dim = -1)
-
+        # Transform to the Lie algebra
+        self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
         self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
         self.obs_seq_pose_lie_rel = update_seq(new_obs = self.robot_rot_ee_pose_r_lie_rel, seq = self.obs_seq_pose_lie_rel)
 
-
-
-        # --- Target pose ---
-        # Obtain the pose for the target in the world frame
-        grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-                                                                                  t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
-        self.debug_target_pose_w = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
-
-
-
+        self.hand_joints_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        self.hand_pose = torch.round(self.hand_joints_pos[:, 0] / self.cfg.m[0], decimals = 0) / 140.0
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -624,7 +593,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached)
+        terminated = torch.logical_or(time_out, self.height_reached)
 
         return truncated, terminated
     
@@ -827,6 +796,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Writes the new object position to the simulation
         self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((tgt_pos_w, 
                                                                                          tgt_quat_w), dim = -1)[env_ids], env_ids = env_ids)
+        self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros((self.num_envs, 6), device=self.device)[env_ids], env_ids = env_ids)
         
         self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
 
