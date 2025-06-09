@@ -557,7 +557,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = diff_actions * torch.logical_not(self.target_reached) # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
 
 
         # ---- Reward composition ----
@@ -687,7 +687,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Builds the new initial pose for the target
         target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
         target_pose_r_group[env_ids] = self.convert_to_group(target_init_pose[:, :3], quat)[env_ids]
-        target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[env_ids]
+        target_pose_r_lie[env_ids] = self.log(target_pose_r_group)[env_ids]
 
         return target_pose_r, target_pose_r_group, target_pose_r_lie
 
