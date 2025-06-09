@@ -138,7 +138,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 2
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
@@ -303,12 +303,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.075,  0.25],
-                         [-0.25,   0.25],
-                         [-0.3,   0.225],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5]]
+    target_poses_incs = [[-0.2,  0.2],
+                         [-0.2,   0.2],
+                         [-0.35,   0.225],
+                         [-3*pi/5,  3*pi/5],
+                         [-3*pi/5,  3*pi/5],
+                         [-pi/2,  pi/2]]
     # target_poses_incs = [[-0.008,  0.008],
     #                      [-0.008,  0.008],
     #                      [-0.008,  0.008],
