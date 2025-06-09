@@ -196,13 +196,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
         
-        # self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
-        # self.teacher_model.policy.eval()
+        self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
+        self.teacher_model.policy.eval()
 
-        # self.student_action = self.actions.clone()
-        # self.teacher_action = self.actions.clone()
+        self.student_action = self.actions.clone()
+        self.teacher_action = self.actions.clone()
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -332,8 +332,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        # grip_action = actions[:, -1]
-        # actions = actions[:, :-1]
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
@@ -357,9 +357,9 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # --- Update gripper position ---
-        # actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
 
-        # self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -374,10 +374,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
-        # self.student_action = actions.clone()
+        self.student_action = actions[:, :-1].clone()
         
-        # teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
-        # actions = self._preprocess_actions(teacher_action, gripper = False)
+        self.teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
+        self.teacher_action = self._preprocess_actions(self.teacher_action, gripper = False)
         
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
@@ -467,35 +467,35 @@ class RLManipulationDirect(DirectRLEnv):
         grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = grasp_point_obj_pos_r, q01 = grasp_point_obj_quat_r,
                                                                                          t12 = self.z_displ.to(self.device), q12 = self.cfg.rot_45_z_pos_quat)
         
-        grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180 = combine_frame_transforms(t01 = grasp_point_obj_pos_r_rot, q01 = grasp_point_obj_quat_r_rot,
-                                                                                          t12 = torch.zeros_like(grasp_point_obj_pos_r_rot), q12 = self.cfg.rot_180_z_pos_quat)
+        # grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180 = combine_frame_transforms(t01 = grasp_point_obj_pos_r_rot, q01 = grasp_point_obj_quat_r_rot,
+        #                                                                                   t12 = torch.zeros_like(grasp_point_obj_pos_r_rot), q12 = self.cfg.rot_180_z_pos_quat)
         
         
 
         
 
 
-        target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
-        target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
-        target_pose_r_lie = self.log(target_pose_r_group)
+        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
+        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
+        self.target_pose_r_lie = self.log(self.target_pose_r_group)
 
-        target_pose_r_180 = torch.cat((grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180), dim = -1)
-        target_pose_r_group_180 = self.convert_to_group(grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180)
-        target_pose_r_lie_180 = self.log(target_pose_r_group_180)
+        # target_pose_r_180 = torch.cat((grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180), dim = -1)
+        # target_pose_r_group_180 = self.convert_to_group(grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180)
+        # target_pose_r_lie_180 = self.log(target_pose_r_group_180)
 
 
-        dist = self.dist_function(self.pose_group_r, target_pose_r_group, self.log, self.diff_operator)
-        dist_180 = self.dist_function(self.pose_group_r, target_pose_r_group_180, self.log, self.diff_operator)    
+        # dist = self.dist_function(self.pose_group_r, target_pose_r_group, self.log, self.diff_operator)
+        # dist_180 = self.dist_function(self.pose_group_r, target_pose_r_group_180, self.log, self.diff_operator)    
 
-        obs_rel = self.diff_operator(target_pose_r_group, self.pose_group_r)
-        obs_rel_180 = self.diff_operator(target_pose_r_group_180, self.pose_group_r)
+        obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        # obs_rel_180 = self.diff_operator(target_pose_r_group_180, self.pose_group_r)
 
-        sel_obs = (dist_180 < dist).int().unsqueeze(-1) 
-        self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel * sel_obs + obs_rel_180 * torch.logical_not(sel_obs))
+        # sel_obs = (dist_180 < dist).int().unsqueeze(-1) 
+        self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel)# * sel_obs + obs_rel_180 * torch.logical_not(sel_obs))
 
-        self.target_pose_r = target_pose_r#  * sel_obs + target_pose_r_180 * torch.logical_not(sel_obs)
-        self.target_pose_r_group = target_pose_r_group#  * sel_obs + target_pose_r_group_180 * torch.logical_not(sel_obs)
-        self.target_pose_r_lie = target_pose_r_lie#  * sel_obs + target_pose_r_lie_180 * torch.logical_not(sel_obs)
+        # self.target_pose_r = target_pose_r#   * sel_obs + target_pose_r_180 * torch.logical_not(sel_obs)
+        # self.target_pose_r_group = target_pose_r_group#   * sel_obs + target_pose_r_group_180 * torch.logical_not(sel_obs)
+        # self.target_pose_r_lie = target_pose_r_lie#   * sel_obs + target_pose_r_lie_180 * torch.logical_not(sel_obs)
 
 
 
@@ -507,12 +507,6 @@ class RLManipulationDirect(DirectRLEnv):
         # self.debug_target_pose_w2 = torch.cat((tgt_pos_rot_w_180, tgt_or_rot_w_180), dim = -1)
 
 
-
-        # Transform to the Lie algebra
-        self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
-        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
-
         self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
         self.obs_seq_pose_lie_rel = update_seq(new_obs = self.robot_rot_ee_pose_r_lie_rel, seq = self.obs_seq_pose_lie_rel)
 
@@ -520,9 +514,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
-        # grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-        #                                                                           t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
-        # self.debug_target_pose_w = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
+        grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+                                                                                  t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
+        self.debug_target_pose_w = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
 
 
 
@@ -545,8 +539,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.filter_collisions()
         
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = self.robot_rot_ee_pose_r_lie_rel
-        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
+        # obs = self.robot_rot_ee_pose_r_lie_rel
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
         # obs = self.obs_seq_pose_lie_rel.view(self.num_envs, -1)
 
         
@@ -576,6 +570,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
+
+        diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3
+
+        print(diff_actions)
         
         
 
@@ -593,16 +591,16 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = diff_actions # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
 
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached # + contacts_w
+        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w * self.target_reached
 
 
         # Reward for lifting
-        # reward = reward + self.target_reached * (self.target_pose_r[:, 2] - 0.25) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
+        reward = reward + self.target_reached * (self.target_pose_r[:, 2] - 0.25) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
@@ -766,6 +764,41 @@ class RLManipulationDirect(DirectRLEnv):
                                                                                                           self.target_pose_r_group, 
                                                                                                           self.target_pose_r_lie),
                                                                                                  ranges = self.target_pose_ranges)
+
+        grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = self.target_pose_r[:, :3], q01 = self.target_pose_r[:, 3:],
+                                                                                         t12 = 0*self.z_displ.to(self.device), q12 = self.cfg.rot_45_z_pos_quat)
+        
+        grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180 = combine_frame_transforms(t01 = grasp_point_obj_pos_r_rot, q01 = grasp_point_obj_quat_r_rot,
+                                                                                          t12 = torch.zeros_like(grasp_point_obj_pos_r_rot), q12 = self.cfg.rot_180_z_pos_quat)
+        
+        target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
+        target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
+        target_pose_r_lie = self.log(target_pose_r_group)
+
+        target_pose_r_180 = torch.cat((grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180), dim = -1)
+        target_pose_r_group_180 = self.convert_to_group(grasp_point_obj_pos_r_180, grasp_point_obj_quat_r_180)
+        target_pose_r_lie_180 = self.log(target_pose_r_group_180)
+
+
+        dist = self.dist_function(self.pose_group_r, target_pose_r_group, self.log, self.diff_operator)
+        dist_180 = self.dist_function(self.pose_group_r, target_pose_r_group_180, self.log, self.diff_operator)    
+
+        obs_rel = self.diff_operator(target_pose_r_group, self.pose_group_r)
+        obs_rel_180 = self.diff_operator(target_pose_r_group_180, self.pose_group_r)
+
+        sel_obs = (dist_180 > dist).int().unsqueeze(-1) 
+        self.robot_rot_ee_pose_r_lie_rel = self.log(obs_rel * sel_obs + obs_rel_180 * torch.logical_not(sel_obs))
+
+        self.target_pose_r[env_ids] = target_pose_r[env_ids] * sel_obs[env_ids] + target_pose_r_180[env_ids] * torch.logical_not(sel_obs)[env_ids]
+        self.target_pose_r_group[env_ids] = target_pose_r_group[env_ids]  * sel_obs[env_ids] + target_pose_r_group_180[env_ids] * torch.logical_not(sel_obs)[env_ids]
+        self.target_pose_r_lie[env_ids] = target_pose_r_lie[env_ids]  * sel_obs[env_ids] + target_pose_r_lie_180[env_ids] * torch.logical_not(sel_obs)[env_ids]
+
+
+
+
+
+
+    
         self.target_pose_r2, self.target_pose_r_group2, self.target_pose_r_lie2 = self.reset_target(env_ids = env_ids,
                                                                                                     targets=(self.target_pose_r2, 
                                                                                                           self.target_pose_r_group2, 

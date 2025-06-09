@@ -157,8 +157,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    num_actions = size  # Number of actions per environment (overridden)
-    num_observations = size #* (seq_len)                         # Number of observations per environment (overridden)
+    num_actions = size + 1   # Number of actions per environment (overridden)
+    num_observations = size + 1 #* (seq_len)                         # Number of observations per environment (overridden)
     # state_space = 0
     
 
@@ -364,7 +364,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-0.44,   -0.44],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
-                         [-pi/2,  pi/2]]
+                         [0,  pi]]
     
     target_poses_incs2 = [[-0.25,  0.25],
                          [-0.25,  0.25],
@@ -411,7 +411,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Bonus for reaching the target
     bonus_tgt_reached = 300
-    bonus_lifting = 30
+    bonus_lifting = 15
 
 
     # Contacts
