@@ -571,10 +571,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
 
-        diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3
-
-        print(diff_actions)
-        
+        diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
         
 
         # Obtains wether the agent is approaching or not

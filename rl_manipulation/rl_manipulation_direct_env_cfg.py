@@ -129,7 +129,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2025-05-06_18-49-55/model" # Path to the pre-trained approaching model
+    path_to_pretrained = "2025-06-09_07-31-53/model_53248000_steps" # Path to the pre-trained approaching model
 
     # --- Mapping configuration ---
     DQ = 0
@@ -361,10 +361,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,  0.2],
-                         [-0.44,   -0.44],
-                         [-2*pi/5*0,  2*pi/5*0],
-                         [-2*pi/5*0,  2*pi/5*0],
-                         [0,  pi]]
+                         [-0.35,   0.225],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5],
+                         [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.25,  0.25],
                          [-0.25,  0.25],
