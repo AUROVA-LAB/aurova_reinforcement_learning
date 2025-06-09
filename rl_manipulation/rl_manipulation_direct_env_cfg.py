@@ -123,13 +123,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 500              # Maximum steps in an episode
+    max_steps = 320              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2025-06-09_07-31-53/model_53248000_steps" # Path to the pre-trained approaching model
+    path_to_pretrained = "2025-05-06_18-49-55/model" # Path to the pre-trained approaching model
 
     # --- Mapping configuration ---
     DQ = 0
