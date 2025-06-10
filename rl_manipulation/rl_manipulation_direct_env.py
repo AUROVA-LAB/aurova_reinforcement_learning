@@ -334,8 +334,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        grip_action = actions[:, -1] + self.target_reached*8
-        actions = actions[:, :-1] * torch.logical_not(self.target_reached)
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
