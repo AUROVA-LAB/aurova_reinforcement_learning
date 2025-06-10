@@ -334,8 +334,8 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        grip_action = actions[:, -1]
-        actions = actions[:, :-1]
+        grip_action = actions[:, -1]#  + self.target_reached*8
+        actions = actions[:, :-1]#  * torch.logical_not(self.target_reached)
 
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
@@ -360,8 +360,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        
+        move_hand = (self.hand_pose*140) < 100.0
 
-        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -556,6 +558,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
 
+        close_grip = torch.logical_and((self.hand_pose*140.0) < 85, self.target_reached)
+
 
         # ---- Distance reward ----
         # Reward for the approaching
@@ -564,10 +568,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
+        reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w + close_grip * self.cfg.bonus_close_grip
 
         # Reward for lifting
-        reward = reward + self.target_reached * (self.target_pose_r[:, 2] - 0.25) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
+        reward = reward + self.target_reached * (self.target_pose_r[:, 2] - 0.26) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
