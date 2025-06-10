@@ -711,7 +711,7 @@
     <origin rpy="0 0 0" xyz="-0.01 0.008 0"/>
   </joint>
 
-  <!-- <link name="robotiq_finger_middle_contact_tip">
+  <link name="robotiq_finger_middle_contact_tip">
     <visual>
       <geometry>
         <box size="0.0535 0.001 0.0235"/>
@@ -727,7 +727,7 @@
     <parent link="robotiq_finger_middle_link_3"/>
     <child link="robotiq_finger_middle_contact_tip"/>
     <origin rpy="0 0 0.55" xyz="0.005 0.012 0.0"/>
-  </joint> -->
+  </joint>
 
   <link name="robotiq_finger_middle_contact_2">
     <visual>
@@ -766,7 +766,7 @@
     <child link="robotiq_finger_1_contact_3"/>
     <origin rpy="0 0 0" xyz="-0.01 0.008 0"/>
   </joint>
-<!-- 
+
   <link name="robotiq_finger_1_contact_tip">
     <visual>
       <geometry>
@@ -783,7 +783,7 @@
     <parent link="robotiq_finger_1_link_3"/>
     <child link="robotiq_finger_1_contact_tip"/>
     <origin rpy="0 0 0.55" xyz="0.005 0.012 0.0"/>
-  </joint> -->
+  </joint>
 
   <link name="robotiq_finger_1_contact_2">
     <visual>
@@ -822,7 +822,7 @@
     <child link="robotiq_finger_2_contact_3"/>
     <origin rpy="0 0 0" xyz="-0.01 0.008 0"/>
   </joint>
-<!-- 
+
   <link name="robotiq_finger_2_contact_tip">
     <visual>
       <geometry>
@@ -839,7 +839,7 @@
     <parent link="robotiq_finger_2_link_3"/>
     <child link="robotiq_finger_2_contact_tip"/>
     <origin rpy="0 0 0.55" xyz="0.005 0.012 0.0"/>
-  </joint> -->
+  </joint>
 
   <link name="robotiq_finger_2_contact_2">
     <visual>
