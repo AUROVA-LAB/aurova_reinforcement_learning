@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 320              # Maximum steps in an episode
+    max_steps = 350              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -150,7 +150,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
-    grip_scaling = 1.5
+    grip_scaling = 5
 
     action_scaling = scalings[representation][mapping]
 
@@ -269,7 +269,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.CuboidCfg(
             size=(0.045, 0.3, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
                                                             contact_offset=0.0075),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
@@ -405,7 +405,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.08 # 0.03
     height_thres = 0.8
 
 
@@ -491,6 +491,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2,2,2,])
+    cfg.contact_matrix = torch.tensor([0.4,0.4,0.4])
 
     return cfg
