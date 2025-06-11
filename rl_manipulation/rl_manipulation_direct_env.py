@@ -545,6 +545,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
+        is_contact = contacts_w > 4
 
         diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
         
@@ -571,7 +572,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
 
         # Reward for lifting
-        reward = reward + self.target_reached * (self.target_pose_r[:, 2]) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
+        reward = reward + is_contact * self.target_reached * (self.target_pose_r[:, 2]) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
