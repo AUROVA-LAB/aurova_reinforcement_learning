@@ -810,7 +810,7 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         # Sets the command to the DifferentialIKController
-        self.controller.set_command(self.target_pose_r[env_ids])
+        self.controller.set_command(self.target_pose_r)
 
         # Obtains current poses for the robot
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()  
@@ -820,7 +820,7 @@ class RLManipulationDirect(DirectRLEnv):
         #   - the joint coordinates for the hand.
         new_joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[:, (6):]), 
-                               dim=-1)[env_ids] 
+                               dim=-1)
 
         joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)
 
