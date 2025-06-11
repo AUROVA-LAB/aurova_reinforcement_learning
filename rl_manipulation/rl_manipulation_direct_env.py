@@ -346,6 +346,7 @@ class RLManipulationDirect(DirectRLEnv):
         action_pose_lab = self.convert_to_Lab(action_pose)
 
         # Set the command for the IKDifferentialController
+        # self.controller.set_command(action_pose_lab)
         self.controller.set_command(action_pose_lab)
                 
         # Obtains the poses
@@ -553,7 +554,7 @@ class RLManipulationDirect(DirectRLEnv):
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.target_reached = torch.logical_or(contacts_w > 1.6, self.target_reached)
+        self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
         self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
@@ -777,7 +778,6 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.height_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
 
@@ -803,9 +803,46 @@ class RLManipulationDirect(DirectRLEnv):
         
         self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
 
-
         # Updates the poses 
         self.update_new_poses()  
 
 
+
+        # Sets the command to the DifferentialIKController
+        self.controller.set_command(self.target_pose_r[env_ids])
+
+        # Obtains current poses for the robot
+        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()  
+
+        # Obtains the joint positions to reset. Concatenates:
+        #   - the joint coordinates for the action computed by the IKDifferentialController and
+        #   - the joint coordinates for the hand.
+        new_joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+                               self.default_joint_pos[:, (6):]), 
+                               dim=-1)[env_ids] 
         
+        joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)[env_ids]
+
+        move_tgt = torch.rand((self.num_envs, 1)).to(self.device) < 0.5
+        self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids] * move_tgt.squeeze(-1)[env_ids] + torch.ones(self.num_envs).bool().to(self.device)[env_ids] * torch.logical_not(move_tgt.squeeze(-1))[env_ids]
+        print(self.target_reached)
+
+
+        joint_pos[env_ids] = joint_pos[env_ids] * move_tgt[env_ids] + new_joint_pos[env_ids] * torch.logical_not(move_tgt)[env_ids]
+
+
+        
+        # Obtains the joint velocities
+        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
+       
+        # Writes the state to the simulation
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+        
+        # new_joint_pos[:, 2+6] = 0.6        
+        # new_joint_pos[:, 3+6] = 0.6
+        # new_joint_pos[:, 4+6] = 0.6        
+        # new_joint_pos[:, -1] = -0.6
+        # new_joint_pos[:, -2] = -0.6        
+        # new_joint_pos[:, -3] = -0.6
+
+        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(new_joint_pos, joint_vel, None, env_ids)

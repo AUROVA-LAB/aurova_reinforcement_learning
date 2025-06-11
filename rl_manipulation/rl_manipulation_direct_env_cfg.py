@@ -123,7 +123,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 350              # Maximum steps in an episode
+    max_steps = 100              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -361,7 +361,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,  0.2],
-                         [-0.35,   -0.35],
+                         [-0.42,   -0.42],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-pi/2,  pi/2]]
@@ -460,7 +460,7 @@ def update_collisions(cfg, num_envs):
 
     # Contact between robot 2 finger pads and object
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_contact.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle.*",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -468,7 +468,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_contact.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1.*",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -476,7 +476,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_contact.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2.*",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
