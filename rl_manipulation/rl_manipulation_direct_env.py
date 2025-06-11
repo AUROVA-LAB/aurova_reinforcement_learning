@@ -108,6 +108,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # List for the default joint poses of both robots --> As a list due to the different joints of the arms (6 and 7) 
         self.default_joint_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_pos
+        self.default_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel
 
 
         # List of joint actions
@@ -196,8 +197,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         
         self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
@@ -666,6 +667,10 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Obtains the joint velocities
         joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
+
+        print(joint_pos.shape)
+        print(joint_vel.shape)
+        print(env_ids)
        
         # Writes the state to the simulation
         self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
@@ -820,24 +825,16 @@ class RLManipulationDirect(DirectRLEnv):
         new_joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[:, (6):]), 
                                dim=-1)[env_ids] 
-        
-        joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)[env_ids]
+
+        joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)
 
         move_tgt = torch.rand((self.num_envs, 1)).to(self.device) < 0.5
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids] * move_tgt.squeeze(-1)[env_ids] + torch.ones(self.num_envs).bool().to(self.device)[env_ids] * torch.logical_not(move_tgt.squeeze(-1))[env_ids]
 
+        joint_pos_ = joint_pos * move_tgt.int() + new_joint_pos * torch.logical_not(move_tgt).int()
 
-        joint_pos[env_ids] = joint_pos[env_ids] * move_tgt[env_ids] + new_joint_pos[env_ids] * torch.logical_not(move_tgt)[env_ids]
-
-
-        
-        # Obtains the joint velocities
-        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
-
-        print(joint_pos)
-       
         # Writes the state to the simulation
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos_[env_ids], self.default_vel[env_ids], None, env_ids)
         
         # new_joint_pos[:, 2+6] = 0.6        
         # new_joint_pos[:, 3+6] = 0.6
