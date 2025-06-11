@@ -667,10 +667,6 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Obtains the joint velocities
         joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
-
-        print(joint_pos.shape)
-        print(joint_vel.shape)
-        print(env_ids)
        
         # Writes the state to the simulation
         self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
