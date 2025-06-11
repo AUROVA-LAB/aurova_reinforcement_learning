@@ -844,4 +844,4 @@ class RLManipulationDirect(DirectRLEnv):
         # new_joint_pos[:, -2] = -0.6        
         # new_joint_pos[:, -3] = -0.6
 
-        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(new_joint_pos, joint_vel, None, env_ids)
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(new_joint_pos, joint_vel, None, env_ids)
