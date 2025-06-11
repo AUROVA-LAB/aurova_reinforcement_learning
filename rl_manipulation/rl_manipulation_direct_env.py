@@ -571,7 +571,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
 
         # Reward for lifting
-        reward = reward + self.target_reached * (self.target_pose_r[:, 2] - 0.26) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
+        reward = reward + self.target_reached * (self.target_pose_r[:, 2]) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
