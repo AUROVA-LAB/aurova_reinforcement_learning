@@ -825,7 +825,6 @@ class RLManipulationDirect(DirectRLEnv):
 
         move_tgt = torch.rand((self.num_envs, 1)).to(self.device) < 0.5
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids] * move_tgt.squeeze(-1)[env_ids] + torch.ones(self.num_envs).bool().to(self.device)[env_ids] * torch.logical_not(move_tgt.squeeze(-1))[env_ids]
-        print(self.target_reached)
 
 
         joint_pos[env_ids] = joint_pos[env_ids] * move_tgt[env_ids] + new_joint_pos[env_ids] * torch.logical_not(move_tgt)[env_ids]
