@@ -129,7 +129,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    path_to_pretrained = "2025-05-06_18-49-55/model" # Path to the pre-trained approaching model
+    models = [["2025-05-06_13-10-55/model", "2025-05-06_18-49-55/model", "2025-05-08_18-22-52/model"],
+              ["2025-05-07_01-15-07/model_46080000_steps"],
+              ["2025-05-07_10-31-30/model", "2025-05-09_05-58-42/model", "2025-05-09_08-56-41/model"],
+              []]
 
     # --- Mapping configuration ---
     DQ = 0
@@ -145,6 +148,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
+    path_to_pretrained = models[representation][mapping] # Path to the pre-trained approaching model
 
     scalings = [[[0.01, 0.001], [0.07,  0.003], [0.01, 0.007]],
                 [[0.007, 0.02]],
