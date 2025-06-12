@@ -366,12 +366,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-2*pi/5*0,  2*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.25,  0.25],
-                         [-0.25,  0.25],
-                         [-0.3,   0.225],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5]]
+    target_poses_incs2 = [[-0.25*0,  0.25*0],
+                         [-0.25*0,  0.25*0],
+                         [-0.3*0,   0.225*0],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0]]
     # target_poses_incs = [[-0.008,  0.008],
     #                      [-0.008,  0.008],
     #                      [-0.008,  0.008],
@@ -405,7 +405,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # Position threshold for ending the episode
-    distance_thres = 0.03 # 0.08 # 0.03
+    distance_thres = 0.02 # 0.08 # 0.03
     height_thres = 0.8
 
 
@@ -460,25 +460,25 @@ def update_collisions(cfg, num_envs):
 
     # Contact between robot 2 finger pads and object
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger.*",
         update_period=0.001, 
-        history_length=1, 
+        history_length=10, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_f.*",
         update_period=0.001, 
-        history_length=1, 
+        history_length=10, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_f.*",
         update_period=0.001, 
-        history_length=1, 
+        history_length=10, 
         debug_vis=True,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
     )
