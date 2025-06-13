@@ -167,7 +167,7 @@ class RLManipulationDirect(DirectRLEnv):
         interpolators = [ScLERP, None, None, None]
 
         # Lis of distance functions
-        distances = [[dqLOAM_distance, geodesic_dist, double_geodesic_dist],
+        distances = [[geodesic_dist, dqLOAM_distance, double_geodesic_dist],
                      [geodesic_dist],
                      [geodesic_dist],
                      [geodesic_dist]]
