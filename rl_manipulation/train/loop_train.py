@@ -46,10 +46,12 @@ if __name__ == "__main__":
         for m in range(map):
             for d in range(dist):
                 
-                modify_cfg(repr, m, d)
+                modify_cfg("DQ", 1, 1)
 
                 print("--- RUN: ", repr, " ", m, " ", d)
                 subprocess.run(command, shell = True, check = True)
+
+                raise
                 
 
 
