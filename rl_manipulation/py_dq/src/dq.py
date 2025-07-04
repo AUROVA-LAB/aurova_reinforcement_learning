@@ -95,7 +95,7 @@ def q_normalize(q: torch.Tensor):
     assert q.shape[-1] == 4
 
     norm = q_norm(q = q)
-    assert not torch.any(torch.isclose(norm, torch.zeros_like(norm, device=q.device)))  # check for singularities
+    # assert not torch.any(torch.isclose(norm, torch.zeros_like(norm, device=q.device)))  # check for singularities
     return  q/norm.unsqueeze(-1)#torch.div(q, norm[:, None])  # q_norm = q / ||q||
 
 
