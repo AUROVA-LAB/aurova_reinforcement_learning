@@ -470,13 +470,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.debug_target_pose_w = torch.cat((tgt_pos_rot_w, tgt_rot_rot_w), dim = -1)
 
-        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1) * torch.logical_not(self.target_reached)
-        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot) * torch.logical_not(self.target_reached)
-        self.target_pose_r_lie = self.log(self.target_pose_r_group) * torch.logical_not(self.target_reached)
+        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1) * torch.logical_not(self.target_reached).unsqueeze(-1)
+        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot) * torch.logical_not(self.target_reached).unsqueeze(-1)
+        self.target_pose_r_lie = self.log(self.target_pose_r_group) * torch.logical_not(self.target_reached).unsqueeze(-1)
 
-        self.target_pose_r += self.target_pose_r2
-        self.target_pose_r_group += self.target_pose_r_group2 
-        self.target_pose_r_lie += self.target_pose_r_lie2
+        self.target_pose_r += self.target_pose_r2 * self.target_reached.unsqueeze(-1)
+        self.target_pose_r_group += self.target_pose_r_group2 * self.target_reached.unsqueeze(-1) 
+        self.target_pose_r_lie += self.target_pose_r_lie2 * self.target_reached.unsqueeze(-1)
 
 
 
