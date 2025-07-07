@@ -583,11 +583,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
 
-        mod_gripper = 2 * torch.logical_and(torch.logical_not(self.target_reached), dist < 0.04) - 1
-
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions + mod_gripper * self.hand_pose * 10  # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = diff_actions * torch.logical_not(self.target_reached)  # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
 
 
         # ---- Reward composition ----
