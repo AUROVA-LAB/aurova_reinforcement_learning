@@ -415,10 +415,10 @@ class RLManipulationDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
-                                                                         self.target_pose_r2[:, :3])), 
+                                                                         self.debug_target_pose_w[:, :3])), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
                                                                           self.debug_target_pose_w[:, 3:],
-                                                                          self.target_pose_r2[:, 3:]),), 
+                                                                          self.debug_target_pose_w[:, 3:]),), 
                                                 marker_indices=marker_indices)
 
 
