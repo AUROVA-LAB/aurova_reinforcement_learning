@@ -382,8 +382,15 @@ class RLManipulationDirect(DirectRLEnv):
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
         self.student_action = actions[:, :-1].clone()
+
+        aux_pose = self.convert_to_Lab(self.target_pose_r_group)
+        aux_pose[:, 2] += 0.15 * torch.logical_not(self.up_tgt_reached)
+        aux_pose = self.convert_to_group(aux_pose[:, :3], aux_pose[:, 3:])
+
+        diff = self.diff_operator(aux_pose, self.pose_group_r)
+        aux_diff_lie = self.log(diff)
         
-        self.teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
+        self.teacher_action = torch.tensor(self.teacher_model.predict(aux_diff_lie.cpu().numpy(), deterministic = True)[0]).to(self.device)
         self.teacher_action = self._preprocess_actions(self.teacher_action, gripper = False)
         
         # Obtains the increments and the poses
@@ -579,7 +586,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact) # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
 
 
         # ---- Reward composition ----
