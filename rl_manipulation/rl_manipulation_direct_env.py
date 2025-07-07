@@ -198,8 +198,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         
         self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
@@ -415,10 +415,10 @@ class RLManipulationDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
-                                                                         self.debug_target_pose_w[:, :3])), 
+                                                                         self.target_pose_r2[:, :3])), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
                                                                           self.debug_target_pose_w[:, 3:],
-                                                                          self.debug_target_pose_w[:, 3:]),), 
+                                                                          self.target_pose_r2[:, 3:]),), 
                                                 marker_indices=marker_indices)
 
 
@@ -455,7 +455,6 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
         tgt_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, :, :7].squeeze(-2)
-        tgt_pose_w[:, 2] += 0.15 * torch.logical_not(self.up_tgt_reached)
 
         grasp_point_obj_pos_r, grasp_point_obj_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                                   t02 = tgt_pose_w[:, :3], q02 = tgt_pose_w[:, 3:])
@@ -549,7 +548,14 @@ class RLManipulationDirect(DirectRLEnv):
             - compute_rewards() - torch.tensor(N,1): reward for each environment.
         '''  
 
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)
+        # self.target_pose_r_group[:, 2] += 0.15 * torch.logical_not(self.up_tgt_reached)
+        aux_pose = self.convert_to_Lab(self.target_pose_r_group)
+        aux_pose[:, 2] += 0.15 * torch.logical_not(self.up_tgt_reached)
+
+
+        dist = self.dist_function(self.pose_group_r, 
+                                  self.convert_to_group(aux_pose[:, :3], aux_pose[:, 3:]), 
+                                  self.log, self.diff_operator)
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
@@ -564,9 +570,9 @@ class RLManipulationDirect(DirectRLEnv):
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.up_tgt_reached = torch.logical_or(dist < self.cfg.distance_thres, self.up_tgt_reached)
-        self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.up_tgt_reached)
         self.height_reached = torch.logical_and(dist < self.cfg.distance_thres, self.target_reached)
+        self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.up_tgt_reached)
+        self.up_tgt_reached = torch.logical_or(dist < self.cfg.distance_thres, self.up_tgt_reached)
 
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
 
@@ -818,38 +824,3 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Updates the poses 
         self.update_new_poses()  
-
-
-
-
-        # # Sets the command to the DifferentialIKController
-        # self.controller.set_command(self.target_pose_r)
-
-        # # Obtains current poses for the robot
-        # ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()  
-
-        # # Obtains the joint positions to reset. Concatenates:
-        # #   - the joint coordinates for the action computed by the IKDifferentialController and
-        # #   - the joint coordinates for the hand.
-        # new_joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
-        #                        self.default_joint_pos[:, (6):]), 
-        #                        dim=-1)
-
-        # joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)
-
-        # move_tgt = torch.rand((self.num_envs, 1)).to(self.device) < 0.5
-        # self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids] * move_tgt.squeeze(-1)[env_ids] + torch.ones(self.num_envs).bool().to(self.device)[env_ids] * torch.logical_not(move_tgt.squeeze(-1))[env_ids]
-
-        # joint_pos_ = joint_pos * move_tgt.int() + new_joint_pos * torch.logical_not(move_tgt).int()
-
-        # # Writes the state to the simulation
-        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos_[env_ids], self.default_vel[env_ids], None, env_ids)
-        
-        # new_joint_pos[:, 2+6] = 0.6        
-        # new_joint_pos[:, 3+6] = 0.6
-        # new_joint_pos[:, 4+6] = 0.6        
-        # new_joint_pos[:, -1] = -0.6
-        # new_joint_pos[:, -2] = -0.6        
-        # new_joint_pos[:, -3] = -0.6
-
-        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(new_joint_pos, joint_vel, None, env_ids)
