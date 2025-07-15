@@ -397,6 +397,11 @@ class RLManipulationDirect(DirectRLEnv):
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
 
+
+        neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
+        robot_rot_ee_quat_r[neg_idx] *= -1
+
+
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
@@ -647,6 +652,9 @@ class RLManipulationDirect(DirectRLEnv):
         quat = quat_from_euler_xyz(roll = target_init_pose[:, 3],
                                     pitch = target_init_pose[:, 4],
                                     yaw = target_init_pose[:, 5])
+        
+        neg_idx = quat[:, 0] < 0.0
+        quat[neg_idx] *= -1
         
         # aa = torch.tensor([[-0.4329, -0.0009,  0.1967,  0.2940, -0.4766, -0.8255, -0.0700]]).to(self.device)
         # # aa = torch.tensor([[-0.3539,  0.0888,  0.2101, -0.0669, -0.5682, -0.7918,  0.2140]]).to(self.device)
