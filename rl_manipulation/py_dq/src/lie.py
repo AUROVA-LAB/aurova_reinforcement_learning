@@ -44,12 +44,18 @@ def exp_bruno(dq_: torch.Tensor):
 
     res = torch.cat((prim, q_mul(dq_[:, 4:], prim)), dim = -1)
 
+    neg_idx = res[:, 0] < 0.0
+    res[neg_idx] *= -1
+
     
     return res
 
 def log_bruno(dq: torch.Tensor):
     assert dq.shape[-1] == 8
     # assert torch.any(dq_is_norm(dq))
+
+    neg_idx = dq[:, 0] < 0.0
+    dq[neg_idx] *= -1
 
     primary = (q_angle(q = dq[:, :4]).unsqueeze(-1)*0.5)*q_axis(q = dq[:, :4])
     dual = dq_translation(dq = dq)*0.5
@@ -168,13 +174,22 @@ def exp_stereo(dq_:torch.Tensor):
     assert dq_.shape[-1] == 6
     # assert V.shape[-1] == 3
 
-    q_p = exp_stereo_q(q_ = dq_[:, :3])  
+    
 
-    return dq_from_tr(t = dq_[:, 3:], r = q_p)
+    q_p = exp_stereo_q(q_ = dq_[:, :3])  
+    dq = dq_from_tr(t = dq_[:, 3:], r = q_p)
+
+    neg_idx = dq[:, 0] < 0.0
+    dq[neg_idx] *= -1
+
+    return dq
 
 def log_stereo(dq: torch.Tensor):
     assert dq.shape[-1] == 8
     assert torch.any(dq_is_norm(dq))
+
+    neg_idx = dq[:, 0] < 0.0
+    dq[neg_idx] *= -1
 
     # t_, V = log_stereo_t(t = dq_translation(dq = dq), r = dq[:, :4])
     t_ = dq_translation(dq = dq)
@@ -209,14 +224,14 @@ def exp_cayley(dq_: torch.Tensor):
 
 
 
-# t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]])
-# r1 = torch.tensor([[3.3840e-06, -3.8268e-01, -9.2388e-01,  2.1003e-06]])
+t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]])
+r1 = torch.tensor([[3.3840e-06, -3.8268e-01, -9.2388e-01,  2.1003e-06]])
 
-# t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
-# r2 = torch.tensor([[0.2521, 0.0346, 0.9422,  -0.2179]])
+t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
+r2 = torch.tensor([[0.2521, 0.0346, 0.9422,  -0.2179]])
 
-# t2 = torch.tensor([[-0.0,  0.01,  0.0]])
-# r2 = torch.tensor([[0.4999, -0.866, 0.0,  -0.0]])
+t2 = torch.tensor([[-0.0,  0.01,  0.0]])
+r2 = torch.tensor([[0.4999, -0.866, 0.0,  -0.0]])
 
 
 # dq1 = dq_from_tr(t = t1, r = r1)
@@ -253,3 +268,18 @@ def exp_cayley(dq_: torch.Tensor):
 # print("Exponencial: ", b.round(decimals = 6))
 # print("\n\n\n\n\n\n")
 
+# dq1 = dq_from_tr(t = t1, r = r1)
+# dq2 = dq_from_tr(t = t1, r = -r1)
+
+# l1 = log_bruno(dq1)
+# l2 = log_bruno(dq2)
+
+# e1 = exp_bruno(l1)
+# e2 = exp_bruno(l2)
+
+# print(dq1)
+# print(dq2)
+# print("L1: ", l1)
+# print("L2: ", l2)
+# print("E1: ", e1)
+# print("E2: ", e2)
