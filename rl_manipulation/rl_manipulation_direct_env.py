@@ -141,7 +141,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
         self.target_pose_ranges2 = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs2)] for poses in cfg.target_pose]).to(self.device)
         
-        self.z_displ = torch.tensor([0.0, 0.0, -0.23]).to(self.device).repeat(self.num_envs, 1)
+        self.z_displ = torch.tensor([0.0, 0.0, -0.25]).to(self.device).repeat(self.num_envs, 1)
 
         # Create output directory to save images
         if self.cfg.save_imgs:
@@ -206,8 +206,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         
         self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
@@ -575,7 +575,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
         self.height_reached = torch.logical_and(dist < self.cfg.distance_thres, self.change_obs)
 
-        self.change_obs = contacts_w > 4
+        self.change_obs = torch.logical_or(contacts_w > 4, self.change_obs)
         # apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
 
 
@@ -583,7 +583,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = diff_actions 
         reward = reward - 3 * self.hand_pose * torch.logical_not(self.target_reached)
-        reward = reward + 3 * self.hand_pose * torch.logical_and(self.target_reached, torch.logical_not(self.change_obs))
+        reward = reward + 6 * self.hand_pose * torch.logical_and(self.target_reached, torch.logical_not(self.change_obs))
 
 
         # ---- Reward composition ----
