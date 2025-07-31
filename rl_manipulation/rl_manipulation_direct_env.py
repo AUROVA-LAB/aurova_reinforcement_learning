@@ -583,7 +583,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = diff_actions 
         reward = reward - 3 * self.hand_pose * torch.logical_not(self.target_reached)
-        reward = reward + 6 * (self.hand_pose * torch.logical_and(self.target_reached, torch.logical_not(self.change_obs)) - 1)
+        reward = reward + 6 * (self.hand_pose - 1) * torch.logical_and(self.target_reached, torch.logical_not(self.change_obs))
 
 
         # ---- Reward composition ----
