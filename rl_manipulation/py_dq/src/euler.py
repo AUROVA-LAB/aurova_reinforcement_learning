@@ -13,6 +13,9 @@ def from_quat_to_euler(t: torch.Tensor, r: torch.Tensor):
     assert t.shape[-1] == 3
     assert r.shape[-1] == 4
 
+    neg_idx = r[:, 0] < 0.0
+    r[neg_idx] *= -1
+
     r,p,y = euler_xyz_from_quat(quat = r)
     e = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim = -1)
 
