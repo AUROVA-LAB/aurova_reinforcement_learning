@@ -129,9 +129,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
    
     option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
 
-    models = [["2025-05-06_13-10-55/model", "2025-05-06_18-49-55/model", "2025-05-08_18-22-52/model"],
-              ["2025-05-07_01-15-07/model_46080000_steps"],
-              ["2025-05-07_10-31-30/model", "2025-05-09_05-58-42/model", "2025-05-09_08-56-41/model"],
+    models = [["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
+              ["2025-05-06_18-49-55/model"],
+              ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               []]
 
     # --- Mapping configuration ---
