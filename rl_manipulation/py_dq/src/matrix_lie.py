@@ -1,8 +1,8 @@
 import math
 import torch
-from .matrix import *
-from .dq import q_is_norm
-from omni.isaac.lab.utils.math import quat_from_matrix
+from matrix import *
+from dq import q_is_norm
+# from omni.isaac.lab.utils.math import quat_from_matrix
 
 
 
@@ -89,41 +89,129 @@ def exp_mat(mat_: torch.tensor):
 
 
 
+def log_mat(mat: torch.tensor):
+    assert mat.shape[-1] == 16
 
-# r1 = torch.tensor([[-7.0711e-01,  7.0710e-01, -7.8603e-06,
-#                      7.0710e-01,  7.0711e-01, -1.2909e-06,
-#                      4.6453e-06, -6.4708e-06, -1.0000e+00]]).repeat(2,1)
-# t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(2,1)
+    device = mat.device
 
+    mat = mat.view(-1, 4, 4)
+    R = mat[:, :-1, :-1]
+    t = mat[:, :-1, -1]
 
-# r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
-#                     -0.0000, -0.5000,  0.8660,
-#                      0.0000, -0.8660, -0.5000]])
-# t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
-
-
-# r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
-#                     -0.0000, -0.5000,  0.8660,
-#                      0.0000, -0.8660, -0.5000]]).repeat(2,1)
-# t2 = torch.tensor([[-0.0,  0.01,  0.0]]).repeat(2,1)
+    eps = 1e-6
 
 
-# h1 = homo_from_mat_trans(t1, r1)
-# h2 = homo_from_mat_trans(t2, r2)
+    # ---- Compute theta ----
+    # Trace
+    c = torch.clamp((torch.vmap(torch.trace)(R)  - 1)/2, -1, 1)
+    
+    # Base zero tensor
+    # theta = torch.zeros(mat.shape[0]).to(device)
 
-# print("H1: ", torch.round(h1, decimals = 4))
-# print("H2: ", torch.round(h2, decimals = 4))
-
-# h_diff = mat_diff(h1, h2)
-
-# print("DIFF: ", torch.round(h_diff, decimals = 4))
-
-# l_ = log_mat(mat = h_diff)
-# b = exp_mat(mat_ = l_)
+    # # Indexes for zeros
+    
+    # The non-zero are assigned the trace cosinus
+    theta = torch.acos(c)
+    is_zero = torch.isclose(theta, torch.zeros_like(theta), rtol = eps)
 
 
-# print("DIFF: ", b.round(decimals = 4))
-# print("PRE Logaritmico: ", l_.round(decimals = 4))
+    # ---- Compute exp(R) ----
+    # Skew of R
+    A_skew = 0.5 * (R - R.transpose(-1, -2))
+    
+    # Skew indexes 
+    idx_skew = torch.tensor([7, 2, 3])
+    
+    # Select skew elements
+    A_skew_f = A_skew.view(A_skew.shape[0], -1)
+    A = A_skew_f[:, idx_skew]
+ 
+    # The non-zero are assigned the extended calculus
+    A[~is_zero] *= (theta[~is_zero] / torch.sin(theta[~is_zero])).unsqueeze(-1)
+
+
+    # ---- Inverse Left Jacobian ----
+    J_inv = 1 - 0.5 * A_skew
+    J_inv[is_zero]  += 1 / 12 * (A_skew@A_skew)[is_zero]
+    J_inv[~is_zero] += (1 / theta[~is_zero]**2 - (1 + torch.cos(theta[~is_zero])) / (2 * theta[~is_zero] * torch.sin(theta[~is_zero]))).unsqueeze(-1).unsqueeze(-1) * (A_skew@A_skew)[~is_zero]
+
+
+    # ---- Coupled lineal part ----
+    v = torch.bmm(J_inv, t.unsqueeze(-1)).squeeze(-1)
+
+    return torch.cat((A, v), dim = -1), {"A_skew": A_skew, "theta":theta, "is_zero": is_zero}
+
+ 
+def exp_mat(mat_: torch.tensor, kwargs = None):
+    assert mat_.shape[-1] == 6
+
+    device = mat_.device
+    
+    A_skew = kwargs["A_skew"]
+    theta = kwargs["theta"]
+    is_zero = kwargs["is_zero"]
+
+    # ---- Rotation matrix ----
+
+
+    '''
+    Poner EYE en vez del 1, se la identidad'''
+
+
+
+    R = 1 + A_skew + 0.5 * (A_skew@A_skew)
+    R[~is_zero] = 1 + (torch.sin(theta[~is_zero]) / theta[~is_zero]).unsqueeze(-1).unsqueeze(-1)*A_skew[~is_zero] + \
+                ((1 - torch.cos(theta[~is_zero])) / theta[~is_zero]**2).unsqueeze(-1).unsqueeze(-1) * (A_skew@A_skew)[~is_zero]
+    
+
+    # ----Left Jacobian ----
+    J = 1 + 0.5 * A_skew + 1/6 * (A_skew@A_skew)
+    J[~is_zero] = 1 + ((1 - torch.cos(theta[~is_zero])) / (theta[~is_zero]**2)).unsqueeze(-1).unsqueeze(-1) * A_skew[~is_zero] + \
+                ((theta[~is_zero] - torch.sin(theta[~is_zero])) / (theta[~is_zero]**3)).unsqueeze(-1).unsqueeze(-1) * (A_skew@A_skew)[~is_zero]
+    
+    t = torch.bmm(J, mat_[:, 3:].unsqueeze(-1)).squeeze(-1)
+
+    return homo_from_mat_trans(t = t, r = R.view(-1, 9))
+
+    
+
+
+
+r1 = torch.tensor([[-7.0711e-01,  7.0710e-01, -7.8603e-06,
+                     7.0710e-01,  7.0711e-01, -1.2909e-06,
+                     4.6453e-06, -6.4708e-06, -1.0000e+00]]).repeat(4,1)
+t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(4,1)
+
+
+r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
+                    -0.0000, -0.5000,  0.8660,
+                     0.0000, -0.8660, -0.5000]])
+t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
+
+
+r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
+                    -0.0000, -0.5000,  0.8660,
+                     0.0000, -0.8660, -0.5000]]).repeat(4,1)
+t2 = torch.tensor([[-0.0,  0.01,  0.0]]).repeat(4,1)
+
+
+h1 = homo_from_mat_trans(t1, r1)
+h2 = homo_from_mat_trans(t2, r2)
+
+print("H1: ", torch.round(h1, decimals = 4))
+print("H2: ", torch.round(h2, decimals = 4))
+
+h_diff = mat_diff(h1, h2)
+h_diff[0] = h2[0]
+
+print("DIFF: ", torch.round(h_diff, decimals = 4))
+
+l_, k = log_mat(mat = h_diff)
+b = exp_mat(mat_ = l_, kwargs=k)
+
+
+print("DIFF: ", b.round(decimals = 4))
+print("PRE Logaritmico: ", l_.round(decimals = 4))
 
 # b = mat_mul(h1, b)
 

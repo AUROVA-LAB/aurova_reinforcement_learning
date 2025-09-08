@@ -26,7 +26,7 @@ def dq_adjoint(v: torch.Tensor, dq: torch.Tensor):
 
 
 
-def exp_bruno(dq_: torch.Tensor):
+def exp_bruno(dq_: torch.Tensor, kwargs = None):
 
     assert dq_.shape[-1] == 6
 
@@ -170,7 +170,7 @@ def log_stereo_q(q: torch.Tensor):
 
     return q[:, 1:] / (1+q[:, 0]).unsqueeze(-1)
 
-def exp_stereo(dq_:torch.Tensor):
+def exp_stereo(dq_:torch.Tensor, kwargs = None):
     assert dq_.shape[-1] == 6
     # assert V.shape[-1] == 3
 

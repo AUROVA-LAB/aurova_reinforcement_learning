@@ -164,6 +164,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
+        self.kwargs = None
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -288,7 +289,7 @@ class RLManipulationDirect(DirectRLEnv):
         # print("LOG DIFF: ", self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r)))
         # print("Lie Pose1: ", self.robot_rot_ee_pose_r_lie_rel)
 
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions, kwargs = self.kwargs)
  
         # print("Lie Pose2: ", action_pose)
  
@@ -406,9 +407,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
         # Transform to the Lie algebra
-        self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie, __ = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
+        self.robot_rot_ee_pose_r_lie_rel, self.kwargs = self.log(diff)
 
         self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
         self.obs_seq_pose_lie_rel = update_seq(new_obs = self.robot_rot_ee_pose_r_lie_rel, seq = self.obs_seq_pose_lie_rel)
@@ -632,7 +633,8 @@ class RLManipulationDirect(DirectRLEnv):
         
 
         self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
-        self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
+        log, __ = self.log(self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie[env_ids], kwargs = log[env_ids]
 
         self.obs_seq_vel_lie[env_ids] = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()[env_ids]
 
@@ -671,7 +673,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
 
         self.target_pose_r_group[env_ids] = self.convert_to_group(target_init_pose[:, :3], quat)[env_ids]
-        self.target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[env_ids]
+        self.target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[0][env_ids]
 
         # --- Reset previous values ---
         # Reset previous distances
@@ -680,10 +682,11 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        log, self.kwargs = self.log(obs_rel)
 
-        self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
+        self.robot_rot_ee_pose_r_lie_rel[env_ids] = log[env_ids]
 
-        self.obs_seq_pose_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
+        self.obs_seq_pose_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel)[0], 
                                                                      self.cfg.seq_len, 
                                                                      dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
 
