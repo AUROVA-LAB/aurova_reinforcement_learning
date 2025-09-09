@@ -292,10 +292,6 @@ class RLManipulationDirect(DirectRLEnv):
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
  
         # print("Lie Pose2: ", action_pose)
-
-        print(self.target_pose_r_group.shape)
-        print(action_pose.shape)
- 
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
  

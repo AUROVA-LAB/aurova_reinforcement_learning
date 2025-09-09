@@ -148,7 +148,7 @@ def exp_se3(xi: torch.Tensor):
 
     t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
 
-    return homo_from_rt(R, t)
+    return homo_from_rt(R, t).view(B, -1)
 
 
 
