@@ -61,6 +61,9 @@ def log_se3(T: torch.Tensor):
     Devuelve: xi (B,6) donde xi = [phi, rho]
     """
     B = T.shape[0]
+
+    T = T.view(-1, 4, 4)
+
     R = T[:,:3,:3]
     t = T[:,:3, 3]
 
