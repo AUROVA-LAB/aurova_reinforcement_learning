@@ -35,14 +35,14 @@ def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor, log_fc = None,
 
 def geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
 
-    log_diff = log_fc(diff_fc(x1, x2))[0]
+    log_diff = log_fc(diff_fc(x1, x2))
 
     return torch.norm(log_diff, dim = -1)
 
 
 def double_geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
 
-    log_x1 = log_fc(x1)[0]
-    log_x2 = log_fc(x2)[0]
+    log_x1 = log_fc(x1)
+    log_x2 = log_fc(x2)
 
     return q_inn_prod(q1 = log_x1[:, :3], q2 = log_x2[:, :3]) + q_inn_prod(q1 = log_x1[:, 3:], q2 = log_x2[:, 3:])
