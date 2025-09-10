@@ -106,7 +106,7 @@ def log_se3(T: torch.Tensor):
     rho = torch.bmm(J_inv, t.unsqueeze(-1)).squeeze(-1)
 
     xi = torch.cat([phi, rho], dim=-1)
-    return xi
+    return torch.round(xi, decimals =3)
 
 # =========================
 # Exponencial de se(3)
@@ -148,7 +148,7 @@ def exp_se3(xi: torch.Tensor):
 
     t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
 
-    return homo_from_rt(R, t).view(B, -1)
+    return torch.round(homo_from_rt(R, t).view(B, -1), decimals =3)
 
 
 

@@ -279,22 +279,12 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-
-
-        # Perform increment in the algebra and exponential map
-        # print("\n\n\n")
-        # print("Initial Pose: ", torch.round(self.pose_group_r, decimals = 4))
-        # print("Target: ", self.target_pose_r_group)
-        # print("DIFF: ", self.diff_operator(self.target_pose_r_group, self.pose_group_r))
-        # print("LOG DIFF: ", self.log(self.diff_operator(self.target_pose_r_group, self.pose_group_r)))
-        # print("Lie Pose1: ", self.robot_rot_ee_pose_r_lie_rel)
-
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
  
         # print("Lie Pose2: ", action_pose)
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
- 
+        # action_pose = self.normalize(action_pose)
+
         # print("Res pose: ", torch.round(action_pose ,decimals = 4))
 
         # print("\n")
@@ -398,12 +388,17 @@ class RLManipulationDirect(DirectRLEnv):
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
 
 
-        neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
-        robot_rot_ee_quat_r[neg_idx] *= -1
+        # neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
+        # robot_rot_ee_quat_r[neg_idx] *= -1
 
+        # print("OBS")
+        # print(self.pose_group_r)
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+
+        # print(self.pose_group_r)
+        # print("--------\n")
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
@@ -483,15 +478,8 @@ class RLManipulationDirect(DirectRLEnv):
         mod = (2*(dist < self.prev_dist).int() - 1).float()
 
         # Target reached flag
-        self.target_reached = dist < self.cfg.distance_thres
+        self.target_reached = dist < self.cfg.distance_thres        
 
-        bool_vel = (self.obs_seq_vel_lie < 0.0).int()
-        
-        diff_vel = bool_vel[:, self.seq_idx[0]] - bool_vel[:, self.seq_idx[1]]
-        is_diff_vel = (diff_vel != 0).int()
-        vel_mod = is_diff_vel.sum(-2).sum(-1) / (self.cfg.seq_len - 1) + 1
-
-        mod *= torch.pow(vel_mod.float(), -mod)
 
         # print(self.obs_seq_vel_lie)
         # print(bool_vel)
