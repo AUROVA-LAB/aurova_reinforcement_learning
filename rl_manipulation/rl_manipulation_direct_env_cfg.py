@@ -27,14 +27,6 @@ from omni.isaac.lab.assets import RigidObjectCfg
 from omni.isaac.lab.managers import EventTermCfg, SceneEntityCfg
 from omni.isaac.lab.envs import mdp
 
-'''
-                    ############## IMPORTANT #################
-   The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
-   These two variables (cfg.UR5e and cfg.GEN3) serve as an abstraction to treat the robots during the episodes. In fact,
-all the methods need an index to differentiate from which robot get the information.
-   Also, data storage is performed using lists, not tensors because the joint space of the robots is
-different from one another.
-'''
 
 
 # Function to change a Euler angles to a quaternion as a tensor
@@ -87,29 +79,7 @@ class EventCfg:
           "distribution": "log_uniform",
       },
   )
-#   reset_gravity = EventTermCfg(
-#       func=mdp.randomize_physics_scene_gravity,
-#       mode="interval",
-#       is_global_time=True,
-#       interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
-#       params={
-#           "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
-#           "operation": "add",
-#           "distribution": "gaussian",
-#       },
-#   )
 
-#   body_mass = EventTermCfg(
-#       func = mdp.randomize_rigid_body_mass,
-#       mode = "reset",
-#       params = {
-#           "asset_cfg": SceneEntityCfg("object"),
-#           "mass_distribution_params": (0.5, 1.5),
-#           "operation": "scale",
-#           "distribution": "uniform",
-#           "recompute_inertia": False,
-#       }
-#   )
 
 # Configuration class for the environment
 @configclass
@@ -153,9 +123,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    num_actions = size   # Number of actions per environment (overridden)
-    num_observations = num_actions #* (seq_len)                         # Number of observations per environment (overridden)
-    # state_space = 0
+    num_actions = size                  # Number of actions per environment (overridden)
+    num_observations = num_actions      # Number of observations per environment (overridden)
     
 
 
@@ -309,12 +278,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-3*pi/5,  3*pi/5],
                          [-3*pi/5,  3*pi/5],
                          [-pi/2,  pi/2]]
-    # target_poses_incs = [[-0.008,  0.008],
-    #                      [-0.008,  0.008],
-    #                      [-0.008,  0.008],
-    #                      [-0.12,  0.12],
-    #                      [-0.12,  0.12],
-    #                      [-0.12,  0.12]]
+
     apply_range_tgt = True
 
 
@@ -322,12 +286,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Reward variables ----
     # reward scales
     rew_scale_dist: float= 1.0
-    rew_scale_vel: float= 0.4
-
-    dist_scale = 0.1545
-    vel_scale = 1.2104
-
-
 
     # Position threshold for ending the episode
     distance_thres = 0.05 # 0.08 # 0.03
@@ -349,7 +307,6 @@ def update_cfg(cfg, num_envs, device):
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
 
-    # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
 

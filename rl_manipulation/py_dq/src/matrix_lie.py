@@ -1,8 +1,8 @@
 import math
 import torch
-from matrix import *
-from dq import q_is_norm
-# from omni.isaac.lab.utils.math import quat_from_matrix
+from .matrix import *
+from .dq import q_is_norm
+from omni.isaac.lab.utils.math import quat_from_matrix
 
 
 
@@ -177,43 +177,43 @@ def exp_mat(mat_: torch.tensor, kwargs = None):
 
 
 
-r1 = torch.tensor([[-7.0711e-01,  7.0710e-01, -7.8603e-06,
-                     7.0710e-01,  7.0711e-01, -1.2909e-06,
-                     4.6453e-06, -6.4708e-06, -1.0000e+00]]).repeat(4,1)
-t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(4,1)
+# r1 = torch.tensor([[-7.0711e-01,  7.0710e-01, -7.8603e-06,
+#                      7.0710e-01,  7.0711e-01, -1.2909e-06,
+#                      4.6453e-06, -6.4708e-06, -1.0000e+00]]).repeat(4,1)
+# t1 = torch.tensor([[-4.9190e-01,  1.3330e-01,  4.8790e-01]]).repeat(4,1)
 
 
-r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
-                    -0.0000, -0.5000,  0.8660,
-                     0.0000, -0.8660, -0.5000]])
-t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
+# r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
+#                     -0.0000, -0.5000,  0.8660,
+#                      0.0000, -0.8660, -0.5000]])
+# t2 = torch.tensor([[-0.1,  0.1348,  0.3480]])
 
 
-r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
-                    -0.0000, -0.5000,  0.8660,
-                     0.0000, -0.8660, -0.5000]]).repeat(4,1)
-t2 = torch.tensor([[-0.0,  0.01,  0.0]]).repeat(4,1)
+# r2 = torch.tensor([[ 1.0000,  0.0000,  0.0000,
+#                     -0.0000, -0.5000,  0.8660,
+#                      0.0000, -0.8660, -0.5000]]).repeat(4,1)
+# t2 = torch.tensor([[-0.0,  0.01,  0.0]]).repeat(4,1)
 
 
-h1 = homo_from_mat_trans(t1, r1)
-h2 = homo_from_mat_trans(t2, r2)
+# h1 = homo_from_mat_trans(t1, r1)
+# h2 = homo_from_mat_trans(t2, r2)
 
-print("H1: ", torch.round(h1, decimals = 4))
-print("H2: ", torch.round(h2, decimals = 4))
+# print("H1: ", torch.round(h1, decimals = 4))
+# print("H2: ", torch.round(h2, decimals = 4))
 
-h_diff = mat_diff(h1, h2)
-h_diff[0] = h2[0]
+# h_diff = mat_diff(h1, h2)
+# h_diff[0] = h2[0]
 
-print("DIFF: ", torch.round(h_diff, decimals = 4))
+# print("DIFF: ", torch.round(h_diff, decimals = 4))
 
-l_, k = log_mat(mat = h_diff)
-b = exp_mat(mat_ = l_, kwargs=k)
+# l_, k = log_mat(mat = h_diff)
+# b = exp_mat(mat_ = l_, kwargs=k)
 
 
-print("DIFF: ", b.round(decimals = 4))
-print("PRE Logaritmico: ", l_.round(decimals = 4))
+# print("DIFF: ", b.round(decimals = 4))
+# print("PRE Logaritmico: ", l_.round(decimals = 4))
 
-# b = mat_mul(h1, b)
+# # b = mat_mul(h1, b)
 
-# print("Logaritmico: ", l_.round(decimals = 4))
-# print("Exponencial: ", b.round(decimals = 4))
+# # print("Logaritmico: ", l_.round(decimals = 4))
+# # print("Exponencial: ", b.round(decimals = 4))
