@@ -306,9 +306,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
                          [-0.35,   0.225],
-                         [-3*pi/5,  3*pi/5],
-                         [-3*pi/5,  3*pi/5],
-                         [-pi/2,  pi/2]]
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5]]
     # target_poses_incs = [[-0.008,  0.008],
     #                      [-0.008,  0.008],
     #                      [-0.008,  0.008],
