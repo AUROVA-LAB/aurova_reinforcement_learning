@@ -64,6 +64,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_group =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
         self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
 
+        self.pose_group_r_teacher = torch.zeros((self.num_envs, 8)).to(self.device).float()
+        self.pose_group_r_lie_teacher = torch.zeros((self.num_envs, 6)).to(self.device).float()
+
         self.target_pose_r_180 =  torch.tensor([0.0 ,0.0 ,0.0, 1.0 ,0.0 ,0.0 ,0.0]).to(self.device).repeat(self.num_envs, 1).float()
         self.target_pose_r_group_180 =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
         self.target_pose_r_lie_180 = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
@@ -73,8 +76,13 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_group2 =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
         self.target_pose_r_lie2 = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
         
+        self.target_pose_r_group_teacher2 = torch.zeros((self.num_envs, 8)).to(self.device).float()
+        self.target_pose_r_lie_teacher2 = torch.zeros((self.num_envs, 6)).to(self.device).float()
+
+
         # self.obs_seq_robot_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.seq_len, self.cfg.size)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
+        self.robot_rot_ee_pose_r_lie_rel_teacher = torch.zeros((self.num_envs, 6)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
         
         self.obs_seq_vel_lie = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()
@@ -152,7 +160,7 @@ class RLManipulationDirect(DirectRLEnv):
         map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],       [exp_stereo, log_stereo]],
                     [[identity_map, identity_map],],
                     [[identity_map, identity_map], [exp_quat_cayley, log_quat_cayley], [exp_quat_stereo, log_quat_stereo]],
-                    [[identity_map, identity_map], [exp_se3, log_se3]]]
+                    [[identity_map, identity_map], [exp_mat, log_mat]]]
 
         # List of conversions
         conversions = [[convert_dq_to_Lab, dq_from_tr], 
@@ -192,12 +200,13 @@ class RLManipulationDirect(DirectRLEnv):
         self.normalize = normalizes[cfg.representation]
     
         self.pose_group_r = torch.tensor(self.identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
+        self.pose_group_r_teacher =  torch.tensor(self.identities[0]).to(self.device).repeat(self.num_envs, 1).float()
         self.target_pose_r_group2 = torch.tensor(self.identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
         self.target_pose_r_group = torch.tensor(self.identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
         self.seq_idx = torch.tensor([range(0, self.cfg.seq_len - 1), range(1, self.cfg.seq_len)])
 
-        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
         # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         
@@ -206,6 +215,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.student_action = self.actions.clone()
         self.teacher_action = self.actions.clone()
+
+        self.change_obs = torch.tensor([False]).repeat(self.num_envs).to(self.device)
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -382,7 +393,7 @@ class RLManipulationDirect(DirectRLEnv):
         actions = self._preprocess_actions(actions)
         self.student_action = actions[:, :-1].clone()
         
-        self.teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel.cpu().numpy(), deterministic = True)[0]).to(self.device)
+        self.teacher_action = torch.tensor(self.teacher_model.predict(self.robot_rot_ee_pose_r_lie_rel_teacher.cpu().numpy(), deterministic = True)[0]).to(self.device)
         self.teacher_action = self._preprocess_actions(self.teacher_action, gripper = False)
         
         # Obtains the increments and the poses
@@ -468,9 +479,14 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.debug_target_pose_w = torch.cat((tgt_pos_rot_w, tgt_rot_rot_w), dim = -1)
 
-        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
-        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)
-        self.target_pose_r_lie = self.log(self.target_pose_r_group)
+        self.target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)*torch.logical_not(self.change_obs.unsqueeze(-1)) + self.target_pose_r2 * self.change_obs.unsqueeze(-1)
+        
+        self.target_pose_r_group = self.convert_to_group(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot) *torch.logical_not(self.change_obs.unsqueeze(-1)) + self.target_pose_r_group2 * self.change_obs.unsqueeze(-1)
+        self.target_pose_r_group_teacher = dq_from_tr(grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot)*torch.logical_not(self.change_obs.unsqueeze(-1)) + self.target_pose_r_group_teacher2 * self.change_obs.unsqueeze(-1)
+
+        self.target_pose_r_lie = self.log(self.target_pose_r_group)*torch.logical_not(self.change_obs.unsqueeze(-1)) + self.target_pose_r_lie2 * self.change_obs.unsqueeze(-1)
+        self.target_pose_r_lie_teacher = log_bruno(self.target_pose_r_group_teacher)*torch.logical_not(self.change_obs.unsqueeze(-1)) + self.target_pose_r_lie_teacher2 * self.change_obs.unsqueeze(-1)
+
 
         # --- Robot poses ---
         # Obtain the pose of the GEN3 end effector in world frame
@@ -484,11 +500,15 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+        self.pose_group_r_teacher = dq_from_tr(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
+
+        diff_teacher = dq_diff(self.target_pose_r_group_teacher, self.pose_group_r_teacher)
+        self.robot_rot_ee_pose_r_lie_rel_teacher = log_bruno(diff_teacher)
 
         self.obs_seq_vel_lie = update_seq(new_obs = vel, seq = self.obs_seq_vel_lie)
         self.obs_seq_pose_lie_rel = update_seq(new_obs = self.robot_rot_ee_pose_r_lie_rel, seq = self.obs_seq_pose_lie_rel)
@@ -548,30 +568,29 @@ class RLManipulationDirect(DirectRLEnv):
         is_contact = contacts_w > 4
 
         diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
-        
-
-        # Obtains wether the agent is approaching or not
-        mod = (2*(dist < self.prev_dist).int() - 1).float()
 
         aux_reached = self.target_reached.clone()
 
         # Target reached flag
         self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
-        self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
+        self.height_reached = torch.logical_and(dist < self.cfg.distance_thres, self.change_obs)
 
+        self.change_obs = torch.logical_or(contacts_w > 4, self.change_obs)
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
 
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions * torch.logical_not(self.target_reached) # mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = diff_actions 
+        # reward = reward - 3 * self.hand_pose * torch.logical_not(self.target_reached)
+        # reward = reward + 6 * (self.hand_pose - 1) * torch.logical_and(self.target_reached, torch.logical_not(self.change_obs))
 
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
         reward = reward + apply_bonus * self.cfg.bonus_tgt_reached + contacts_w
 
-        # Reward for lifting
+        # # Reward for lifting
         reward = reward + is_contact * self.target_reached * (self.target_pose_r[:, 2]) * self.cfg.bonus_lifting + self.height_reached * self.cfg.bonus_tgt_reached
 
         # Update previous distances
@@ -776,12 +795,15 @@ class RLManipulationDirect(DirectRLEnv):
                                                                                                           self.target_pose_r_group2, 
                                                                                                           self.target_pose_r_lie2),
                                                                                                     ranges = self.target_pose_ranges2)
+        self.target_pose_r_group_teacher2[env_ids] = dq_from_tr(self.target_pose_r2[:, :3], self.target_pose_r2[:, 3:])[env_ids]
+        self.target_pose_r_lie_teacher2[env_ids] = log_bruno(self.target_pose_r_group_teacher2)[env_ids]
 
         # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.height_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.change_obs[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
 
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
@@ -808,38 +830,3 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Updates the poses 
         self.update_new_poses()  
-
-
-
-
-        # # Sets the command to the DifferentialIKController
-        # self.controller.set_command(self.target_pose_r)
-
-        # # Obtains current poses for the robot
-        # ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()  
-
-        # # Obtains the joint positions to reset. Concatenates:
-        # #   - the joint coordinates for the action computed by the IKDifferentialController and
-        # #   - the joint coordinates for the hand.
-        # new_joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
-        #                        self.default_joint_pos[:, (6):]), 
-        #                        dim=-1)
-
-        # joint_pos = torch.cat((joint_pos, self.default_joint_pos[:, (6):]), dim=-1)
-
-        # move_tgt = torch.rand((self.num_envs, 1)).to(self.device) < 0.5
-        # self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids] * move_tgt.squeeze(-1)[env_ids] + torch.ones(self.num_envs).bool().to(self.device)[env_ids] * torch.logical_not(move_tgt.squeeze(-1))[env_ids]
-
-        # joint_pos_ = joint_pos * move_tgt.int() + new_joint_pos * torch.logical_not(move_tgt).int()
-
-        # # Writes the state to the simulation
-        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos_[env_ids], self.default_vel[env_ids], None, env_ids)
-        
-        # new_joint_pos[:, 2+6] = 0.6        
-        # new_joint_pos[:, 3+6] = 0.6
-        # new_joint_pos[:, 4+6] = 0.6        
-        # new_joint_pos[:, -1] = -0.6
-        # new_joint_pos[:, -2] = -0.6        
-        # new_joint_pos[:, -3] = -0.6
-
-        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(new_joint_pos, joint_vel, None, env_ids)
