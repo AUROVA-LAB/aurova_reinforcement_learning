@@ -120,7 +120,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 130              # Maximum steps in an episode
+    max_steps = 350              # Maximum steps in an episode
 
     seq_len = 2                 # Length of the sequence
    
@@ -186,7 +186,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Configurations ----
     # Simulation
-    sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
+    sim: SimulationCfg = SimulationCfg(dt = 1/130, render_interval = decimation)
     # SimulationCfg: configuration for simulation physics 
     #    dt: time step of the simulation (seconds)
     #    render_interval: number of physics steps per rendering steps
@@ -327,10 +327,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     dist_scale = 0.1545
     vel_scale = 1.2104
 
-
+    # DQ: 0.0159 +- 0.0152
+    # SE3: 0.0163 +-0.0280
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    distance_thres = 0.001 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100

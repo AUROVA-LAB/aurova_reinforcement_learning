@@ -48,19 +48,13 @@ def main():
 
     models = [file for file in os.listdir(dir) if file.endswith(".zip")]
 
-    # Results of the evaluation
-    results = {}
-
     # Reset
     obs, __ = env.reset()
 
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         
-        model_name_ = "model.zip"
-
-        # Accumulated reward for all the episodes
-        r = torch.zeros((args_cli.num_envs))
+        model_name_ = "model_40960000_steps.zip"
 
         # Loading model
         model = PPO.load(os.path.join(dir, model_name_))
@@ -80,46 +74,8 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor(action))
                 
-                print(rew)
-
-
-
-                # Accumulate reward
-                # r += rew.cpu()
-                
-                # # Reset condition
-                # if terminated or truncated:
+                # print(rew)       
                     
-                #     # Increase episode
-                #     ep += 1
-
-                #     # Break if final episodes has been reached
-                #     if ep == args_cli.num_episodes: break
-
-                #     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
-        
-    #     # Compute mean reward
-    #     mean_rew = torch.mean(r).item() / args_cli.num_episodes
-
-    #     print(f" ------ Reward per episode: {mean_rew}")
-
-    #     # Create metric for one model
-    #     results[model_name] = {
-    #         "name": model_name,
-    #         "mean_reward" : mean_rew,
-    #     }
-
-
-    # # Serializing json
-    # json_object = json.dumps(results, indent=4)
-    
-    # saving_path = os.path.join(path_to_train, dir, "evaluation.json")
-
-    # # Writing to sample.json
-    # with open(saving_path, "w") as outfile:
-    #     outfile.write(json_object)                    
-                    
-
 
     env.close()
 
