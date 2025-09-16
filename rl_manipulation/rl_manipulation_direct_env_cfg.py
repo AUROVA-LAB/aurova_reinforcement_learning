@@ -132,7 +132,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     models = [["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
-              ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"]]
+              ["2025-05-06_18-49-55/model", "2025-09-12_10-23-50/model"]]
 
     # --- Mapping configuration ---
     DQ = 0
@@ -154,7 +154,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
-    grip_scaling = 5
+    grip_scaling = 3
 
     action_scaling = scalings[representation][mapping]
 
