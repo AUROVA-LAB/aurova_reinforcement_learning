@@ -117,7 +117,7 @@ class RLManipulationDirect(DirectRLEnv):
         map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],       [exp_stereo, log_stereo]],
                     [[identity_map, identity_map],],
                     [[identity_map, identity_map], [exp_quat_cayley, log_quat_cayley], [exp_quat_stereo, log_quat_stereo]],
-                    [[identity_map, identity_map], [exp_mat, log_mat]]]
+                    [[identity_map, identity_map], [exp_se3, log_se3]]]
 
         # List of conversions
         conversions = [[convert_dq_to_Lab, dq_from_tr], 
