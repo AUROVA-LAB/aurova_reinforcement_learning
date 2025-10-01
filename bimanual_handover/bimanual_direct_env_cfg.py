@@ -70,21 +70,13 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
 
-    # Variables to distinguish the phases
-    APPROACH = 0
-    MANIPULATION = 1
+    num_actions = 6 + 3            # Number of actions per environment (overridden)
+    num_observations = 7 + 7 +  3  # Number of observations per environment (overridden)
+    euler_flag = True              # Wether to use Euler angles or quaternions for the actions
 
-    phase = MANIPULATION       # Phase of the task (0: approach, 1: manipulation)
-    option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
-
-    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
-
-    num_actions = 6 + phase * 3           # Number of actions per environment (overridden)
-    num_observations = 7 + 7 + phase * 3  # Number of observations per environment (overridden)
-    euler_flag = True                     # Wether to use Euler angles or quaternions for the actions
-
+    # Simulation variables
     num_envs = 1                # Number of environments by default (overriden)
-
+    
     debug_markers = False        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False         # Activate image rendering
@@ -92,14 +84,16 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     velocity_limit = 10         # Velocity limit for robots' end effector
 
+    # Robot constants
     UR5e = 0
     GEN3 = 1
 
     keys = ['UR5e', 'GEN3']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame']
+    
+    # Random seed
     seed = 69
-
 
 
     # ---- Configurations ----
@@ -113,7 +107,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     robot_cfg_1: Articulation = UR5e_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e])
     robot_cfg_2: Articulation = GEN3_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[GEN3])
 
-    # Object
+    # Object (the comments correspond to other object configurations)
     object_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/Cuboid",
 
@@ -228,7 +222,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
-    ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],  #   0.63,0.28,-0.68,-0.26
+    ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272], 
                                       [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
@@ -239,21 +233,18 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
 
     # Increments in the original poses for sampling random values on each axis
-    # ee_pose_incs = torch.tensor([[-0.15,  0.15],
-    #                              [-0.15,  0.15],
-    #                              [-0.15,  0.15],
-    #                              [-0.3,  0.3],
-    #                              [-0.6,  0.6],
-    #                              [-0.3,  0.3]])
     ee_pose_incs = torch.tensor([[-0.15,  0.15],
                                  [-0.15,  0.15],
                                  [-0.15,  0.15],
-                                 [-0.0,  0.0],
-                                 [-0.0,  0.0],
-                                 [-0.0,  0.0]])
+                                 [-0.3,   0.3],
+                                 [-0.6,   0.6],
+                                 [-0.3,   0.3]])
     
     # Which robot apply the sampling poses
     apply_range = [True, False]
+
+    # Holder moves
+    move_holder = False
 
 
 
@@ -262,8 +253,6 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     obj_pos_trans = torch.tensor([0.0 - 0.075, -0.0335*2 - 0.075, 0.115])
 
     # Transform to quaternions
-    rot_45_z_neg_quat = rot2tensor(rot_45_z_neg)
-    rot_225_z_neg_quat = rot2tensor(rot_225_z_neg)
     rot_225_z_pos_quat = rot2tensor(rot_225_z_pos)
 
     # Aggregate rotations as quaternions
@@ -291,10 +280,6 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # reward scales
     rew_scale_hand_obj: float= 1.0
     rew_scale_obj_target: float= 12.0
-
-    # Position threshold for changing reach reward
-    rew_change_thres = 0.0235 # 0.018
-    obj_reach_target_thres = 0.01
 
     # Bonus for reaching the target
     bonus_obj_reach = 300
