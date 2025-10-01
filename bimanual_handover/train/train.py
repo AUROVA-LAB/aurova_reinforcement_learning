@@ -28,7 +28,7 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--train", type=bool, default=False, help="Wether to train or perform normal loop")
+parser.add_argument("--train", type=bool, default=True, help="Wether to train or perform normal loop")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -72,8 +72,8 @@ from omni.isaac.lab_tasks.utils.hydra import hydra_task_config
 from omni.isaac.lab_tasks.utils.wrappers.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 from train_utils import AddNoiseObservation
 
-# import wandb
-# from wandb.integration.sb3 import WandbCallback
+import wandb
+from wandb.integration.sb3 import WandbCallback
 
 from networks import *
 
@@ -81,7 +81,7 @@ from networks import *
 # directory for logging into
 path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/bimanual_handover/train"
 log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-# run = wandb.init(project="bim_hand_dani_julio", name=log_dir.split("/")[-1], sync_tensorboard=True)
+run = wandb.init(project="bim_hand_dani_julio", name=log_dir.split("/")[-1], sync_tensorboard=True)
 
 
 @hydra_task_config(args_cli.task, "sb3_cfg_entry_point")
@@ -157,7 +157,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create agent from stable baselines
     agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
-    # agent = SAC(policy = "MlpPolicy", env = env, verbose=1, **agent_cfg)
 
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
@@ -174,7 +173,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     else:
         obs = env.reset()
-        # agent = PPO.load("/workspace/isaaclab/source/logs/sb3/Isaac-UR5e-joint-reach-v0/2024-10-16_12-32-25/model_18960000_steps.zip", weights_only=True)
                              
         action = torch.rand((env_cfg.scene.num_envs, 6+4))
         action = torch.tensor([[0, 0, 0, 0, 0, 0, 
