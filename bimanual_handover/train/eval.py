@@ -60,7 +60,7 @@ def main():
 
     ep = 0
 
-    model_name_ = "model_599552000_steps.zip"
+    model_name_ =  "model_599552000_steps.zip"
     model_name2_ = "model_599552000_steps.zip"
 
     # Accumulated reward for all the episodes
@@ -73,17 +73,12 @@ def main():
     model2 = PPO.load(os.path.join(dir2, model_name2_))
     model2.policy.eval()
 
-    # print(f"\n\n{idx + 1}. Loading model: " + model_name_)
 
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         if ep == args_cli.num_episodes: break
 
-        
-
         print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
-
-        
 
         # Simulate physics
         while simulation_app.is_running():
@@ -95,31 +90,12 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor((action)))
                 
-                # Accumulate reward
-                # r += rew.cpu()
-                
-                # Reset condition
-                # if terminated.item() or truncated.item():
-                    
-                #     # Increase episode
-                #     ep += 1
-
-                #     # Break if final episodes has been reached
-                #     if ep == args_cli.num_episodes: break
-
-                #     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
-                
                 traj["distances"][-1].append(obs["dist"])
-                # traj["phase"][-1].append(obs["phase"])
 
                 # Reset condition
                 if terminated.item() or truncated.item():
-
-                    # print(traj["distances"][-1])
-                    # print(traj["phase"][-1])
                     
                     traj["distances"].append([])
-                    # traj["phase"].append([])
                     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
 
                     ep+=1
