@@ -70,9 +70,6 @@ class CustomMlpExtractor(MlpExtractor):
 # Define a custom policy
 class CustomActorCriticPolicy(ActorCriticPolicy):
     def __init__(self, observation_space, action_space, lr_schedule, net_arch=None, **kwargs):
-        
-        # Extract the arguments for the phase filtering
-        my_kwargs = kwargs.pop("my_kwargs")
 
         super(CustomActorCriticPolicy, self).__init__(
             observation_space,
