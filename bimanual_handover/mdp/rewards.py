@@ -6,158 +6,151 @@
 from __future__ import annotations
 
 import torch
-from typing import TYPE_CHECKING
-
-from omni.isaac.lab.assets import RigidObject
-from omni.isaac.lab.managers import SceneEntityCfg
-from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms, quat_error_magnitude, quat_mul
-
 from .dq import dq_distance, q_mul
 
-if TYPE_CHECKING:
-    from omni.isaac.lab.envs import ManagerBasedRLEnv
+from omni.isaac.lab.utils.math import euler_xyz_from_quat, matrix_from_quat
+from math import pi
 
 
-def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Penalize tracking of the position error using L2-norm.
+# Compute error as a dual quaternion distance
+def dual_quaternion_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pose1 / pose2 - torch.Tensor(N, 7): poses to compute the distance in translation(3) + rotation in quaternions(4).
+        - device - str: Device into which the environment is stored.
 
-    The function computes the position error between the desired position (from the command) and the
-    current position of the asset's body (in world frame). The position error is computed as the L2-norm
-    of the difference between the desired and current positions.
-    """
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    # Gets the asset: the robot
-
-    command = env.command_manager.get_command(command_name)
-    # Gets the command in the local frame
-
-    # obtain the desired and current positions
-    des_pos_b = command[:, :3]
-    # Position part from the command in the local frame
-
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_state_w[:, :3], asset.data.root_state_w[:, 3:7], des_pos_b)
-    # Converts the desired pose in the robot frame to the world frame
-    # asset.data.root_state_w --> Robot base/root position in world frame
-    # des_pos_b --> frame of the desired pose in local frame -> frame that is transformed
-
-    curr_pos_w = asset.data.body_state_w[:, asset_cfg.body_ids[0], :3]  # type: ignore
-    # Obtains the current position in the world frame 
-    # asset.data.body_state_w --> obtains the world pose of all bodies of the asset. 
-    #      This command obtains the world position of the selected body (ee_link)
-    # asset_cfg.body_ids --> list of body IDs passed as numbers
-
-
-    return torch.norm(curr_pos_w - des_pos_w, dim=1)
-    # Gets the position error
-
-# THIS FUNCTION IS SIMILAR TO THE PREVIOUS ONE, although the hyperbolic function is applied to limit the reward
-def position_command_error_tanh(
-    env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg
-) -> torch.Tensor:
-    """Reward tracking of the position using the tanh kernel.
-
-    The function computes the position error between the desired position (from the command) and the
-    current position of the asset's body (in world frame) and maps it with a tanh kernel.
-    """
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    command = env.command_manager.get_command(command_name)
-    # obtain the desired and current positions
-    des_pos_b = command[:, :3]
-    des_pos_w, _ = combine_frame_transforms(asset.data.root_state_w[:, :3], asset.data.root_state_w[:, 3:7], des_pos_b)
-    curr_pos_w = asset.data.body_state_w[:, asset_cfg.body_ids[0], :3]  # type: ignore
-    distance = torch.norm(curr_pos_w - des_pos_w, dim=1)
-    return 1 - torch.tanh(distance / std)
-
-def orientation_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Penalize tracking orientation error using shortest path.
-
-    The function computes the orientation error between the desired orientation (from the command) and the
-    current orientation of the asset's body (in world frame). The orientation error is computed as the shortest
-    path between the desired and current orientations.
-    """
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    # Gets the asset: the robot
-
-    command = env.command_manager.get_command(command_name)
-    # Gets the command in the local frame
-
-    # obtain the desired and current orientations
-    des_quat_b = command[:, 3:7]
-    # Orientation part of the command in the local frame
-
-    des_quat_w = quat_mul(asset.data.root_state_w[:, 3:7], des_quat_b)
-    # Transforms the desired obervation in the local frame to the global frame
-    # asset.data.root_state_w -> Robot base/root position in world frame
-
-    curr_quat_w = asset.data.body_state_w[:, asset_cfg.body_ids[0], 3:7]  # type: ignore
-    # Obtains the current orientation of the selected body in the global frame
-
-    return quat_error_magnitude(curr_quat_w, des_quat_w)
-    # Error computation usign quaternions
-
-def dual_quaternion_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.tensor:
-
-    # extract the asset (to enable type hinting)
-    asset: RigidObject = env.scene[asset_cfg.name]
-    # Gets the asset: the robot
-
-    command = env.command_manager.get_command(command_name)
-    des_pos_b = command[:,:3]
-    des_or_b = command[:, 3:7]
-    # Gets the command in the local frame
-    # command --> frame of the desired pose in local frame
-
-    curr_pose_w = asset.data.body_state_w[:,asset_cfg.body_ids[0], :7]
-    
-    # Obtains the current position in the world frame 
-
-    base_pose = asset.data.root_state_w[:, :7]
-    # Pose of the base
-    # asset.data.root_state_w --> Robot base/root position in world frame
-
-    # des_pos_w, des_or_w = combine_frame_transforms(base_pose[:,:3], base_pose[:,:7], command[:,:3], command[:,:7])
-    # Converts the desired pose in the robot frame to the world frame
-
-    curr_pos_b, curr_or_b = subtract_frame_transforms(base_pose[:,:3], base_pose[:,3:7], curr_pose_w[:,:3], curr_pose_w[:,3:7])
-    # Converts the current position in the world frame to the robot frame
-    # The current is in the world frame. Then it has to be converted to the base frame, so the ...
-    #    ... inverse of the base frame is used.
-    # It is the inverse operation of the "position_command_error" function.
-
-    curr_pos_b = trans2q(pos = curr_pos_b, device = env.device)
-    des_pos_b = trans2q(pos = des_pos_b, device = env.device)
-    # Convert position to simple quaternion
-
-    curr_dq = pose2dq(pos = curr_pos_b, orient = curr_or_b)
-    des_dq = pose2dq(pos = des_pos_b, orient = des_or_b)
+    Out:
+        - distance - torch.Tensor(N, 3): distance[:, 0] in dual quaternions, translation module[:, 1] and rotation module[:, 2].
+    '''
     # Convert position and orientation (pose) to dual quaternion
+    pose1_dq = pose2dq(pose = pose1, device = device)
+    pose2_dq = pose2dq(pose = pose2, device = device)
 
-    distance, translation_mod, orientation_mod = dq_distance(des_dq, curr_dq)
     # Compute dual quaternion distance
+    distance = dq_distance(pose2_dq, pose1_dq)
         
     return distance
+
+# Compute error as a dual quaternion distance
+def cartesian_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pose1 / pose2 - torch.Tensor(N, 7): poses to compute the distance in translation(3) + rotation in quaternions(4).
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - distance - torch.Tensor(N, 3): distance[:, 0] in translation and Euler angles, translation module[:, 1] and rotation module[:, 2].
+    '''
+    # Convert position and orientation (pose) to dual quaternion
+    pos_1, pos_2 = pose1[:, :3], pose2[:, :3]
+
+    r1, p1, y1 = euler_xyz_from_quat(quat = pose1[:, 3:])
+    r2, p2, y2 = euler_xyz_from_quat(quat = pose2[:, 3:])
+
+    euler_1 = torch.cat((r1.unsqueeze(-1), p1.unsqueeze(-1), y1.unsqueeze(-1)), dim=-1).to(device)
+    euler_2 = torch.cat((r2.unsqueeze(-1), p2.unsqueeze(-1), y2.unsqueeze(-1)), dim=-1).to(device)
+    
+    # euler_1 = torch.tensor(euler_1).to(device)
+    # euler_2 = torch.tensor(euler_2).to(device)
+
+    euler_1 = torch.where(euler_1 > 0.0, euler_1, -euler_1)
+    euler_2 = torch.where(euler_2 > 0.0, euler_2, -euler_2)
+
+    t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.46
+    r_dist = (euler_1 - euler_2).norm(dim = -1) / 3.1
+
+    distance = t_dist + r_dist
+        
+    return torch.cat((distance.unsqueeze(-1), t_dist.unsqueeze(-1), r_dist.unsqueeze(-1)), dim = -1)
+
+
+def SE3_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pose1 / pose2 - torch.Tensor(N, 7): poses to compute the distance in translation(3) + rotation in quaternions(4).
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - distance - torch.Tensor(N, 3): distance[:, 0] in SE(3), translation module[:, 1] and rotation module[:, 2].
+    '''
+
+    pos_1, pos_2 = pose1[:, :3], pose2[:, :3]
+
+    R1 = matrix_from_quat(quaternions = pose1[:, 3:])
+    R2 = matrix_from_quat(quaternions = pose2[:, 3:])
+
+    R_diff = torch.matmul(torch.transpose(R1, -1, -2), R2)
+    trace_diff = R_diff[:, 0, 0] + R_diff[:, 1, 1] + R_diff[:, 2, 2]
+
+    t_dist = (pos_1 - pos_2).norm(dim = -1) / 0.46
+    
+    r_dist = torch.abs(torch.acos(torch.clamp((trace_diff - 1) / 2, -1.0, 1.0))) / pi
+
+    distance = t_dist + r_dist
+        
+    return torch.cat((distance.unsqueeze(-1), t_dist.unsqueeze(-1), r_dist.unsqueeze(-1)), dim = -1)
 
 
 ##
 # UTILS
 ##
 
-def pose2dq(pos: torch.tensor, orient: torch.tensor) -> torch.tensor:
+# Transforms a pose / frame into a dual quaternion
+def pose2dq(pose: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pose - torch.Tensor(N, 7): pose to be converted into a dual quaternion in translation(3) + rotation in quaternions(4).
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - return - torch.Tensor(N, 8): frame represented as a dual quaternion.
+    '''
+
+    # Separate position and orientation
+    pos = pose[:, :3]
+    orient = pose[:, 3:]
+
+    # Converts position to a simple quaternion
+    pos = trans2q(pos = pos, device = device)
 
     # Shape comprobation
     assert pos.shape[-1] == 4
     assert orient.shape[-1] == 4
 
-    # From translation and orientation to DQ
-    return torch.cat((orient, 0.5 * q_mul(orient, pos)), dim = 1)
 
-def trans2q(pos: torch.tensor, device: str) -> torch.tensor:
+
+
+
+
+
+
+# TODO: poner pos*orient que esta bien
+
+
+
+
+
+
+
+
+
+    # From translation and orientation to DQ
+    return torch.cat((orient, 0.5 * q_mul(orient, pos)), dim = -1)
+
+
+# Transforms a linear translation to simple quaternion
+def trans2q(pos: torch.Tensor, device: str) -> torch.Tensor:
+    '''
+    In:
+        - pos - torch.Tensor(N, 3): position to be converted into a simple quaternion.
+        - device - str: Device into which the environment is stored.
+
+    Out:
+        - return - torch.Tensor(N, 4): translation represented as a simple quaternion.
+    '''
 
     # Shape comprobation
     assert pos.shape[-1] == 3
 
     # Add zero to the imaginary part of the translation quaternion
-    return torch.cat((torch.zeros((pos.size()[0], 1)).to(device), pos), dim=1)
+    return torch.cat((torch.zeros((pos.size()[0], 1)).to(device), pos), dim = -1)
