@@ -213,7 +213,7 @@
       -->
     <origin rpy="0 0 3.141592653589793" xyz="0 0 0"/>
   </joint>
-  <joint name="shoulder_pan_joint" type="revolute">
+  <joint name="arm_shoulder_pan_joint" type="revolute">
     <parent link="base_link_inertia"/>
     <child link="shoulder_link"/>
     <origin rpy="0 0 0" xyz="0 0 0.1625"/>
@@ -221,7 +221,7 @@
     <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="shoulder_lift_joint" type="revolute">
+  <joint name="arm_shoulder_lift_joint" type="revolute">
     <parent link="shoulder_link"/>
     <child link="upper_arm_link"/>
     <origin rpy="1.570796327 0 0" xyz="0 0 0"/>
@@ -229,7 +229,7 @@
     <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="elbow_joint" type="revolute">
+  <joint name="arm_elbow_joint" type="revolute">
     <parent link="upper_arm_link"/>
     <child link="forearm_link"/>
     <origin rpy="0 0 0" xyz="-0.425 0 0"/>
@@ -237,7 +237,7 @@
     <limit effort="150.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_1_joint" type="revolute">
+  <joint name="arm_wrist_1_joint" type="revolute">
     <parent link="forearm_link"/>
     <child link="wrist_1_link"/>
     <origin rpy="0 0 0" xyz="-0.3922 0 0.1333"/>
@@ -245,7 +245,7 @@
     <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_2_joint" type="revolute">
+  <joint name="arm_wrist_2_joint" type="revolute">
     <parent link="wrist_1_link"/>
     <child link="wrist_2_link"/>
     <origin rpy="1.570796327 0 0" xyz="0 -0.0997 -2.044881182297852e-11"/>
@@ -253,7 +253,7 @@
     <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
     <dynamics damping="0" friction="0"/>
   </joint>
-  <joint name="wrist_3_joint" type="continuous">
+  <joint name="arm_wrist_3_joint" type="continuous">
     <parent link="wrist_2_link"/>
     <child link="wrist_3_link"/>
     <origin rpy="1.570796326589793 3.141592653589793 3.141592653589793" xyz="0 0.0996 -2.042830148012698e-11"/>
@@ -424,7 +424,7 @@
     <child link="camera_link"/>
   </joint>
 
-  <link name="palm_link">
+  <link name="hand_palm_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/base_link_left.obj"/>
@@ -454,7 +454,7 @@
   <!-- FINGERS -->
   <!-- RIGHT HAND due to which finger is number 0 -->
   <!-- for LEFT HAND switch the sign of the **offset_origin_y** and **finger_angle_r** parameters-->
-  <link name="link_0.0">
+  <link name="hand_link_0.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -476,11 +476,11 @@
   <joint name="joint_0.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_0.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_0.0_link"/>
     <origin rpy="0.08726646255 0 0" xyz="0 -0.0435 -0.001542"/>
   </joint>
-  <link name="link_1.0">
+  <link name="hand_link_1.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -502,11 +502,34 @@
   <joint name="joint_1.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_0.0"/>
-    <child link="link_1.0"/>
+    <parent link="hand_link_0.0_link"/>
+    <child link="hand_link_1.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_2.0">
+
+  <link name="finger_1_contact_1">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_1.0_link"/>
+    <child link="finger_1_contact_1"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
+  <link name="hand_link_2.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -528,11 +551,34 @@
   <joint name="joint_2.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_1.0"/>
-    <child link="link_2.0"/>
+    <parent link="hand_link_1.0_link"/>
+    <child link="hand_link_2.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_3.0">
+
+  <link name="finger_1_contact_2">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_2.0_link"/>
+    <child link="finger_1_contact_2"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
+  <link name="hand_link_3.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -554,11 +600,34 @@
   <joint name="joint_3.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_2.0"/>
-    <child link="link_3.0"/>
+    <parent link="hand_link_2.0_link"/>
+    <child link="hand_link_3.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_3.0_tip">
+
+  <!-- <link name="finger_1_contact_3">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_3" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link"/>
+    <child link="finger_1_contact_3"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
+  <link name="hand_link_3.0_link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -580,12 +649,35 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_3.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_3.0"/>
-    <child link="link_3.0_tip"/>
+  <joint name="joint_3.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link"/>
+    <child link="hand_link_3.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
-  <link name="link_4.0">
+
+  <link name="finger_1_contact_3_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_1_contact2_3_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_3.0_link_tip_link"/>
+    <child link="finger_1_contact_3_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link name="hand_link_4.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -607,11 +699,11 @@
   <joint name="joint_4.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_4.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_4.0_link"/>
     <origin rpy="0.0 0 0" xyz="0 0 0.0007"/>
   </joint>
-  <link name="link_5.0">
+  <link name="hand_link_5.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -633,11 +725,34 @@
   <joint name="joint_5.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_4.0"/>
-    <child link="link_5.0"/>
+    <parent link="hand_link_4.0_link"/>
+    <child link="hand_link_5.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_6.0">
+
+  <link name="finger_2_contact_5">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact5_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_5.0_link"/>
+    <child link="finger_2_contact_5"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
+  <link name="hand_link_6.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -659,11 +774,34 @@
   <joint name="joint_6.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_5.0"/>
-    <child link="link_6.0"/>
+    <parent link="hand_link_5.0_link"/>
+    <child link="hand_link_6.0_link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_7.0">
+
+  <link name="finger_2_contact_6">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact6_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_6.0_link"/>
+    <child link="finger_2_contact_6"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
+  <link name="hand_link_7.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -684,11 +822,34 @@
   <joint name="joint_7.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_6.0"/>
-    <child link="link_7.0"/>
+    <parent link="hand_link_6.0_link"/>
+    <child link="hand_link_7.0_link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_7.0_tip">
+
+  <!-- <link name="finger_2_contact_7">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact2_7" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link"/>
+    <child link="finger_2_contact_7"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
+  <link name="hand_link_7.0_link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -709,12 +870,35 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_7.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_7.0"/>
-    <child link="link_7.0_tip"/>
+  <joint name="joint_7.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link"/>
+    <child link="hand_link_7.0_link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
-  <link name="link_8.0">
+
+  <link name="finger_2_contact_7_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_2_contact2_7_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_7.0_link_tip_link"/>
+    <child link="finger_2_contact_7_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link name="hand_link_8.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_0.0.obj"/>
@@ -736,11 +920,11 @@
   <joint name="joint_8.0" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_8.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_8.0_link"/>
     <origin rpy="-0.08726646255 0 0" xyz="0 0.0435 -0.001542"/>
   </joint>
-  <link name="link_9.0">
+  <link name="hand_link_9.0_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_1.0.obj"/>
@@ -762,11 +946,34 @@
   <joint name="joint_9.0" type="revolute">
     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
     <axis xyz="0 1 0"/>
-    <parent link="link_8.0"/>
-    <child link="link_9.0"/>
+    <parent link="hand_link_8.0_link"/>
+    <child link="hand_link_9.0_link"/>
     <origin xyz="0 0 0.0164"/>
   </joint>
-  <link name="link_10.0">
+
+  <link name="finger_3_contact_9">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact9_1" type="fixed" dont_collapse="true">
+    <parent link="hand_link_9.0_link"/>
+    <child link="finger_3_contact_9"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0275"/>
+  </joint>
+
+  <link name="hand_link_10._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_2.0.obj"/>
@@ -788,11 +995,34 @@
   <joint name="joint_10.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
-    <parent link="link_9.0"/>
-    <child link="link_10.0"/>
+    <parent link="hand_link_9.0_link"/>
+    <child link="hand_link_10._link"/>
     <origin xyz="0 0 0.054"/>
   </joint>
-  <link name="link_11.0">
+
+  <link name="finger_3_contact_10">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.017 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact10_2" type="fixed" dont_collapse="true">
+    <parent link="hand_link_10._link"/>
+    <child link="finger_3_contact_10"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.0325"/>
+  </joint>
+
+  <link name="hand_link_11._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_3.0.obj"/>
@@ -813,11 +1043,34 @@
   <joint name="joint_11.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
-    <parent link="link_10.0"/>
-    <child link="link_11.0"/>
+    <parent link="hand_link_10._link"/>
+    <child link="hand_link_11._link"/>
     <origin xyz="0 0 0.0384"/>
   </joint>
-  <link name="link_11.0_tip">
+
+  <!-- <link name="finger_3_contact_11">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact2_11" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link"/>
+    <child link="finger_3_contact_11"/>
+    <origin rpy="0 0 0" xyz="0.01 0 -0.005"/>
+  </joint> -->
+
+  <link name="hand_link_11._link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -838,13 +1091,36 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_11.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_11.0"/>
-    <child link="link_11.0_tip"/>
+  <joint name="joint_11.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link"/>
+    <child link="hand_link_11._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.03"/>
   </joint>
+
+  <link name="finger_3_contact_11_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_3_contact2_11_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_11._link_tip_link"/>
+    <child link="finger_3_contact_11_tip"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
   <!-- THUMB -->
-  <link name="link_12.0">
+  <link name="hand_link_12._link">
     <visual>
       <geometry>
         <!-- RIGHT -->
@@ -863,7 +1139,7 @@
       <!-- RIGHT -->
       <!-- <origin rpy="0 0 0" xyz="-0.0179 0.009 0.0145"/> -->
       <!-- LEFT -->
-      <origin rpy="0 0 0" xyz="${-0.0358/2+0.0} ${-.018/2} ${.029/2}"/>
+      <origin rpy="0 0 0" xyz="-0.0179 -0.09 0.145"/>
     </collision>
     <inertial>
       <mass value="0.0176"/>
@@ -874,11 +1150,11 @@
   <joint name="joint_12.0" type="revolute">
     <axis xyz="1 0 0"/>
     <limit effort="0.35" lower="0.263" upper="1.396" velocity="6.283"/>
-    <parent link="palm_link"/>
-    <child link="link_12.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_link_12._link"/>
     <origin rpy="0 -1.65806278845 1.5707963259" xyz="-0.0182 -0.019333 -0.045987"/>
   </joint>
-  <link name="link_13.0">
+  <link name="hand_link_13._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_13.0.obj"/>
@@ -902,14 +1178,14 @@
   <joint name="joint_13.0" type="revolute">
     <axis xyz="0 0 -1"/>
     <limit effort="0.35" lower="-0.105" upper="1.163" velocity="6.283"/>
-    <parent link="link_12.0"/>
-    <child link="link_13.0"/>
+    <parent link="hand_link_12._link"/>
+    <child link="hand_link_13._link"/>
     <!-- LEFT -->
     <origin xyz="-0.027 -0.005 0" rpy="0 0 -1.57"/> <!-- -0.027 -0.005 -0.0399 -->
     <!-- RIGHT -->
     <!-- <origin xyz="-0.027 0.005 0.0399"/> -->
   </joint>
-  <link name="link_14.0">
+  <link name="hand_link_14._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_14.0.obj"/>
@@ -932,11 +1208,34 @@
   <joint name="joint_14.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.189" upper="1.644" velocity="6.283"/>
-    <parent link="link_13.0"/>
-    <child link="link_14.0"/>
+    <parent link="hand_link_13._link"/>
+    <child link="hand_link_14._link"/>
     <origin xyz="0 0 0.0177"/>
   </joint>
-  <link name="link_15.0">
+
+<link name="finger_4_contact_14">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.0375"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_14" type="fixed" dont_collapse="true">
+    <parent link="hand_link_14._link"/>
+    <child link="finger_4_contact_14"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.005"/>
+  </joint>
+
+  <link name="hand_link_15._link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/link_15.0.obj"/>
@@ -959,11 +1258,34 @@
   <joint name="joint_15.0" type="revolute">
     <axis xyz="0 1 0"/>
     <limit effort="0.35" lower="-0.162" upper="1.719" velocity="6.283"/>
-    <parent link="link_14.0"/>
-    <child link="link_15.0"/>
+    <parent link="hand_link_14._link"/>
+    <child link="hand_link_15._link"/>
     <origin xyz="0 0 0.0514"/>
   </joint>
-  <link name="link_15.0_tip">
+
+  <link name="finger_4_contact_15">
+    <visual>
+      <geometry>
+        <box size="0.00125 0.022 0.035"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00125 0.022 0.035"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_15" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link"/>
+    <child link="finger_4_contact_15"/>
+    <origin rpy="0 0 0" xyz="0.01 0 0.005"/>
+  </joint>
+
+  <link name="hand_link_15._link_tip_link">
     <visual>
       <geometry>
         <mesh filename="./../meshes/allegro/meshes/allegro/digit.obj"/>
@@ -984,14 +1306,38 @@
       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
     </inertial>
   </link>
-  <joint name="joint_15.0_tip" type="fixed" dont_collapse="true">
-    <parent link="link_15.0"/>
-    <child link="link_15.0_tip"/>
+  <joint name="joint_15.0_tip_link" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link"/>
+    <child link="hand_link_15._link_tip_link"/>
     <origin rpy="0 0 0" xyz="0.02 0 0.0455"/>
   </joint>
+
+  <link name="finger_4_contact_15_tip">
+    <visual>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.00075 0.02 0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="finger_4_contact2_15_tip" type="fixed" dont_collapse="true">
+    <parent link="hand_link_15._link_tip_link"/>
+    <child link="finger_4_contact_15_tip"/>
+    <origin rpy="0 0 0" xyz="0.0 0 0.0"/>
+  </joint>
+
+
   <joint name="palm_2_ur" type="fixed" dont_collapse="true">
     <parent link="ee_link"/>
-    <child link="palm_link"/>
+    <child link="hand_palm_link"/>
     <origin rpy="0 0 5.5" xyz="0.0 0 0.1175"/>
   </joint>
   
