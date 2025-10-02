@@ -1,7 +1,6 @@
 import gymnasium as gym
 
 from .bimanual_direct_env_cfg import BimanualDirectCfg
-from .bimanual_direct_env_joint_cfg import BimanualDirectJointCfg
 from . import agents
 
 

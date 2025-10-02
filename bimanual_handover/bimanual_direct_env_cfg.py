@@ -311,8 +311,8 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
 
-    cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
-    cfg.rot_225_z_neg_quat = cfg.rot_225_z_neg_quat.repeat(num_envs, 1).to(device)
+    # cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
+    # cfg.rot_225_z_neg_quat = cfg.rot_225_z_neg_quat.repeat(num_envs, 1).to(device)
     cfg.rot_225_z_pos_quat = cfg.rot_225_z_pos_quat.repeat(num_envs, 1).to(device)
 
     cfg.tips_displacement = cfg.tips_displacement.repeat(num_envs, 1).to(device)
