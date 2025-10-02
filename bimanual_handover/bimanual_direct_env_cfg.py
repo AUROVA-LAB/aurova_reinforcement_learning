@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+'''
+                    ############## IMPORTANT #################
+   The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
+   These two variables (cfg.UR5e and cfg.GEN3) serve as an abstraction to treat the robots during the episodes. In fact,
+all the methods need an index to differentiate from which robot get the information.
+   Also, data storage is performed using lists, not tensors because the joint space of the robots is
+different from one another.
+'''
+
 import os
 from math import pi
 import torch
@@ -7,8 +16,11 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.bimanual_handover.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, GEN3_4f_CFG
 from .mdp.utils import compute_rewards, save_images_grid
+# from aux import *
+
+# source/omni.isaac.lab_tasks/omni.isaac.lab_tasks
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -22,6 +34,8 @@ from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.markers import VisualizationMarkersCfg
 from omni.isaac.lab.assets import RigidObjectCfg
 
+
+
 '''
                     ############## IMPORTANT #################
    The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
@@ -30,7 +44,6 @@ all the methods need an index to differentiate from which robot get the informat
    Also, data storage is performed using lists, not tensors because the joint space of the robots is
 different from one another.
 '''
-
 
 # Function to change a Euler angles to a quaternion as a tensor
 def rot2tensor(rot: Rotation) -> torch.tensor:
@@ -51,12 +64,6 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     
     return rot_tensor_quat
 
-# Rotations respecto to the end effector robot link frame for object spawning
-rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
-rot_225_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 225 degrees rotation in Z axis 
-rot_225_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1])) # Positive 225 degrees rotation in Z axis
-rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
-
 
 # Configuration class for the environment
 @configclass
@@ -67,7 +74,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 200             # Maximum steps in an episode
     angle_scale = 8.5*pi/180.0    # Action angle scalation
-    translation_scale = torch.tensor([0.02, 0.02, 0.02]) # Action translation scalation
+    translation_scale = [0.02, 0.02, 0.02] # Action translation scalation
     hand_joint_scale = 0.075    # Hand joint scalation
 
     num_actions = 6 + 3            # Number of actions per environment (overridden)
@@ -202,7 +209,7 @@ class BimanualDirectCfg(DirectRLEnvCfg):
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]]  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
     
     # Displacement from the tips
-    tips_displacement = torch.tensor([0.03, -0.03, 0.0])
+    tips_displacement = [0.03, -0.03, 0.0]
 
     # All joint names
     all_joints = [[], []]
@@ -216,23 +223,29 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     contact_sensors_dict = {}
 
     # Contact matrix for weight the contacts
-    contact_matrix = torch.tensor([[0.0]])
+    contact_matrix = [[0.0]]
 
 
 
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
+
     ee_init_pose_quat = torch.tensor([[-0.5144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272], 
                                       [0.2954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877]])
     
     # Obtain Euler angles from the quaternion
-    r, p, y = euler_xyz_from_quat(ee_init_pose_quat[:, 3:])
-    euler = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim=-1)
+    r, p, y = euler_xyz_from_quat(torch.tensor(ee_init_pose_quat)[:, 3:])
+    
+    euler = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim=-1).numpy().tolist()
+    r = r.numpy().tolist()
+    p = p.numpy().tolist()
+    y = y.numpy().tolist()
 
     # Initial pose using Euler angles
-    ee_init_pose = torch.cat((ee_init_pose_quat[:,:3], euler), dim = -1)
+    ee_init_pose = torch.cat((torch.tensor(ee_init_pose_quat)[:,:3], torch.tensor(euler)), dim = -1).numpy().tolist()
 
     # Increments in the original poses for sampling random values on each axis
+
     ee_pose_incs = torch.tensor([[-0.15,  0.15],
                                  [-0.15,  0.15],
                                  [-0.15,  0.15],
@@ -250,7 +263,20 @@ class BimanualDirectCfg(DirectRLEnvCfg):
 
     # ---- Object poses ----
     # Traslation respect to the end effector robot link frame for object spawning
-    obj_pos_trans = torch.tensor([0.0 - 0.075, -0.0335*2 - 0.075, 0.115])
+    obj_pos_trans = [0.0 - 0.075, -0.0335*2 - 0.075, 0.115]
+    
+
+    
+
+
+    # Rotations respecto to the end effector robot link frame for object spawning
+    rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
+    rot_225_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 225 degrees rotation in Z axis 
+    rot_225_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1])) # Positive 225 degrees rotation in Z axis
+    rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+
+
+
 
     # Transform to quaternions
     rot_225_z_pos_quat = rot2tensor(rot_225_z_pos)
@@ -262,17 +288,21 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     #    but for IsaacLab it needs to be in [0] position 
     obj_quat_trans = torch.zeros((4))
     obj_quat_trans[0], obj_quat_trans[1:] = rot_quat[-1].clone(), rot_quat[:3].clone()
+
     
     # Height limits for the object and the GEN3 robot
-    object_height_limit = ee_init_pose_quat[0, 2] + ee_pose_incs[0, 0] - 0.25 # = 0.35
+    object_height_limit = ee_init_pose_quat[0][2] + ee_pose_incs[0][0] - 0.25 # = 0.35
     gen3_height_limit = 0.1
     
     # Translation respect to the object link frame for object grasping point observation
-    grasp_obs_obj_pos_trans = torch.tensor([0.0, 0.0, 0.175])
-    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos)
+    grasp_obs_obj_pos_trans = [0.0, 0.0, 0.175]
+    grasp_obs_obj_quat_trans = rot2tensor(rot_90_x_pos).numpy().tolist()
 
     # Target position for the object -> origin GEN3 position with offset in X axis
-    target_pose = torch.tensor([0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873])
+    target_pose = [0.1054, -0.0250, 0.5662, -0.2845, -0.6176, -0.2554, -0.6873]
+
+    rot_quat = None
+    obj_quat_trans = obj_quat_trans.numpy().tolist()
     
     
 
@@ -284,8 +314,10 @@ class BimanualDirectCfg(DirectRLEnvCfg):
     # Bonus for reaching the target
     bonus_obj_reach = 300
 
-
-
+    rot_45_z_neg = None       # Negative 45 degrees rotation in Z axis 
+    rot_225_z_neg = None     # Negative 225 degrees rotation in Z axis 
+    rot_225_z_pos = None # Positive 225 degrees rotation in Z axis
+    rot_90_x_pos = None
 
 
 # Function to update the variables in the configuration class
@@ -301,27 +333,23 @@ def update_cfg(cfg, num_envs, device):
         - cfg - BimanualDirectCfg: modified configuration class
     '''
 
-    cfg.translation_scale = cfg.translation_scale.to(device)
+    cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
-    cfg.obj_pos_trans = cfg.obj_pos_trans.repeat(num_envs, 1).to(device)
-    cfg.obj_quat_trans = cfg.obj_quat_trans.repeat(num_envs, 1).to(device)
+    cfg.obj_pos_trans = torch.tensor(cfg.obj_pos_trans).repeat(num_envs, 1).to(device)
+    cfg.obj_quat_trans = torch.tensor(cfg.obj_quat_trans).repeat(num_envs, 1).to(device)
 
-    cfg.grasp_obs_obj_pos_trans = cfg.grasp_obs_obj_pos_trans.repeat(num_envs, 1).to(device)
-    cfg.grasp_obs_obj_quat_trans = cfg.grasp_obs_obj_quat_trans.repeat(num_envs, 1).to(device)
+    cfg.grasp_obs_obj_pos_trans = torch.tensor(cfg.grasp_obs_obj_pos_trans).repeat(num_envs, 1).to(device)
+    cfg.grasp_obs_obj_quat_trans = torch.tensor(cfg.grasp_obs_obj_quat_trans).repeat(num_envs, 1).to(device)
 
-    cfg.target_pose = cfg.target_pose.repeat(num_envs, 1).to(device)
-
-    # cfg.rot_45_z_neg_quat = cfg.rot_45_z_neg_quat.repeat(num_envs, 1).to(device)
-    # cfg.rot_225_z_neg_quat = cfg.rot_225_z_neg_quat.repeat(num_envs, 1).to(device)
+    cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+    
     cfg.rot_225_z_pos_quat = cfg.rot_225_z_pos_quat.repeat(num_envs, 1).to(device)
 
-    cfg.tips_displacement = cfg.tips_displacement.repeat(num_envs, 1).to(device)
+    cfg.tips_displacement = torch.tensor(cfg.tips_displacement).repeat(num_envs, 1).to(device)
 
-    cfg.contact_matrix = cfg.contact_matrix.to(device)
+    cfg.contact_matrix = torch.tensor(cfg.contact_matrix).to(device)
     
     return cfg
-
-
 
 
 # Add the collision sensors to the configuration class according to the number of environments

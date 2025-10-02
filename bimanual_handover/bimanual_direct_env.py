@@ -24,6 +24,7 @@ from omni.isaac.lab.markers import VisualizationMarkers
 from omni.isaac.lab.assets import RigidObject
 
 
+
 '''
                     ############## IMPORTANT #################
    The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
@@ -584,13 +585,14 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
+
         hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
 
         # Dual quaternion distance between GEN3 back hand and object
         hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
 
         # Dual quaternion distance between object and target pose
-        obj_target_dist = dual_quaternion_error(obj_pose, target_pose, device)
+        obj_target_dist = quat_error(obj_pose, target_pose, device)
 
         # Distance between hand tips of the robots
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)

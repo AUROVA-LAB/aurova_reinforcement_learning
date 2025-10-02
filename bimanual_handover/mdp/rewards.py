@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import torch
-from .dq import dq_distance, q_mul
+from .dq import dq_distance, q_mul, q_conjugate
+
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
 
 from omni.isaac.lab.utils.math import euler_xyz_from_quat, matrix_from_quat
 from math import pi
@@ -39,6 +41,7 @@ def cartesian_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> to
         - device - str: Device into which the environment is stored.
 
     Out:
+
         - distance - torch.Tensor(N, 3): distance[:, 0] in translation and Euler angles, translation module[:, 1] and rotation module[:, 2].
     '''
     # Convert position and orientation (pose) to dual quaternion
@@ -49,9 +52,6 @@ def cartesian_error(pose1: torch.Tensor, pose2: torch.Tensor, device: str) -> to
 
     euler_1 = torch.cat((r1.unsqueeze(-1), p1.unsqueeze(-1), y1.unsqueeze(-1)), dim=-1).to(device)
     euler_2 = torch.cat((r2.unsqueeze(-1), p2.unsqueeze(-1), y2.unsqueeze(-1)), dim=-1).to(device)
-    
-    # euler_1 = torch.tensor(euler_1).to(device)
-    # euler_2 = torch.tensor(euler_2).to(device)
 
     euler_1 = torch.where(euler_1 > 0.0, euler_1, -euler_1)
     euler_2 = torch.where(euler_2 > 0.0, euler_2, -euler_2)
@@ -116,22 +116,6 @@ def pose2dq(pose: torch.Tensor, device: str) -> torch.Tensor:
     # Shape comprobation
     assert pos.shape[-1] == 4
     assert orient.shape[-1] == 4
-
-
-
-
-
-
-
-
-# TODO: poner pos*orient que esta bien
-
-
-
-
-
-
-
 
 
     # From translation and orientation to DQ
