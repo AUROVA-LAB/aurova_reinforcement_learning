@@ -151,13 +151,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             clip_reward=np.inf,
         )
 
-    # Add environment arguments to the arguments for the policy
-    agent_cfg["policy_kwargs"]["my_kwargs"] = {"option": env_cfg.option, "phase": env_cfg.phase, "APPROACH": env_cfg.APPROACH, "MANIPULATION": env_cfg.MANIPULATION, "path": env_cfg.path_to_pretrained}
-    agent_cfg["policy_kwargs"]["my_kwargs"]["cfg"] = agent_cfg
-
     # create agent from stable baselines
     agent = PPO(policy = CustomActorCriticPolicy, env = env, verbose=1, **agent_cfg)
-    # agent = SAC(policy = "MlpPolicy", env = env, verbose=1, **agent_cfg)
 
     # configure the logger
     new_logger = configure(log_dir, ["stdout", "tensorboard"])
@@ -174,11 +169,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     else:
         obs = env.reset()
-        # agent = PPO.load("/workspace/isaaclab/source/logs/sb3/Isaac-UR5e-joint-reach-v0/2024-10-16_12-32-25/model_18960000_steps.zip", weights_only=True)
                              
         action = torch.rand((env_cfg.scene.num_envs, 6+4))
         action = torch.tensor([[0, 0, 0, 0, 0, 0, 
-                                 0.1, 0.1, 0.1]])
+                                 0, 0, 0]])
 
         # Simulate physics
         while simulation_app.is_running():

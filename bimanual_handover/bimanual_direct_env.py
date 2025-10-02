@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import torch
+import torch.nn as nn
 from collections.abc import Sequence
 import copy
+import random
 
 from .mdp.utils import compute_rewards, save_images_grid
-from .mdp.rewards import dual_quaternion_error, quat_error
+from .mdp.rewards import dual_quaternion_error, cartesian_error, SE3_error
 from .bimanual_direct_env_cfg import BimanualDirectCfg, update_cfg, update_collisions
 
 import omni.isaac.lab.sim as sim_utils
@@ -22,6 +24,15 @@ from omni.isaac.lab.markers import VisualizationMarkers
 from omni.isaac.lab.assets import RigidObject
 
 
+
+'''
+                    ############## IMPORTANT #################
+   The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
+   These two variables (cfg.UR5e and cfg.GEN3) serve as an abstraction to treat the robots during the episodes. In fact,
+all the methods need an index to differentiate from which robot get the information.
+   Also, data storage is performed using lists, not tensors because the joint space of the robots is
+different from one another.
+'''
 
 # Class for the Bimanual Direct Environment
 class BimanualDirect(DirectRLEnv):
@@ -104,14 +115,16 @@ class BimanualDirect(DirectRLEnv):
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         self.prev_dist_target = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
         
-        # Object reached flags
+        # Reached flags
         self.obj_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.obj_reached_target = torch.zeros(self.num_envs).to(self.device).bool()
 
-        # Reward tensor for the second phase
-        self.rew_2 = torch.ones(self.num_envs).to(self.device)
 
-        self.back = torch.tensor([0.0, 0.05, -0.051, 1, 0, 0, 0]).to(self.device).repeat(self.num_envs, 1)
+        # --------- COMPROBAR VALIDEZ ---------
+        self.err_aux = torch.zeros((self.num_envs, 3)).to(self.device)
+        self.cont_err = torch.zeros(self.num_envs).to(self.device)
+
+        self.aux_info = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 0.0]
     
     
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -137,8 +150,6 @@ class BimanualDirect(DirectRLEnv):
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]] = Articulation(self.cfg.robot_cfg_1)
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]] = Articulation(self.cfg.robot_cfg_2)
 
-        # Add sensors (cameras, contact_sensors, ...)
-        # self.scene.sensors["camera"] = Camera(self.cfg.camera_cfg)
         
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -214,37 +225,34 @@ class BimanualDirect(DirectRLEnv):
         actions_quat = torch.zeros((self.num_envs, 7+16)).to(self.device)
         actions_quat[:, :3] = actions[:, :3]
 
-        # Manipulation phase case, preprocess the actions for the hand
-        if self.cfg.phase == self.cfg.MANIPULATION:
+        # Determines the index of the hand joints
+        hand_joint_index = 6 + int(not self.cfg.euler_flag)
+        
+        # Obtains extended action
+        val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
 
-            # Determines the index of the hand joints
-            hand_joint_index = 6 + int(not self.cfg.euler_flag)
-            
-            # Obtains extended action
-            val = (actions[:, hand_joint_index:] * self.cfg.hand_joint_scale).repeat_interleave(4, dim = -1)
+        # Assigns the values to the respective joints
+        actions_quat[:, 7] = 0
+        actions_quat[:, 8] = val[:, 0] * 2
+        actions_quat[:, 9] = 0
+        actions_quat[:, 10] = 0
+        actions_quat[:, 11] = val[:, 1] * 5
+        actions_quat[:, 12] = 0.0
+        actions_quat[:, 13] = val[:, 2] * 5
+        actions_quat[:, 14] = val[:, 3] * 5
 
-            # Assigns the values to the respective joints
-            actions_quat[:, 7] = 0
-            actions_quat[:, 8] = val[:, 0] * 2
-            actions_quat[:, 9] = 0
-            actions_quat[:, 10] = 0
-            actions_quat[:, 11] = val[:, 1] * 5
-            actions_quat[:, 12] = 0.0
-            actions_quat[:, 13] = val[:, 2] * 5
-            actions_quat[:, 14] = val[:, 3] * 5
+        actions_quat[:, 15] = val[:, 4]*4
+        actions_quat[:, 16] = val[:, 5] * 3
+        actions_quat[:, 17] = val[:, 6]*4
+        actions_quat[:, 18] = val[:, 7]*4
 
-            actions_quat[:, 15] = val[:, 4]*4
-            actions_quat[:, 16] = val[:, 5] * 3
-            actions_quat[:, 17] = val[:, 6]*4
-            actions_quat[:, 18] = val[:, 7]*4
+        actions_quat[:, 19] = val[:, 8] * 2.5
+        actions_quat[:, 20] = val[:, 9] * 2.5
+        actions_quat[:, 21] = val[:, 10] * 2.5
+        actions_quat[:, 22] = val[:, 11] * 2.5
 
-            actions_quat[:, 19] = val[:, 8] * 2.5
-            actions_quat[:, 20] = val[:, 9] * 2.5
-            actions_quat[:, 21] = val[:, 10] * 2.5
-            actions_quat[:, 22] = val[:, 11] * 2.5
-
-            # Assigns hand opening if the object is reached
-            self.reset_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
+        # Assigns hand opening if the object is reached
+        self.reset_joint_positions[self.cfg.UR5e][self.obj_reached.bool(), 6:] = self.open_hand_joints
         
         # If the actions are in euler, transform them to quaternion
         if self.cfg.euler_flag:
@@ -300,7 +308,7 @@ class BimanualDirect(DirectRLEnv):
         self.controller.set_command(new_poses)
 
         # Perform the increment for the hand
-        new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:] * self.cfg.phase
+        new_hand_joint_pos = self.scene.articulations[self.cfg.keys[idx]].data.joint_pos[:, self._hand_joints_idx[idx]] + actions[:, 7:]
         new_hand_joint_pos[:, 5] = -0.65
 
         # Get the actions for the UR5e. Concatenates:
@@ -315,7 +323,7 @@ class BimanualDirect(DirectRLEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         '''
         In: 
-            - actions - torch.tensor(N, ...): actions to apply to the environment.
+            - actions - torch.tensor(N, 6+3): actions to apply to the environment (robot and hand actions).
 
         Out:
             - None
@@ -324,10 +332,6 @@ class BimanualDirect(DirectRLEnv):
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
 
-        # --- UR5e actions ---
-        # Set the command for the IKDifferentialController
-        #self.perform_increment(idx = self.cfg.UR5e, actions = actions)
-
         # --- GEN3 actions ---
         # Obtains the increments and the poses for the GEN3 robot
         self.perform_increment(idx = self.cfg.GEN3, actions = actions)
@@ -335,7 +339,22 @@ class BimanualDirect(DirectRLEnv):
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
     def _apply_action(self) -> None:
-        
+        '''
+        In: 
+            - None
+
+        Out:
+            - None
+        '''
+
+        # Moves the holder if required
+        self.reset_joint_positions[self.cfg.UR5e][:, 0] += self.dir[0]*0.0005 * int(self.cfg.move_holder)
+        self.reset_joint_positions[self.cfg.UR5e][:, 1] += self.dir[1]*0.00015 * int(self.cfg.move_holder)
+        self.reset_joint_positions[self.cfg.UR5e][:, 2] += self.dir[2]*0.00015 * int(self.cfg.move_holder)
+        self.reset_joint_positions[self.cfg.UR5e][:, 3] += self.dir[3]*0.0005 * int(self.cfg.move_holder)
+        self.reset_joint_positions[self.cfg.UR5e][:, 4] += self.dir[4]*0.0007 * int(self.cfg.move_holder)
+        self.reset_joint_positions[self.cfg.UR5e][:, 5] += self.dir[5]*0.00175 * int(self.cfg.move_holder)
+
         # Applies joint actions to the robots 
         self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].set_joint_position_target(self.reset_joint_positions[self.cfg.UR5e], joint_ids=self._all_joints_idx[self.cfg.UR5e])
         self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].set_joint_position_target(self.actions[self.cfg.GEN3], joint_ids=self._all_joints_idx[self.cfg.GEN3])
@@ -510,27 +529,26 @@ class BimanualDirect(DirectRLEnv):
             dim = -1
         )
 
-        # In case of manipulation phase, add the hand joint positions
-        if self.cfg.phase == self.cfg.MANIPULATION:
-
-            # Obtains the joint positions for the hand
-            # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
-            hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
-            
-            # Selects the hand joints to be observed
-            sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
-            
-            # Concatenates the mean of selected hand joint positions
-            obs = torch.cat(
-                (
-                    obs,
-                    sel_hand_joint.view(-1, 3,4).mean(dim = -1).view(-1, 3),
-                ),
-                dim = -1
-            )
+        # Obtains the joint positions for the hand
+        # hand_joint_pos_1 = self.scene.articulations[self.cfg.keys[self.cfg.UR5e]].data.joint_pos[:, self._hand_joints_idx[self.cfg.UR5e]]
+        hand_joint_pos_2 = self.scene.articulations[self.cfg.keys[self.cfg.GEN3]].data.joint_pos[:, self._hand_joints_idx[self.cfg.GEN3]]
+        
+        # Selects the hand joints to be observed
+        sel_hand_joint = torch.round(torch.cat((hand_joint_pos_2[:, 1].unsqueeze(-1), hand_joint_pos_2[:, 4].unsqueeze(-1), hand_joint_pos_2[:, 6:]), dim = -1), decimals = 1)
+        
+        # Concatenates the mean of selected hand joint positions
+        obs = torch.cat(
+            (
+                obs,
+                sel_hand_joint.view(-1, 3,4).mean(dim = -1).view(-1, 3),
+            ),
+            dim = -1
+        )
 
         # Builds the dictionary
-        observations = {"policy": obs}
+        observations = {"policy": obs, 
+                        "dist": self.aux_info[0],
+                        "phase":self.obj_reached.int()}
         
         # Updates markers
         if self.cfg.debug_markers:
@@ -558,7 +576,6 @@ class BimanualDirect(DirectRLEnv):
         obj_pose = self.grasp_point_obj_pose_r
         prev_dist = self.prev_dist
         prev_dist_target = self.prev_dist_target
-        obj_reach_target_thres = self.cfg.obj_reach_target_thres
         device = self.device
         target_pose = self.cfg.target_pose
         
@@ -568,14 +585,19 @@ class BimanualDirect(DirectRLEnv):
 
         # ---- Distance computation ----
         # Dual quaternion distance between GEN3 hand tips and object
-        hand_obj_dist = quat_error(ee_pose, obj_pose, device)
-        hand_obj_dist_back = quat_error(ee_pose_bask, obj_pose, device)
-        
+
+        hand_obj_dist = dual_quaternion_error(ee_pose, obj_pose, device)
+
+        # Dual quaternion distance between GEN3 back hand and object
+        hand_obj_dist_back = dual_quaternion_error(ee_pose_bask, obj_pose, device)
+
         # Dual quaternion distance between object and target pose
         obj_target_dist = quat_error(obj_pose, target_pose, device)
 
-        # Distance between hand tips
+        # Distance between hand tips of the robots
         tips_dist = torch.norm((tips_ur5e - tips_gen3), dim = -1)
+
+        # Distance between object and GEN3 hand tips
         obj_dist = torch.norm((obj - tips_gen3), dim = -1)
 
 
@@ -592,17 +614,14 @@ class BimanualDirect(DirectRLEnv):
         # There is contact if the thumb and the fingers (finger collide without the thumb) are in contact
         contacts_flag = torch.logical_and(contacts_w[:, :-1].sum(-1) - thumb_w.sum(-1) > 0.4, thumb_con)
 
-        # Reached flag pre-conditions
+        # Reached flag pre-conditions: if if it did not reach the object befor ...
         bonus = self.obj_reached.clone().bool()
 
-        # Check it the object is reached (contact with the object) and set it
-        self.obj_reached = torch.logical_or(contacts_flag * (self.cfg.phase == self.cfg.MANIPULATION), self.obj_reached)
+        # ... but does it now, ...
+        self.obj_reached = torch.logical_or(contacts_flag, self.obj_reached)        
         
-        # Reached flag after conditions
-        new_bonus = self.obj_reached.clone().bool()
-
-        # The bonus must be activated if the object is reached at this step
-        bonus = torch.logical_and(new_bonus, torch.logical_not(bonus))
+        # ... the bonus must be activated if the object is reached at this step
+        bonus = torch.logical_and(self.obj_reached.clone().bool(), torch.logical_not(bonus))
 
         # Check if the object has reached the target
         self.obj_reached_target = (obj_pose[:, 0] < 0.05).bool() # (obj_target_dist[:, 1] < obj_reach_target_thres).bool()
@@ -676,7 +695,7 @@ class BimanualDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = torch.logical_or(torch.logical_or(falling, out_of_bounds), GEN3_ground_contact)
-        terminated = torch.logical_or(time_out, self.obj_reached_target * (self.cfg.phase == self.cfg.MANIPULATION) + self.obj_reached * (self.cfg.phase == self.cfg.APPROACH))
+        terminated = torch.logical_or(time_out, self.obj_reached_target)
 
 
         return truncated, terminated
@@ -803,5 +822,9 @@ class BimanualDirect(DirectRLEnv):
         self.obj_reached_target[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
         self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+
+        self.dir = torch.randint(low = -1,high = 1,size=(6,)).to(self.device)*-2-1
+
+        
 
         
