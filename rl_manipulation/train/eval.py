@@ -27,7 +27,6 @@ from omni.isaac.lab_tasks.utils import parse_env_cfg
 import gymnasium as gym
 import os
 from stable_baselines3 import PPO
-import json
 
 
 """Main function"""

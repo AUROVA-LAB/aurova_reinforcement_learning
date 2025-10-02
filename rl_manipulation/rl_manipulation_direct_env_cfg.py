@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-import os
 from math import pi
 import torch
-from collections.abc import Sequence
-import numpy as np
-from scipy.spatial.transform import Rotation
-
-from .py_dq.src.lie import *
 
 from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
-from .mdp.utils import compute_rewards, save_images_grid
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -18,86 +11,21 @@ from omni.isaac.lab.envs import DirectRLEnvCfg
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.sim import SimulationCfg
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.utils.math import euler_xyz_from_quat, matrix_from_quat
-from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.markers import VisualizationMarkersCfg
-from omni.isaac.lab.assets import RigidObjectCfg
 
-from omni.isaac.lab.managers import EventTermCfg, SceneEntityCfg
-from omni.isaac.lab.envs import mdp
-
-
-
-# Function to change a Euler angles to a quaternion as a tensor
-def rot2tensor(rot: Rotation) -> torch.tensor:
-    '''
-    In:
-        - rot - scipy.Rotation(3): rotation expressed in Euler angles.
-
-    Out:
-        - rot_tensor_quat - torch.tensor - (4): rotation expressed a quaternion in a tensor.
-    '''
-
-    # Transform rotation to tensor
-    rot_tensor = torch.tensor(rot.as_quat())
-    rot_tensor_quat = torch.zeros((4))
-
-    # Scipy uses the notation (x,y,z,w) whilst IsaacLab uses (w,x,y,z), so that is changed
-    rot_tensor_quat[0], rot_tensor_quat[1:] = rot_tensor[-1].clone(), rot_tensor[:3].clone()
-    
-    return rot_tensor_quat
-
-# Rotations respecto to the end effector robot link frame for object spawning
-rot_45_z_neg = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
-rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1]))
-rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
-
-
-@configclass
-class EventCfg:
-  robot_physics_material = EventTermCfg(
-      func=mdp.randomize_rigid_body_material,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", body_names=".*"),
-          "static_friction_range": (0.7, 1.3),
-          "dynamic_friction_range": (0.7, 1.2),
-          "restitution_range": (0.5, 1),
-          "num_buckets": 250,
-      },
-  )
-  robot_joint_stiffness_and_damping = EventTermCfg(
-      func=mdp.randomize_actuator_gains,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names=".*"),
-          "stiffness_distribution_params": (0.75, 1.5),
-          "damping_distribution_params": (0.75, 1.5),
-          "operation": "scale",
-          "distribution": "log_uniform",
-      },
-  )
 
 
 # Configuration class for the environment
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
-
-    # events: EventCfg = EventCfg()
     
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 130              # Maximum steps in an episode
-
-    seq_len = 2                 # Length of the sequence
    
-    option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
-
-    path_to_pretrained = "2024-12-11_11-04-13/model_53248000_steps" # Path to the pre-trained approaching model
-
     # --- Mapping configuration ---
     DQ = 0
     EULER = 1
@@ -108,11 +36,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 1
+    mapping = 2
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
 
+    # Scalings for each action
     scalings = [[[0.01, 0.001], [0.03,  0.006], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
@@ -121,12 +50,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
 
 
-
     # --- Action / observation space ---
     num_actions = size                  # Number of actions per environment (overridden)
     num_observations = num_actions      # Number of observations per environment (overridden)
-    
-
 
     num_envs = 1                # Number of environments by default (overriden)
 
@@ -138,7 +64,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     velocity_limit = 10         # Velocity limit for robots' end effector
 
 
-    UR5e = 0                    # Robot options
+    # Robot options
+    UR5e = 0                    
     GEN3 = 1
     UR5e_3f = 2
     UR5e_NOGRIP = 3
@@ -307,8 +234,6 @@ def update_cfg(cfg, num_envs, device):
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
 
-
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
-
 
     return cfg

@@ -22,23 +22,22 @@ simulation_app = app_launcher.app
 """Rest everything follows"""
 
 import torch
-from omni.isaac.lab.envs import ManagerBasedRLEnv
 from omni.isaac.lab_tasks.utils import parse_env_cfg
 import gymnasium as gym
-from omni.isaac.lab_tasks.utils.parse_cfg import load_cfg_from_registry
-import math
-from scipy.spatial.transform import Rotation
 from pynput import keyboard
 
+# Key commands
 key_cmd = '\n'
 pos_cmd = "sdp869"
 neg_cmd = "wal241"
-inc = 1# 0.0075
+inc = 1
 
+# Action variables
 action = torch.zeros(6)
-
 incs = torch.zeros_like(action)
 
+
+# Press callback
 def on_press(key):
     global key_cmd, incs
 
@@ -49,7 +48,8 @@ def on_press(key):
         
     except AttributeError:
         pass
-        
+
+# Update the command according to the key
 def update_cmd(cmd):
     global key_cmd, pos_cmd, neg_cmd, inc
 
@@ -71,25 +71,21 @@ def update_cmd(cmd):
     return cmd
 
 
+
+"""Main function"""
 def main():
-    """Main function"""
     global action, incs
 
+    # Batch actions
     action = action.repeat(args_cli.num_envs, 1)
     incs = incs.repeat(args_cli.num_envs, 1)
     
+    # Start keyboard listener
     listener = keyboard.Listener(
         on_press=on_press)
     listener.start()
 
-
-    # Create environment configuration
-    # env_cfg = UR5eRLReachCfg()
-    # env_cfg.scene.num_envs = args_cli.num_envs
-
-    # # Setup RL environment
-    # env = ManagerBasedRLEnv(cfg=env_cfg)
-
+    # Environment
     env_cfg = parse_env_cfg(
         task_name = args_cli.task, device = args_cli.device, num_envs = args_cli.num_envs, use_fabric = not args_cli.disable_fabric
     )

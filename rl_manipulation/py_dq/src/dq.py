@@ -9,12 +9,12 @@ Acknowledgements:
 - Functions related to dual quaternions: re-implementations based on pip package "dual_quaternions"
 """
 
-###################### IMPORTANT #####################################################
-#### Code taken from                                                       ###########
+##################################### IMPORTANT ######################################
+#### Code from                                                         ###############
 #### https://gist.github.com/Flunzmas/d9485d9fee6244b544e7e75bdc0c352c ###############
 ######################################################################################
 
-# ======== QUATERNIONS =======================================================================
+# ======== QUATERNIONS = [w,x,y,z] =======================================================================
 
 
 def q_mul(q1: torch.Tensor, q2: torch.Tensor):
@@ -57,20 +57,17 @@ def q_angle(q: torch.Tensor):
     assert q.shape[-1] == 4
 
     q = q_normalize(q)
-    q_re, q_im = torch.split(q, [1, 3], dim=-1)
-    norm = torch.linalg.norm(q_im, dim=-1).unsqueeze(dim=-1)
-    # angle = 2.0 * torch.atan2(norm, q_re)
-    # angle = 2*torch.acos(q[:, 0])
+
     angle = 2*torch.acos(torch.round(q[:, 0], decimals =5))
 
-    # return wrap_angle(angle)
     return angle
 
 def q_axis(q: torch.Tensor):
+    """
+    Determine the rotation axis of t¡he quaternion tensor of shape [*, 4].
+    """
     assert q.shape[-1] == 4
-    # assert torch.any(q_is_norm(q = q))
 
-    # return q[:, 1:] / torch.sin(q_angle(q = q) / 2)
     res = torch.zeros((q.shape[0], 3)).to(q.device)
     idx = torch.abs(torch.sin(q_angle(q = q))) > 1e-6
 
@@ -82,6 +79,9 @@ def q_axis(q: torch.Tensor):
 
 
 def q_norm(q: torch.Tensor):
+    """
+    Compute the norm of a quaternion tensor of shape [*, 4].
+    """
     assert q.shape[-1] == 4
 
     return torch.norm(q, dim=-1)  # ||q|| = sqrt(w²+x²+y²+z²)
@@ -96,7 +96,7 @@ def q_normalize(q: torch.Tensor):
 
     norm = q_norm(q = q)
     assert not torch.any(torch.isclose(norm, torch.zeros_like(norm, device=q.device)))  # check for singularities
-    return  q/norm.unsqueeze(-1)#torch.div(q, norm[:, None])  # q_norm = q / ||q||
+    return  q/norm.unsqueeze(-1)  # q_norm = q / ||q||
 
 
 def q_conjugate(q: torch.Tensor):
@@ -109,23 +109,29 @@ def q_conjugate(q: torch.Tensor):
     return q * conj.expand_as(q)
 
 def q_is_norm(q: torch.Tensor):
-
+    """
+    Determines wether the quaternion tensor of shape [*, 4] is normalized.
+    """
     assert q.shape[-1] == 4
 
     return torch.isclose(q_norm(q = q), torch.ones(q.shape[0], device=q.device))
 
 
 def q_is_pure(q: torch.Tensor):
+    """
+    Determines wether the quaternion tensor of shape [*, 4] is pure.
+    """
     assert q.shape[-1] == 4
 
     return torch.isclose(q[:, 0], torch.zeros(q.shape[0], device=q.device))
 
 
 def q_diff(q1: torch.Tensor, q2: torch.Tensor):
+    """
+    Difference between two quaternions q1 and q2 of shape [*, 4].
+    """
     assert q1.shape[-1] == 4
     assert q2.shape[-1] == 4
-    # assert torch.any(q_is_norm(q1))
-    # assert torch.any(q_is_norm(q2))
 
     return q_mul(q1 = q_conjugate(q = q1), q2 = q2)
 
@@ -136,15 +142,29 @@ def q_diff(q1: torch.Tensor, q2: torch.Tensor):
 
 
 def q_inn_prod(q1: torch.Tensor, q2: torch.Tensor):
+    """
+    Computes the inner product between two pure quaternions q1 and q2.
+    """
     assert q1.shape[-1] == 3
     assert q2.shape[-1] == 3
 
-    return q1[:, 0] * q2[:, 0] + q1[:, 1] * q2[:, 1] + q1[:, 2] * q2[:, 2]# + q1[:, 3] * q2[:, 3]
+    return q1[:, 0] * q2[:, 0] + q1[:, 1] * q2[:, 1] + q1[:, 2] * q2[:, 2]
 
 
 
 # === DUAL QUATERNIONS =======================================================================
 
+
+def convert_dq_to_Lab(x: torch.Tensor):
+    """
+    Convert a Dual Quaternion to the format of IsaacLab (translation+quaternion).
+    """
+    assert x.shape[-1] == 8
+
+    t = dq_translation(dq = x)
+    r = x[:, :4]
+
+    return torch.cat((t, r), dim = -1)
 
 def dq_mul(dq1, dq2: torch.Tensor):
     """
@@ -167,6 +187,10 @@ def dq_mul(dq1, dq2: torch.Tensor):
 
 
 def dq_from_tr(t: torch.Tensor, r: torch.tensor):
+    """
+    Createa dual quaternion from a translation tensor t of shape [*, 3] and
+        a rotation quaternion tensor r of shape [*, 4].
+    """
     assert r.shape[-1] == 4
     assert t.shape[-1] == 3
         
@@ -190,6 +214,9 @@ def dq_translation(dq: torch.Tensor):
 
 
 def dq_norm(dq: torch.Tensor):
+    """
+    Computes the norm of a dual quaternion tensor of shape [*, 8].
+    """
     assert dq.shape[-1] == 8
 
     dq_r = dq[..., :4]
@@ -215,7 +242,6 @@ def dq_conjugate(dq: torch.Tensor):
     Returns the quaternion conjugate of the input dual quaternion tensor of shape [*, 8].
     The quaternion conjugate is composed of the complex conjugates of the real and the dual quaternion.
     """
-
     assert dq.shape[-1] == 8
 
     conj = torch.tensor([1, -1, -1, -1,   1, -1, -1, -1], device=dq.device)  # multiplication coefficients per element
@@ -223,12 +249,18 @@ def dq_conjugate(dq: torch.Tensor):
 
 
 def dq_is_norm(dq: torch.Tensor):
+    """
+    Determines wether the dual quaternion tensor of shape [*, 8] is normalized.
+    """
     assert dq.shape[-1] == 8
 
     return torch.isclose(dq_norm(dq = dq), torch.ones(dq.shape[0], device=dq.device))
 
 
 def dq_diff(dq1, dq2: torch.Tensor):
+    """"
+    Computes the difference between two dual quaternions dq1 and dq2 of shape [*, 8]
+    """
     assert dq1.shape[-1] == 8
     assert dq2.shape[-1] == 8
 
@@ -239,6 +271,9 @@ def dq_diff(dq1, dq2: torch.Tensor):
 
 
 def dq_inn_prod(dq1: torch.Tensor, dq2: torch.Tensor):
+    """
+    Computes the inner product between two pure dual quaternions dq1 and dq2 of shape [*, 8].
+    """
     assert dq1.shape[-1] == 8
     assert dq2.shape[-1] == 8
 

@@ -1,6 +1,6 @@
 import torch
 from .dq import *
-from .lie import *
+from .dq_lie import *
 
 
 # === DQ DISTANCES =================================================================================

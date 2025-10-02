@@ -1,3 +1,3 @@
 from .dq import *
 from .distances import *
-from .lie import *
+from .dq_lie import *

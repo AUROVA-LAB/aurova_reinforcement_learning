@@ -5,13 +5,11 @@ import torch
 from collections.abc import Sequence
 import copy
 
-from .mdp.utils import compute_rewards, save_images_grid, update_seq
-from .mdp.rewards import dual_quaternion_error 
 from .rl_manipulation_direct_env_cfg import RLManipulationDirectCfg, update_cfg
 
 from .py_dq.src.dq import *
 from .py_dq.src.distances import *
-from .py_dq.src.lie import *
+from .py_dq.src.dq_lie import *
 from .py_dq.src.interpolators import *
 
 from .py_dq.src.quat_trans_lie import *
@@ -26,20 +24,9 @@ from omni.isaac.lab.utils.math import sample_uniform
 from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms
 from omni.isaac.lab.utils.math import quat_from_euler_xyz
-from omni.isaac.lab.sensors import ContactSensor, Camera
 from omni.isaac.lab.markers import VisualizationMarkers
-from omni.isaac.lab.assets import RigidObject
 
-from numpy import pi
 
-'''
-                    ############## IMPORTANT #################
-   The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
-   These two variables (cfg.UR5e and cfg.GEN3) serve as an abstraction to treat the robots during the episodes. In fact,
-all the methods need an index to differentiate from which robot get the information.
-   Also, data storage is performed using lists, not tensors because the joint space of the robots is
-different from one another.
-'''
 
 # Class for the Bimanual Direct Environment
 class RLManipulationDirect(DirectRLEnv):
@@ -101,11 +88,6 @@ class RLManipulationDirect(DirectRLEnv):
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
 
-        # Create output directory to save images
-        if self.cfg.save_imgs:
-            self.output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output")
-            os.makedirs(self.output_dir, exist_ok=True)
-
         # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
 
@@ -114,9 +96,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Lie algebra ---
         # List of mappings
-        map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],       [exp_stereo, log_stereo]],
+        map_list = [[[identity_map, identity_map], [exp_bruno, log_bruno],     [exp_stereo, log_stereo]],
                     [[identity_map, identity_map],],
-                    [[identity_map, identity_map], [exp_quat_cayley, log_quat_cayley], [exp_quat_stereo, log_quat_stereo]],
+                    [[identity_map, identity_map], [exp_quat_stereo, log_quat_stereo]],
                     [[identity_map, identity_map], [exp_se3, log_se3]]]
 
         # List of conversions
@@ -155,9 +137,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.mul_operator = mul_operators[cfg.representation]
         self.normalize = normalizes[cfg.representation]
     
+        # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
-        self.kwargs = None
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -177,7 +159,6 @@ class RLManipulationDirect(DirectRLEnv):
         self.scene.filter_collisions(global_prim_paths=[])
         # filter_collisions: Disables collisions between the environments in /World/envs/env_.* and enables collisions with the prims in global prim paths (e.g. ground plane).
         #     if "global_prim_paths" is None, environments do not collide with each other.
-
 
         # Add articulations to scene
         if self.cfg.robot == self.cfg.UR5e:
@@ -220,7 +201,6 @@ class RLManipulationDirect(DirectRLEnv):
             actions[:, 7] = torch.clamp(actions[:, 7], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
             actions[:, 11] = torch.clamp(actions[:, 11], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
 
-
         else:
             actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
             actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
@@ -232,7 +212,7 @@ class RLManipulationDirect(DirectRLEnv):
     def _get_ee_pose(self):
         '''
         In: 
-            - idx - int(0,1): index of the robot.
+            - None
 
         Out:
             - ee_pos_r - torch.tensor(N, 3): position of the end effector in the base frame for each environment.
@@ -272,12 +252,10 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
-        # Perform increment in the algebra and exponential map
+        # Perform increment in the algebra and exponential map -> (plus operator)
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-  
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
-
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
@@ -364,10 +342,9 @@ class RLManipulationDirect(DirectRLEnv):
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
 
-
+        # Fix double cover
         neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
         robot_rot_ee_quat_r[neg_idx] *= -1
-
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
@@ -376,7 +353,6 @@ class RLManipulationDirect(DirectRLEnv):
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
-
 
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
@@ -472,7 +448,6 @@ class RLManipulationDirect(DirectRLEnv):
     def reset_robot(self, env_ids):
         '''
         In:
-            - idx - int(0 or 1): index for the robot.
             - env_ids - torch.tensor(m): IDs for the 'm' environments that need to be resetted.
         
         Out:
@@ -491,7 +466,6 @@ class RLManipulationDirect(DirectRLEnv):
     def reset_robot_ee(self, env_ids):
         '''
         In:
-            - idx - int(0 or 1): index for the robot.
             - env_ids - torch.tensor(m): IDs for the 'm' environments that need to be resetted.
         
         Out:
