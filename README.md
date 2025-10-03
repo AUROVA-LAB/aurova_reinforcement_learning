@@ -45,24 +45,15 @@ pip install wandb
 
 ---
 
-## 🤖 RL Environments
+## 🤖 Projects
 
-### Clone Tasks
+### Learning Dexterous Handover
 ```bash
 cd IsaacLab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic
-git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning
+git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b bimanual_handover
 ```
 
-For Pick&Place:
-```bash
-git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b rl_manipulation_pcikplace_v4.2
-```
-
----
-
-## 🚀 Training
-
-### Bimanual Handover
+#### Training
 With GUI:
 ```bash
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-Bimanual-Direct-reach-v0 --num_envs 1
@@ -78,7 +69,20 @@ Server mode (many envs, video enabled):
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-Bimanual-Direct-reach-v0 --num_envs 1024 --enable_cameras --video --headless
 ```
 
-### Lie Manipulation Reach
+
+### Lie Algebra mapping for robotic Reinforcement Learning manipulation:
+#### Reach Task
+```bash
+git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b rl_manipulation_reach_v4.2
+```
+
+#### Pick&Place:
+```bash
+git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b rl_manipulation_pcikplace_v4.2
+```
+
+
+#### Training (both)
 ```bash
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-RL-Manipulation-Direct-reach-v0 --num_envs 1
 ```
@@ -88,7 +92,10 @@ Headless:
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-RL-Manipulation-Direct-reach-v0 --num_envs 1 --headless
 ```
 
----
+Server mode (many envs, video enabled):
+```bash
+./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-RL-Manipulation-Direct-reach-v0 --num_envs 1024 --enable_cameras --video --headless
+```
 
 ## 🧪 Testing
 
