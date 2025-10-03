@@ -3,6 +3,18 @@
 This repository contains setup instructions and training pipelines for **IsaacLab** using NVIDIA Isaac Sim. It includes reinforcement learning (RL) environments such as **Bimanual Handover** and **Lie Manipulation** (Reach & Pick&Place).  
 
 ---
+## 📑 Table of Contents
+- [📦 Installation](#-installation)
+- [🤖 Projects](#-projects)
+  - [Learning Dexterous Handover](#learning-dexterous-handover)
+  - [Lie Algebra mapping for robotic Reinforcement Learning manipulation](#lie-algebra-mapping-for-robotic-reinforcement-learning-manipulation)
+- [🧪 Testing](#-testing)
+- [⚙️ Real Robot Deployment](#-real-robot-deployment)
+- [🐳 Docker Base (For Servers)](#-docker-base-for-servers)
+- [🦾 Importing New Assets](#-importing-new-assets)
+- [📚 References](#-references)
+- [📑 Citations](#-citations)
+---
 
 ## 📦 Installation
 
