@@ -48,12 +48,13 @@ pip install wandb
 ## 🤖 Projects
 
 ### Learning Dexterous Handover
+#### INSTALL
 ```bash
 cd IsaacLab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic
 git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b bimanual_handover
 ```
 
-#### Training
+#### TRAINING
 With GUI:
 ```bash
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-Bimanual-Direct-reach-v0 --num_envs 1
@@ -71,18 +72,20 @@ Server mode (many envs, video enabled):
 
 
 ### Lie Algebra mapping for robotic Reinforcement Learning manipulation:
-#### Reach Task
+#### INSTALL Reach Task
 ```bash
 git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b rl_manipulation_reach_v4.2
 ```
 
-#### Pick&Place:
+#### INSTALL Pick&Place:
 ```bash
 git clone https://github.com/AUROVA-LAB/aurova_reinforcement_learning -b rl_manipulation_pcikplace_v4.2
 ```
 
+Pretrained REACH models available on [Google Drive](https://drive.google.com/drive/folders/1un_rO9T07DCe0Gp4Fy-j5i9ecMWgr7WW?usp=drive_link).  
 
-#### Training (both)
+
+#### TRAINING (both)
 ```bash
 ./isaaclab.sh -p source/extensions/.../train/train.py --task Isaac-RL-Manipulation-Direct-reach-v0 --num_envs 1
 ```
@@ -106,10 +109,8 @@ Move trained models to:
 
 Run evaluation:
 ```bash
-./isaaclab.sh -p source/extensions/.../train/eval.py --task Isaac-RL-Manipulation-Direct-reach-v0 --num_envs 1 --enable_cameras --model_dir <MODEL_PATH>
+./isaaclab.sh -p source/extensions/.../train/eval.py --task <GYM_TASK_NAME> --num_envs 1 --enable_cameras --model_dir <MODEL_PATH>
 ```
-
-Pretrained models available on [Google Drive](https://drive.google.com/drive/folders/1un_rO9T07DCe0Gp4Fy-j5i9ecMWgr7WW?usp=drive_link).  
 
 ---
 
@@ -170,3 +171,20 @@ rosrun xacro xacro --inorder -o model.urdf model.urdf.xacro
 - [IsaacLab Docs](https://isaac-sim.github.io/IsaacLab/main/index.html)  
 - [Docker Compose Notes](https://www.notion.so/IsaacLab-s-Docker-Compose-Explanation-28188e8cb85581478009d2f654ef3707)  
 - [Training & Tutorials](https://www.notion.so/Tutorials-28188e8cb855810ca9d6ee5b8671475f)  
+
+
+---
+## 📑 Citations
+If you use this work in your research, please cite the following articles:
+
+### Learning Dexterous Handover
+
+```bibtex
+@article{frau2025learning,
+  title={Learning Dexterous Object Handover},
+  author={Frau-Alfaro, Daniel and Casta{\~n}o-Amoros, Julio and Puente, Santiago and Gil, Pablo and Calandra, Roberto},
+  journal={arXiv preprint arXiv:2506.16822},
+  year={2025}
+}
+
+
