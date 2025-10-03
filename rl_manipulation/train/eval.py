@@ -27,7 +27,6 @@ from omni.isaac.lab_tasks.utils import parse_env_cfg
 import gymnasium as gym
 import os
 from stable_baselines3 import PPO
-import json
 
 
 """Main function"""
@@ -80,44 +79,7 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor(action))
                 
-                print(rew)
-
-
-
-                # Accumulate reward
-                # r += rew.cpu()
-                
-                # # Reset condition
-                # if terminated or truncated:
-                    
-                #     # Increase episode
-                #     ep += 1
-
-                #     # Break if final episodes has been reached
-                #     if ep == args_cli.num_episodes: break
-
-                #     print(f" -- Episode {ep+1}/{args_cli.num_episodes}")
-        
-    #     # Compute mean reward
-    #     mean_rew = torch.mean(r).item() / args_cli.num_episodes
-
-    #     print(f" ------ Reward per episode: {mean_rew}")
-
-    #     # Create metric for one model
-    #     results[model_name] = {
-    #         "name": model_name,
-    #         "mean_reward" : mean_rew,
-    #     }
-
-
-    # # Serializing json
-    # json_object = json.dumps(results, indent=4)
-    
-    # saving_path = os.path.join(path_to_train, dir, "evaluation.json")
-
-    # # Writing to sample.json
-    # with open(saving_path, "w") as outfile:
-    #     outfile.write(json_object)                    
+                print(rew)            
                     
 
 

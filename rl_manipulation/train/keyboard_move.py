@@ -82,14 +82,6 @@ def main():
         on_press=on_press)
     listener.start()
 
-
-    # Create environment configuration
-    # env_cfg = UR5eRLReachCfg()
-    # env_cfg.scene.num_envs = args_cli.num_envs
-
-    # # Setup RL environment
-    # env = ManagerBasedRLEnv(cfg=env_cfg)
-
     env_cfg = parse_env_cfg(
         task_name = args_cli.task, device = args_cli.device, num_envs = args_cli.num_envs, use_fabric = not args_cli.disable_fabric
     )
@@ -104,7 +96,6 @@ def main():
         with torch.inference_mode():
 
             obs, rew, terminated, truncated, info = env.step(update_cmd(action))
-
 
 
     env.close()

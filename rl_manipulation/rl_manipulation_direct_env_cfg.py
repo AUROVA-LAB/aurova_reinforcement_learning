@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import os
 from math import pi
 import torch
-from collections.abc import Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -12,7 +10,6 @@ from .py_dq.src.lie import *
 import copy
 
 from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
-from .mdp.utils import compute_rewards, save_images_grid
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -20,23 +17,11 @@ from omni.isaac.lab.envs import DirectRLEnvCfg
 from omni.isaac.lab.scene import InteractiveSceneCfg
 from omni.isaac.lab.sim import SimulationCfg
 from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.utils.math import euler_xyz_from_quat, matrix_from_quat
-from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.sensors import ContactSensorCfg
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 from omni.isaac.lab.markers import VisualizationMarkersCfg
 from omni.isaac.lab.assets import RigidObjectCfg
-
-from omni.isaac.lab.managers import EventTermCfg, SceneEntityCfg
-from omni.isaac.lab.envs import mdp
-
-'''
-                    ############## IMPORTANT #################
-   The whole environment is build for two robots: the UR5e and Kinova GEN3-7dof.
-   These two variables (cfg.UR5e and cfg.GEN3) serve as an abstraction to treat the robots during the episodes. In fact,
-all the methods need an index to differentiate from which robot get the information.
-   Also, data storage is performed using lists, not tensors because the joint space of the robots is
-different from one another.
-'''
 
 
 # Function to change a Euler angles to a quaternion as a tensor
@@ -59,76 +44,22 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     return rot_tensor_quat
 
 # Rotations respecto to the end effector robot link frame for object spawning
-rot_45_z_pos = Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))        # Positive 45 degrees rotation in Z axis 
 rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
-rot_305_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 135 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))
-rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
 
 
-@configclass
-class EventCfg:
-  robot_physics_material = EventTermCfg(
-      func=mdp.randomize_rigid_body_material,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", body_names=".*"),
-          "static_friction_range": (0.7, 1.3),
-          "dynamic_friction_range": (0.7, 1.2),
-          "restitution_range": (0.5, 1),
-          "num_buckets": 250,
-      },
-  )
-  robot_joint_stiffness_and_damping = EventTermCfg(
-      func=mdp.randomize_actuator_gains,
-      mode="reset",
-      params={
-          "asset_cfg": SceneEntityCfg("UR5e_NOGRIP", joint_names=".*"),
-          "stiffness_distribution_params": (0.75, 1.5),
-          "damping_distribution_params": (0.75, 1.5),
-          "operation": "scale",
-          "distribution": "log_uniform",
-      },
-  )
-#   reset_gravity = EventTermCfg(
-#       func=mdp.randomize_physics_scene_gravity,
-#       mode="interval",
-#       is_global_time=True,
-#       interval_range_s=(36.0, 36.0),  # time_s = num_steps * (decimation * dt)
-#       params={
-#           "gravity_distribution_params": ([0.0, 0.0, 0.0], [0.0, 0.0, 0.4]),
-#           "operation": "add",
-#           "distribution": "gaussian",
-#       },
-#   )
 
-#   body_mass = EventTermCfg(
-#       func = mdp.randomize_rigid_body_mass,
-#       mode = "reset",
-#       params = {
-#           "asset_cfg": SceneEntityCfg("object"),
-#           "mass_distribution_params": (0.5, 1.5),
-#           "operation": "scale",
-#           "distribution": "uniform",
-#           "recompute_inertia": False,
-#       }
-#   )
 
 # Configuration class for the environment
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
 
-    # events: EventCfg = EventCfg()
-    
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 320              # Maximum steps in an episode
-
-    seq_len = 2                 # Length of the sequence
    
-    option = 0                 # Option for the NN (0: everything, 1: pre-trained MLP, 2: pre-trained MLP with GNN)
-
+    # Pre-trained models that act as master for the RL agent
     models = [["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
@@ -150,34 +81,31 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     distance = 0
     path_to_pretrained = models[representation][mapping] # Path to the pre-trained approaching model
 
+    # Scale factors for the actions
     scalings = [[[0.01, 0.001], [0.07,  0.003], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
+    
     grip_scaling = 5
 
     action_scaling = scalings[representation][mapping]
 
 
-
     # --- Action / observation space ---
-    num_actions = size + 1   # Number of actions per environment (overridden)
-    num_observations = size + 1 #* (seq_len)                         # Number of observations per environment (overridden)
-    # state_space = 0
-    
+    num_actions = size + 1           # Number of actions per environment (overridden)
+    num_observations = size + 1      # Number of observations per environment (overridden)
 
 
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = True        # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
-    render_imgs = False          # Activate image rendering
-    render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
 
 
-    UR5e = 0                    # Robot options
+    # Robot options
+    UR5e = 0                    
     GEN3 = 1
     UR5e_3f = 2
     UR5e_NOGRIP = 3
@@ -190,6 +118,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                'tool0',
                'wrist_3_link']
     
+
+    # Robotiq 3f control
     grip_theta_max = [1.2218, 1.5708]
     m = [grip_theta_max[0]/140, grip_theta_max[1]/100]
 
@@ -376,27 +306,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-2*pi/5,  2*pi/5],
                          [-2*pi/5,  2*pi/5],
                          [-2*pi/5,  2*pi/5]]
-    # target_poses_incs = [[-0.008,  0.008],
-    #                      [-0.008,  0.008],
-    #                      [-0.008,  0.008],
-    #                      [-0.12,  0.12],
-    #                      [-0.12,  0.12],
-    #                      [-0.12,  0.12]]
-    apply_range_tgt = True
 
-    # Rotations respecto to the end effector robot link frame for object spawning
-    # rot_45_z_pos = Rotation.from_rotvec(-pi/4 * np.array([0, 0, 1]))        # Negative 45 degrees rotation in Z axis 
-    # rot_225_z_neg = Rotation.from_rotvec(-5*pi/4 * np.array([0, 0, 1]))     # Negative 225 degrees rotation in Z axis 
-    # rot_225_z_pos = Rotation.from_rotvec((pi/4 + pi) * np.array([0, 0, 1])) # Positive 225 degrees rotation in Z axis
-    # rot_90_x_pos = Rotation.from_rotvec(pi/2 * np.array([1, 0, 0]))         # Positive 90 degrees rotation in X axis
+    apply_range_tgt = True
 
     # Transform to quaternions
     rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
     rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
-    # rot_225_z_neg_quat = rot2tensor(rot_225_z_neg).numpy().tolist()
-    # rot_225_z_pos_quat = rot2tensor(rot_225_z_pos).numpy().tolist()
-
-
 
     # ---- Reward variables ----
     # reward scales
@@ -407,7 +322,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     vel_scale = 1.2104
 
 
-
     # Position threshold for ending the episode
     distance_thres = 0.027 # 0.08 # 0.03
     height_thres = 0.8
@@ -416,7 +330,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Bonus for reaching the target
     bonus_tgt_reached = 300
     bonus_lifting = 30
-    bonus_close_grip = -2
 
 
     # Contacts
