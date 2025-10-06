@@ -27,7 +27,7 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument("--train", type=bool, default=True, help="Wether to train or perform normal loop")
+parser.add_argument("--train", type=bool, default=False, help="Wether to train or perform normal loop")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -76,9 +76,9 @@ from networks import *
 
 
 # directory for logging into
-path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/rl_manipulation/train"
+path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/direct/aurova_reinforcement_learning/deformables/train"
 log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-run = wandb.init(project="rl_manipulation_reach", name=log_dir.split("/")[-1], sync_tensorboard=True)
+run = wandb.init(project="deformables", name=log_dir.split("/")[-1], sync_tensorboard=True)
 
 
 @hydra_task_config(args_cli.task, "sb3_cfg_entry_point")

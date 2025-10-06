@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import pi
 import torch
 
-from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.deformables.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG, ALLEGRO
 
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.assets import Articulation
@@ -19,7 +19,7 @@ from omni.isaac.lab.markers import VisualizationMarkersCfg
 
 # Configuration class for the environment
 @configclass
-class RLManipulationDirectCfg(DirectRLEnvCfg):
+class DeformablesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 3              # Number of control action updates @ sim dt per policy dt.
@@ -69,14 +69,16 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     GEN3 = 1
     UR5e_3f = 2
     UR5e_NOGRIP = 3
+    Allegro = 4
     
-    robot = UR5e_NOGRIP
+    robot = Allegro
 
-    keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
+    keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP', 'Allegro']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame',
                'tool0',
-               'wrist_3_link']
+               'wrist_3_link',
+               'hand_palm_link']
 
 
 
@@ -92,6 +94,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     robot_cfg_2: Articulation = GEN3_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[GEN3])
     robot_cfg_3: Articulation = UR5e_3f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_3f])
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
+    robot_cfg_5: Articulation = ALLEGRO.replace(prim_path="/World/envs/env_.*/" + keys[Allegro])
 
     
     # Markers
@@ -128,14 +131,16 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     joints = [['arm_shoulder_pan_joint', 'arm_shoulder_lift_joint', 'arm_elbow_joint', 'arm_wrist_1_joint', 'arm_wrist_2_joint', 'arm_wrist_3_joint'],
               ['arm_joint_1', 'arm_joint_2', 'arm_joint_3', 'arm_joint_4', 'arm_joint_5', 'arm_joint_6', 'arm_joint_7'],
               ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'],
-              ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']]
+              ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'],
+              []]
     
     # Hand joint names
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
             [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
              "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
              "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"],
-             []]
+             [],
+             ['joint_' + str(i) + '_0' for i in range(0,16)]]
 
     # Link names for the robots
     links = [['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
@@ -149,20 +154,27 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
               'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
               'finger_4_contact_14_link', 'finger_4_contact_15_tip_link'],
     ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link'],
-    ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link']]
+    ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link'],
+    ['hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
+              'finger_1_contact_1_link', 'finger_1_contact_2_link', 'finger_1_contact_3_tip_link',
+              'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
+              'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
+              'finger_4_contact_14_link', 'finger_4_contact_15_tip_link']]
 
     # Fingers tips for the robots
     finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
                     ["tool0"],
-                    ['tool0']]
+                    ['tool0'],
+                    ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]]
 
     # All joint names
-    all_joints = [[], [], [], []]
+    all_joints = [[], [], [], [], []]
     all_joints[UR5e] = joints[UR5e] + hand_joints[UR5e]
     all_joints[GEN3] = joints[GEN3] + hand_joints[GEN3]
     all_joints[UR5e_3f] = joints[UR5e_3f] + hand_joints[UR5e_3f]
     all_joints[UR5e_NOGRIP] = joints[UR5e_NOGRIP]
+    all_joints[Allegro] = joints[Allegro] + hand_joints[Allegro]
 
 
 
@@ -170,6 +182,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
     
@@ -193,7 +206,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                     [-0.5,  0.5]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, False]
+    apply_range = [False, True, False, False, True]
 
 
 

@@ -5,7 +5,7 @@ import torch
 from collections.abc import Sequence
 import copy
 
-from .rl_manipulation_direct_env_cfg import RLManipulationDirectCfg, update_cfg
+from .deformables_direct_env_cfg import DeformablesDirectCfg, update_cfg
 
 from .py_dq.src.dq import *
 from .py_dq.src.distances import *
@@ -29,11 +29,11 @@ from omni.isaac.lab.markers import VisualizationMarkers
 
 
 # Class for the Bimanual Direct Environment
-class RLManipulationDirect(DirectRLEnv):
-    cfg: RLManipulationDirectCfg
+class DeformablesDirect(DirectRLEnv):
+    cfg: DeformablesDirectCfg
 
     # --- init function ---
-    def __init__(self, cfg: RLManipulationDirectCfg, render_mode: str | None = None, **kwargs):
+    def __init__(self, cfg: DeformablesDirectCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         
         # --- Debug variables ---
@@ -172,6 +172,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         elif self.cfg.robot == self.cfg.UR5e_NOGRIP:
             self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_4)
+
+        elif self.cfg.robot == self.cfg.Allegro:
+            self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_5)
+
 
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
@@ -456,11 +460,19 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Default joint position for the robots
-        joint_pos = self.default_joint_pos[env_ids]
-        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
+        if self.cfg.robot == self.cfg.Allegro:
+            root_state = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w
 
-        # Write the joint positions to the environments
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+            self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_root_link_state_to_sim(root_state = root_state, env_ids = env_ids)
+
+
+        else:
+            joint_pos = self.default_joint_pos[env_ids]
+            joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
+
+            # Write the joint positions to the environments
+            self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+
 
 
     # Resets the robot according to their END EFFECTOR
@@ -530,12 +542,14 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Reset the robot ---
         # Reset the robot first to the default joint position so the IK is easier to compute afterwards
-        # self.reset_robot(env_ids = env_ids)
+        self.reset_robot(env_ids = env_ids)
 
         # Reset the robot to a random Euclidean position
         # self.reset_robot_ee(env_ids = env_ids)
         
-
+        # print(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])
+        # print(self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7])
+        # raise
         self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
         self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
 

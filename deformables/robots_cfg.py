@@ -238,7 +238,7 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
 
 ALLEGRO = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/config/usd/allegro.usd",
+        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/deformables/config/usd/allegro.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
