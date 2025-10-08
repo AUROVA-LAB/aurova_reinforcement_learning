@@ -1,0 +1,239 @@
+from __future__ import annotations
+
+from math import pi
+import torch
+
+from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_obstacles.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
+
+import omni.isaac.lab.sim as sim_utils
+from omni.isaac.lab.assets import Articulation
+from omni.isaac.lab.envs import DirectRLEnvCfg
+from omni.isaac.lab.scene import InteractiveSceneCfg
+from omni.isaac.lab.sim import SimulationCfg
+from omni.isaac.lab.utils import configclass
+from omni.isaac.lab.utils.math import euler_xyz_from_quat
+from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.lab.markers import VisualizationMarkersCfg
+
+
+
+# Configuration class for the environment
+@configclass
+class RLObstaclesDirectCfg(DirectRLEnvCfg):
+    
+    # ---- Env variables ----
+    decimation = 3              # Number of control action updates @ sim dt per policy dt.
+    episode_length_s = 3.0      # Length of the episode in seconds
+    max_steps = 130              # Maximum steps in an episode
+   
+    # --- Mapping configuration ---
+    DQ = 0
+    EULER = 1
+    QUAT = 2
+    MAT = 3
+
+    # Size of the Lie algebra
+    sizes = [[8, 6, 7, 16], [6]*4]
+    
+    representation = DQ
+    mapping = 2
+    size = sizes[int(mapping != 0)][representation]
+    size_group = sizes[0][representation]
+    distance = 1
+
+    # Scalings for each action
+    scalings = [[[0.01, 0.001], [0.03,  0.006], [0.01, 0.007]],
+                [[0.007, 0.02]],
+                [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
+                [[0.02,  0.004], [0.03,  0.006]]]
+
+    action_scaling = scalings[representation][mapping]
+
+
+    # --- Action / observation space ---
+    num_actions = size                  # Number of actions per environment (overridden)
+    num_observations = num_actions      # Number of observations per environment (overridden)
+
+    num_envs = 1                # Number of environments by default (overriden)
+
+    debug_markers = True        # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
+    render_imgs = False          # Activate image rendering
+    render_steps = 6            # Render images every certain amount of steps
+
+    velocity_limit = 10         # Velocity limit for robots' end effector
+
+
+    # Robot options
+    UR5e = 0                    
+    GEN3 = 1
+    UR5e_3f = 2
+    UR5e_NOGRIP = 3
+    
+    robot = UR5e_NOGRIP
+
+    keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
+    ee_link = ['tool0',         # Names for the end effector of each robot
+               'tool_frame',
+               'tool0',
+               'wrist_3_link']
+
+
+
+    # ---- Configurations ----
+    # Simulation
+    sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
+    # SimulationCfg: configuration for simulation physics 
+    #    dt: time step of the simulation (seconds)
+    #    render_interval: number of physics steps per rendering steps
+
+    # Robots
+    robot_cfg_1: Articulation = UR5e_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e])
+    robot_cfg_2: Articulation = GEN3_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[GEN3])
+    robot_cfg_3: Articulation = UR5e_3f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_3f])
+    robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
+
+    
+    # Markers
+    marker_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
+        prim_path="/Visuals/myMarkers",
+        markers={
+            "ur5e_ee_pose": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "target_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+        }
+    )
+    # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
+    #    markers: The dictionary of marker configurations.
+    #       UsdFileCfg: USD file to spawn asset from. --> In this case, a frame prim is imported from its USD file.
+
+    # scene
+    scene: InteractiveSceneCfg = InteractiveSceneCfg(num_envs = num_envs, env_spacing = 2.5, replicate_physics = True)
+    # InteractiveSceneCfg: Configuration for the interactive scene.
+    #    num_envs: Number of environment instances handled by the scene.
+    #    env_spacing: Spacing between environments. --> Positions are automatically handled
+    #    replicate_physics: Enable/disable replication of physics schemas when using the Cloner APIs. If True, the simulation will have the same asset instances (USD prims) in all the cloned environments.
+    
+
+
+    # ---- Joint information ----
+    # Robot joint names
+    joints = [['arm_shoulder_pan_joint', 'arm_shoulder_lift_joint', 'arm_elbow_joint', 'arm_wrist_1_joint', 'arm_wrist_2_joint', 'arm_wrist_3_joint'],
+              ['arm_joint_1', 'arm_joint_2', 'arm_joint_3', 'arm_joint_4', 'arm_joint_5', 'arm_joint_6', 'arm_joint_7'],
+              ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'],
+              ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']]
+    
+    # Hand joint names
+    hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
+            [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
+             "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
+             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"],
+             []]
+
+    # Link names for the robots
+    links = [['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
+              'finger_1_contact_1_link', 'finger_1_contact_2_link', 'finger_1_contact_3_tip_link',
+              'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
+              'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
+              'finger_4_contact_14_link', 'finger_4_contact_15_tip_link'], 
+    ['base_link', 'shoulder_link', 'half_arm_1_link', 'half_arm_2_link', 'forearm_link', 'spherical_wrist_1_link', 'spherical_wrist_2_link', 'bracelet_link', 'end_effector_link', 'hand_palm_link', 'hand_link_0_0_link', 'hand_link_12__link', 'hand_link_4_0_link', 'hand_link_8_0_link', 'hand_link_1_0_link', 'hand_link_13__link', 'hand_link_5_0_link', 'hand_link_9_0_link', 'hand_link_2_0_link', 'hand_link_14__link', 'hand_link_6_0_link', 'hand_link_10__link', 'hand_link_3_0_link', 'hand_link_15__link', 'hand_link_7_0_link', 'hand_link_11__link', 'hand_link_3_0_link_tip_link', 'hand_link_15__link_tip_link', 'hand_link_7_0_link_tip_link', 'hand_link_11__link_tip_link', 
+     'finger_1_contact_1_link', 'finger_1_contact_2_link', 'finger_1_contact_3_tip_link',
+              'finger_2_contact_5_link', 'finger_2_contact_6_link', 'finger_2_contact_7_tip_link',
+              'finger_3_contact_9_link', 'finger_3_contact_10_link', 'finger_3_contact_11_tip_link',
+              'finger_4_contact_14_link', 'finger_4_contact_15_tip_link'],
+    ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link'],
+    ['base_link', 'shoulder_link', 'upper_arm_link', 'forearm_link', 'wrist_1_link', 'wrist_2_link', 'wrist_3_link', 'camera_link', 'ee_link']]
+
+    # Fingers tips for the robots
+    finger_tips = [["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_11__link_tip_link", "hand_link_3.0_link_tip_link", "hand_link_7.0_link_tip_link"]
+                   ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"],  # ["hand_link_8.0_link", "hand_link_0.0_link", "hand_link_4.0_link"]
+                    ["tool0"],
+                    ['tool0']]
+
+    # All joint names
+    all_joints = [[], [], [], []]
+    all_joints[UR5e] = joints[UR5e] + hand_joints[UR5e]
+    all_joints[GEN3] = joints[GEN3] + hand_joints[GEN3]
+    all_joints[UR5e_3f] = joints[UR5e_3f] + hand_joints[UR5e_3f]
+    all_joints[UR5e_NOGRIP] = joints[UR5e_NOGRIP]
+
+
+
+    # ---- Initial pose for the robot ----
+    # Initial pose of the robots in quaternions
+    ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
+                         [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
+    
+    # Obtain Euler angles from the quaternion
+    r, p, y = euler_xyz_from_quat(torch.tensor(ee_init_pose_quat)[:, 3:])
+    
+    euler = torch.cat((r.unsqueeze(-1), p.unsqueeze(-1), y.unsqueeze(-1)), dim=-1).numpy().tolist()
+    r = r.numpy().tolist()
+    p = p.numpy().tolist()
+    y = y.numpy().tolist()
+
+    # Initial pose using Euler angles
+    ee_init_pose = torch.cat((torch.tensor(ee_init_pose_quat)[:,:3], torch.tensor(euler)), dim = -1).numpy().tolist()
+
+    # Increments in the original poses for sampling random values on each axis
+    ee_pose_incs = [[-0.3,  0.3],
+                    [-0.3,  0.3],
+                    [-0.3,  0.3],
+                    [-0.5,  0.5],
+                    [-0.5,  0.5],
+                    [-0.5,  0.5]]
+    
+    # Which robot apply the sampling poses
+    apply_range = [False, True, False, False]
+
+
+
+    # ---- Target poses ----
+    target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
+    target_poses_incs = [[-0.2,  0.2],
+                         [-0.2,   0.2],
+                         [-0.35,   0.225],
+                         [-3*pi/5,  3*pi/5],
+                         [-3*pi/5,  3*pi/5],
+                         [-pi/2,  pi/2]]
+
+    apply_range_tgt = True
+
+
+
+    # ---- Reward variables ----
+    # reward scales
+    rew_scale_dist: float= 1.0
+
+    # Position threshold for ending the episode
+    distance_thres = 0.05 # 0.08 # 0.03
+
+    # Bonus for reaching the target
+    bonus_tgt_reached = 100
+
+
+# Function to update the variables in the configuration class
+#    using new information in the BimanualDirect class and new number of environments
+def update_cfg(cfg, num_envs, device):
+    '''
+    In:
+        - cfg - RLManipulationDirectCfg: configuration class.
+        - num_envs - int: number of environments in the simulation.
+        - device - str: Cuda or cpu device
+    
+    Out:
+        - cfg - RLManipulationDirectCfg: modified configuration class
+    '''
+
+    cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+
+    return cfg
