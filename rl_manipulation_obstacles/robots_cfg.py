@@ -2,7 +2,7 @@
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.assets import ArticulationCfg
+from isaaclab.assets import ArticulationCfg, RigidObjectCfg
 from math import pi
 ## 
 # Configuration
@@ -233,4 +233,20 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
         
 
     # },
+)
+
+
+MASTER_CHEF_CAN = RigidObjectCfg(
+    spawn = sim_utils.UsdFileCfg(
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/master_chef_can.usd",
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            disable_gravity=False,
+            max_depenetration_velocity=5.0,
+        ),
+        activate_contact_sensors=True,
+        collision_props=sim_utils.CollisionPropertiesCfg(
+            collision_enabled = True,
+        )
+    ),
+    init_state=RigidObjectCfg.InitialStateCfg(pos = (1.0, 0.0, 0.0)),
 )

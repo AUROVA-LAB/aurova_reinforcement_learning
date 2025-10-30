@@ -17,7 +17,7 @@ from .py_dq.src.matrix_lie import *
 from .py_dq.src.euler import *
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation
+from isaaclab.assets import Articulation, RigidObject
 from isaaclab.envs import DirectRLEnv
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import sample_uniform
@@ -235,6 +235,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         elif self.cfg.robot == self.cfg.UR5e_NOGRIP:
             self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_4)
+        
+        self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
 
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
@@ -264,6 +266,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         trans = torch.tensor([[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]).to(self.device)
         rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).to(self.device)
+        rot = torch.tensor([[-0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916, -0.3825884841399441]]).to(self.device)
 
 
         camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]

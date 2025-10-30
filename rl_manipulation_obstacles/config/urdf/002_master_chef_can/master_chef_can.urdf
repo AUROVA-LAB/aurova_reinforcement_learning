@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<robot name="master_chef_can">
+
+  <link name="link">
+
+    <!-- Inertial -->
+    <inertial>
+      <origin xyz="-0.01707072958296921 -0.009762855837207728 0.07058421978429177"
+              rpy="0.0008027823824317601 0.0013536605031130087 0.2022337856188338" />
+      <mass value="0.0010545331012102948" />
+      <inertia
+        ixx="2.2661150547293195e-06"
+        ixy="1.8006239658831286e-22"
+        ixz="-3.0733301310289394e-22"
+        iyy="2.261091292777374e-06"
+        iyz="-5.962806044885196e-22"
+        izz="1.3207509037839934e-06" />
+    </inertial>
+
+    <!-- Collision -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="model://002_master_chef_can/downsampled.obj"/>
+      </geometry>
+    </collision>
+
+    <!-- Visual -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="model://002_master_chef_can/google_16k/textured.obj"/>
+      </geometry>
+      <material name="master_chef_can">
+        <!-- URDF can't directly load .material scripts, Gazebo uses this -->
+        <texture filename="model://002_master_chef_can/master_chef_can.material"/>
+      </material>
+    </visual>
+
+  </link>
+
+</robot>
+
