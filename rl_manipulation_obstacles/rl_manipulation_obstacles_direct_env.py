@@ -23,12 +23,15 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import sample_uniform
 from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from isaaclab.utils.math import quat_from_euler_xyz
+from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sensors import TiledCamera
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+from pynput import keyboard
+
 
 
 
@@ -108,12 +111,18 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_pose_r =  torch.tensor([0.0 ,0.0 ,0.0, 1.0 ,0.0 ,0.0 ,0.0]).to(self.device).repeat(self.num_envs, 1).float()
         self.target_pose_r_group =  torch.zeros((self.num_envs, cfg.size_group)).to(self.device).float()
         self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
+
+        self.object_pose_w_lab = torch.tensor([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]).repeat(self.num_envs, 1).to(self.device)
         
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
 
+        self.root_robot_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
+        
+
         # Indexes for: robot joints, hand joints, all joints
         self._robot_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.joints[self.cfg.robot])[0]
+        self._hand_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.hand_joints[self.cfg.robot])[0]
         self._all_joints_idx = self.scene.articulations[self.cfg.keys[self.cfg.robot]].find_joints(self.cfg.all_joints[self.cfg.robot])[0]
 
         # IK Controller
@@ -139,10 +148,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # List of joint actions
-        self.actions = copy.deepcopy(self.default_joint_pos)
+        self.actions = torch.zeros((self.num_envs, len(self._all_joints_idx))).to(self.device)
 
         # Poses obtained at reset
-        self.reset_robot_poses_r = torch.zeros((self.num_envs, 7)).to(self.device) 
+        self.reset_robot_poses_r = torch.zeros((self.num_envs, 7)).to(self.device)
 
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
@@ -150,6 +159,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
+        self.box_ranges = torch.tensor([[self.cfg.box_range[0], self.cfg.box_range[1]]]).repeat(self.num_envs, 1).to(self.device)
 
         # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
@@ -203,6 +213,28 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
+        
+        self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
+        self.correspondences = ['w','s','a','d','o','l']
+        self.inc = 0.01
+
+
+        # Crear listener
+        listener = keyboard.Listener(on_press=self.on_press)
+        listener.start()  # ✅ No bloquea
+
+
+    def on_press(self, key):
+        try:
+            if key.char in self.correspondences:
+                idx = self.correspondences.index(key.char)
+
+                self.prim_action[:, int(idx/2)] += (2 * int(idx%2 == 0) - 1) * self.inc
+
+            
+        except AttributeError:
+            pass
+
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -236,12 +268,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         elif self.cfg.robot == self.cfg.UR5e_NOGRIP:
             self.scene.articulations[self.cfg.keys[self.cfg.robot]] = Articulation(self.cfg.robot_cfg_4)
         
+        self.scene.rigid_objects["shelf"] = RigidObject(self.cfg.shelf_cfg)
         self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
 
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+        # self.scene.sensors["camera_2"] = TiledCamera(self.cfg.tiled_camera_2)
 
 
         # Add lights
@@ -250,7 +284,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
     # Method to preprocess the actions so they have a proper format
-    def _preprocess_actions(self, actions: torch.Tensor) -> torch.Tensor:
+    def _preprocess_actions(self, actions: torch.Tensor, gripper = True) -> torch.Tensor:
         '''
         In:
             - actions - torch.Tensor (N, m): incremental actions in the Lie algebra
@@ -258,54 +292,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         Out:
             - actions - torch.Tensor: preprocessed actions.
         '''
-
-
-
-        self.count += 1
-        output_dir = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/"
-
-        trans = torch.tensor([[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]).to(self.device)
-        rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).to(self.device)
-        rot = torch.tensor([[-0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916, -0.3825884841399441]]).to(self.device)
-
-
-        camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
-        print(rot)
-        print(camera_pose[:, 3:7])
-        new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3], q01 = camera_pose[:, 3:7],
-                                                                    t12 = trans,              q12 = rot)
-        
-        self.scene.sensors["camera"].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
-
-        # [0.1231539748184402, 0.09738024537036244, 0.015012247696052522]
-        
-        # X, Y, Z, W
-        # [-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]
-
-
-
-        # Render images every certain amount of steps
-        if self.count % 5 == 0:
-            
-            # Obtain images from the sensor
-            image_tensor = [self.scene.sensors["camera"].data.output["rgb"][0, ..., :3]]
-
-            # Function to save images (in utils)
-            if True:
-                save_images_grid(images = image_tensor,
-                                 subtitles = ["Camera"],
-                                 title = "RGB Image: Cam0",
-                                 filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
-
-
-
-
-
-
-
-
-
-
 
         # Clamp actions
         if self.cfg.representation == self.cfg.MAT and self.cfg.mapping == 0:
@@ -319,7 +305,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         else:
             actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
-            actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            # actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+
+            if gripper:
+                actions[:, 3:-1] = torch.clamp(actions[:, 3:-1], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+                actions[:, -1] = torch.clamp(actions[:, -1], -self.cfg.grip_scaling, self.cfg.grip_scaling)
+
+            else:
+                actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+
 
         return actions
     
@@ -368,9 +362,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - None
         '''
 
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
+        actions = self.prim_action
+        self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
+
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
 
         # Convert to IsaacLab representation (translation, quaternion)
@@ -386,7 +385,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Get the actions for the robot. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.actions = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
+        self.actions[:, :6] = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
+
+
+        # --- Update gripper position ---
+        actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        
+        move_hand = (self.hand_pose*140) < 125.0
+
+        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+
         
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -421,19 +429,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - Pose of the object.
         '''
         
-        # Obtains the positions of the of the robots
-        ee_pose_w_1 = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
+        self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
+                                                                         self.debug_target_pose_w[:, :3])), 
                                                                          
-                                                                         self.debug_target_pose_w[:, :3],)), 
-                                                orientations = torch.cat((ee_pose_w_1[:, 3:], 
-                                                                          
-                                                                          self.debug_target_pose_w[:,3:],),), 
+                                                orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
+                                                                          self.debug_target_pose_w[:,3:])), 
+
                                                 marker_indices=marker_indices)
 
 
@@ -451,30 +457,90 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtain the pose of the GEN3 end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
 
-        # Obtains the pose of the base of the GEN3 robot in the world frame
-        robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
-
         # Obtain the pose of the end effector in GEN3 root frame
-        robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
+        robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
 
         # Fix double cover
         neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
         robot_rot_ee_quat_r[neg_idx] *= -1
+        
 
+
+        # --- Target pose ---
+        self.debug_target_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 0:7]
+
+        target_pos_r, target_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
+                                                                t02 = self.debug_target_pose_w[:, :3], q02 = self.debug_target_pose_w[:, 3:])
+
+        # Fix double cover
+        neg_idx = target_quat_r[:, 0] < 0.0
+        target_quat_r[neg_idx] *= -1
+
+
+
+        # --- Build relative pose observation ---
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+        self.target_pose_r_group = self.convert_to_group(target_pos_r, target_quat_r)
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
-        # --- Target pose ---
-        # Obtain the pose for the target in the world frame
-        grasp_point_obj_pos_r, grasp_point_obj_quat_r = combine_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
-                                                                                  t12 = self.target_pose_r[:, :3], q12 = self.target_pose_r[:, 3:])
-        self.debug_target_pose_w = torch.cat((grasp_point_obj_pos_r, grasp_point_obj_quat_r), dim = -1)
+
+        
+
+        # Hand observations
+        self.hand_joints_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
+        self.hand_pose = torch.round(self.hand_joints_pos[:, 2] / self.cfg.m[0], decimals = 0) / 140.0
+
+
+    def _get_images(self, camera_key = "camera"):
+        '''
+        In:
+            - camera_key - str: key of the camera to obtain images from.
+        
+        Out:
+            - imgs - torch.Tensor: image obtained from the desired camera.
+        '''
+
+        self.count += 1
+        output_dir = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/"
+
+        trans = torch.tensor([[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]).repeat(self.num_envs, 1).to(self.device)
+        # rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).repeat(self.num_envs, 1).to(self.device)
+        rot = torch.tensor([[-0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916, -0.3825884841399441]]).repeat(self.num_envs, 1).to(self.device)
+
+        camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
+        
+        new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3], q01 = camera_pose[:, 3:7],
+                                                                    t12 = trans,              q12 = rot)
+        
+        self.scene.sensors["camera"].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
+
+        # [0.1231539748184402, 0.09738024537036244, 0.015012247696052522]
+        
+        # X, Y, Z, W
+        # [-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]
+
+        # Obtain images from the sensor
+        image_tensor = self.scene.sensors[camera_key].data.output["rgb"][0, ..., :3]
+
+
+        # Render images every certain amount of steps
+        if self.cfg.save_imgs:
+            if self.count % 5 == 0:
+            # Function to save images (in utils)
+                save_images_grid(images = [image_tensor],
+                                 subtitles = ["Camera"],
+                                 title = "RGB Image: Cam0",
+                                 filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
+                
+        return image_tensor
+
+
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -490,8 +556,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
         
+        image = self._get_images()
+        
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = self.robot_rot_ee_pose_r_lie_rel
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -619,7 +687,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[:, (6):]), 
                                dim=-1)[env_ids] 
-        
+                
         # Obtains the joint velocities
         joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[env_ids]
        
@@ -691,6 +759,37 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         # Updates the poses 
         self.update_new_poses()  
+
+        box_pos = sample_uniform(
+            self.box_ranges[:, 0],
+            self.box_ranges[:, 1],
+            [self.num_envs, 2],
+            self.device,
+        )
+
+
+        new_incs = self.cfg.object_increments.clone()
+        
+        new_incs[:, 1] *= box_pos[:, 0].int()
+        new_incs[:, 2] *= box_pos[:, 1].int()
+
+
+
+        new_obj_pose_r = combine_frame_transforms(t01 = self.cfg.object_base_pose[:, :3], q01 = self.cfg.object_base_pose[:, 3:],
+                                                t12 = new_incs[:, :3], q12 = new_incs[:, 3:])
+        
+        
+        new_obj_pose_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
+                                                  t12 = new_obj_pose_r[0], q12 = new_obj_pose_r[1])
+        
+        
+        
+        self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((new_obj_pose_w), dim = -1), env_ids = env_ids)
+        self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
+
+        
+
+
 
 
         

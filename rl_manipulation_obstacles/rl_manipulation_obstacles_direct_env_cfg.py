@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from math import pi
 import torch
+import copy
 
-from isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation_obstacles.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG, MASTER_CHEF_CAN
+from isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation_obstacles.robots_cfg import *
 
 
 import isaaclab.sim as sim_utils
@@ -24,9 +25,9 @@ from isaaclab.sensors import TiledCameraCfg
 class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
-    decimation = 3              # Number of control action updates @ sim dt per policy dt.
+    decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 130              # Maximum steps in an episode
+    max_steps = 40              # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
@@ -38,7 +39,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 2
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
@@ -50,17 +51,20 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
+    grip_scaling = 5
+
+    img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
-    action_space = size                  # Number of actions per environment (overridden)
-    observation_space = action_space     # Number of observations per environment (overridden)
+    action_space = 7             # Number of actions per environment (overridden)
+    observation_space = 7# + img_height*img_width       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
+    debug_markers = True       # Activate marker visualization
+    save_imgs = True           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -73,19 +77,48 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     UR5e_3f = 2
     UR5e_NOGRIP = 3
     
-    robot = UR5e_NOGRIP
+    robot = UR5e_3f
 
     keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot
                'tool_frame',
                'tool0',
                'wrist_3_link']
+    
+     # Robotiq 3f control
+    grip_theta_max = [1.2218, 1.5708]
+    m = [grip_theta_max[0]/140, grip_theta_max[1]/100]
+
+    def_pos = [0.0, 0.05, 0.0, -0.053]
+
+    open = [def_pos[1], 
+            def_pos[0], def_pos[0],
+            def_pos[2],
+            def_pos[1], def_pos[1],
+            def_pos[3],
+            def_pos[2], def_pos[2],
+            def_pos[3], def_pos[3]]
+    close = copy.deepcopy(open)
+    close[0] = 0.65
+    close[4] = 0.65
+    close[5] = 0.65
+
+    close[-1] = -0.65
+    close[-2] = -0.65
+    close[-5] = -0.65
+
+    moving_joints_gripper = [m[0], 
+                             0.0,
+                             m[0], m[0],
+                             -m[0],
+                             0.0, 0.0,
+                             -m[0], -m[0]]
 
 
 
     # ---- Configurations ----
     # Simulation
-    sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
+    sim: SimulationCfg = SimulationCfg(dt = 1/100, render_interval = decimation)
     # SimulationCfg: configuration for simulation physics 
     #    dt: time step of the simulation (seconds)
     #    render_interval: number of physics steps per rendering steps
@@ -96,6 +129,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     robot_cfg_3: Articulation = UR5e_3f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_3f])
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
 
+    shelf_cfg: RigidObject = SHELF.replace(prim_path="/World/envs/env_.*/shelf")
     object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
 
     
@@ -134,8 +168,19 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
         ),
-        width=80,
-        height=80,
+        width=img_width,
+        height=img_height,
+    )
+
+    tiled_camera_2: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_2",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        ),
+        width=img_width,
+        height=img_height,
     )
 
 
@@ -186,7 +231,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-0.2830,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
     
     # Obtain Euler angles from the quaternion
@@ -209,7 +254,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                     [-0.5,  0.5]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, False]
+    apply_range = [False, False, False, False]
 
 
 
@@ -223,6 +268,26 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                          [-pi/2,  pi/2]]
 
     apply_range_tgt = True
+
+    box_range = [0,2]
+    object_base_pose = [-0.7800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
+    object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
+
+    # Left
+    # -0.6000, -0.3900,  0.6500,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000, -0.3900,  0.3500,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000, -0.3900,  0.0500,  1.0000,  0.0000,  0.0000,  0.0000
+
+    # Center
+    # -0.6000,  0.0900,  0.6400,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000,  0.0900,  0.3400,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000,  0.0900,  0.0400,  1.0000,  0.0000,  0.0000,  0.0000
+
+
+    # Right
+    # -0.6000,  0.6200,  0.6500,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000,  0.6200,  0.3500,  1.0000,  0.0000,  0.0000,  0.0000
+    # -0.6000,  0.6200,  0.0500,  1.0000,  0.0000,  0.0000,  0.0000
 
 
 
@@ -251,5 +316,8 @@ def update_cfg(cfg, num_envs, device):
     '''
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+    cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
+    cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
+    cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
 
     return cfg

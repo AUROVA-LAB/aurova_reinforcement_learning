@@ -119,15 +119,15 @@ UR5e_3f_CFG = ArticulationCfg(
             "shoulder_pan_joint": 0.0,
             "shoulder_lift_joint": -pi/2,
             "elbow_joint": -pi/2,
-            "wrist_1_joint": -pi/2,
+            "wrist_1_joint": 0*-pi/2,
             "wrist_2_joint": pi/2,
             "wrist_3_joint": -pi/4,
-            "robotiq_finger_middle_joint_1": 0.049,
-            "robotiq_finger_1_joint_1": 0.049,
-            "robotiq_finger_2_joint_1": 0.049,
-            "robotiq_finger_middle_joint_3": -0.052,
-            "robotiq_finger_1_joint_3": -0.052,
-            "robotiq_finger_2_joint_3": -0.052,
+            "robotiq_finger_middle_joint_1": 0.05,
+            "robotiq_finger_1_joint_1": 0.05,
+            "robotiq_finger_2_joint_1": 0.05,
+            "robotiq_finger_middle_joint_3": -0.053,
+            "robotiq_finger_1_joint_3": -0.053,
+            "robotiq_finger_2_joint_3": -0.053,
         },
     ),
     actuators={
@@ -241,12 +241,36 @@ MASTER_CHEF_CAN = RigidObjectCfg(
         usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/master_chef_can.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
-            max_depenetration_velocity=5.0,
+            max_depenetration_velocity=1.0,
         ),
         activate_contact_sensors=True,
         collision_props=sim_utils.CollisionPropertiesCfg(
             collision_enabled = True,
+            rest_offset = 0.0
+        ),
+        scale = (1, 1, 1),
+        mass_props = sim_utils.MassPropertiesCfg(
+            mass = 0.01,
         )
     ),
     init_state=RigidObjectCfg.InitialStateCfg(pos = (1.0, 0.0, 0.0)),
+)
+
+
+SHELF = RigidObjectCfg(
+    spawn = sim_utils.UsdFileCfg(
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/shelf_2.usd",
+        rigid_props=None,
+        # sim_utils.RigidBodyPropertiesCfg(
+        #     disable_gravity=True,
+        #     max_depenetration_velocity=1.0,
+        # ),
+        activate_contact_sensors=True,
+        collision_props=sim_utils.CollisionPropertiesCfg(
+            collision_enabled = True,
+            rest_offset = 0.0
+        ),
+        scale=(0.01, 0.01, 0.01),
+    ),
+    init_state=RigidObjectCfg.InitialStateCfg(pos = (-0.6, -0.6, 0.0), rot = (0.7073883, 0.0, 0.0, 0.7068252)),
 )
