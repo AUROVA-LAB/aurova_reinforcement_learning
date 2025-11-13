@@ -345,15 +345,24 @@ def update_collisions(cfg, num_envs):
         filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
+    robot_w_shelf: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot],
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/shelf" for i in range(num_envs)],
+    )
+
 
 
     # Dictionary of contact sensors configurations
     cfg.contact_sensors_dict = {"finger_middle_w_object": finger_middle_w_object,
                                 "finger_1_w_object": finger_1_w_object,
                                 "finger_2_w_object": finger_2_w_object,
+                                "robot_w_shelf": robot_w_shelf ,
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5])
+    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -5.0])
 
     return cfg
