@@ -526,14 +526,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # [-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]
 
         # Obtain images from the sensor
-        image_tensor = self.scene.sensors[camera_key].data.output["rgb"][0, ..., :3]
+        image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3]
 
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
             if self.count % 5 == 0:
             # Function to save images (in utils)
-                save_images_grid(images = [image_tensor],
+                save_images_grid(images = [image_tensor[0]],
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
@@ -556,10 +556,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
         
-        image = self._get_images()
-        
+        image = self._get_images().permute(0, 3, 1, 2).reshape(self.num_envs, -1)
+        image[image == float('inf')] = 255.0
+        image /= 255.0
+
         # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1)), dim = -1)
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), image), dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -569,6 +571,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.update_markers()
 
         return observations
+
 
 
     # Computes the reward of the transition --> Overrides method of DirectRLEnv

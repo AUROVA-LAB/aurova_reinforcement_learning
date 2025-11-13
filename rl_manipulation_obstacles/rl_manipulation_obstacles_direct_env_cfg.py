@@ -58,13 +58,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     action_space = 7             # Number of actions per environment (overridden)
-    observation_space = 7# + img_height*img_width       # Number of observations per environment (overridden)
+    observation_space = 7 + img_height*img_width       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
+    debug_markers = False       # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -176,6 +176,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/camera_2",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
         data_types=["rgb", "depth"],
+        depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
         ),
