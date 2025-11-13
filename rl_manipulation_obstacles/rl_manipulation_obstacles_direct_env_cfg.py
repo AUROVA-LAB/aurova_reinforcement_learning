@@ -16,7 +16,7 @@ from isaaclab.utils import configclass
 from isaaclab.utils.math import euler_xyz_from_quat
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.sensors import TiledCameraCfg
+from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
 
 
 
@@ -160,20 +160,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     #    env_spacing: Spacing between environments. --> Positions are automatically handled
     #    replicate_physics: Enable/disable replication of physics schemas when using the Cloner APIs. If True, the simulation will have the same asset instances (USD prims) in all the cloned environments.
 
-
     tiled_camera: TiledCameraCfg = TiledCameraCfg(
-        prim_path="/World/envs/env_.*/"+ keys[robot] +"/wrist_3_link/camera",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
-        ),
-        width=img_width,
-        height=img_height,
-    )
-
-    tiled_camera_2: TiledCameraCfg = TiledCameraCfg(
-        prim_path="/World/envs/env_.*/camera_2",
+        prim_path="/World/envs/env_.*/camera",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
         data_types=["rgb", "depth"],
         depth_clipping_behavior = "max",
@@ -182,6 +170,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         ),
         width=img_width,
         height=img_height,
+        # update_latest_camera_pose = True
     )
 
 
@@ -320,5 +309,51 @@ def update_cfg(cfg, num_envs, device):
     cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
     cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
+
+    return cfg
+
+
+
+# Add the collision sensors to the configuration class according to the number of environments
+def update_collisions(cfg, num_envs):
+
+
+
+
+    # Contact between robot 2 finger pads and object
+    finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
+    )
+
+    finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
+    )
+
+    finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=True,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
+    )
+
+
+
+    # Dictionary of contact sensors configurations
+    cfg.contact_sensors_dict = {"finger_middle_w_object": finger_middle_w_object,
+                                "finger_1_w_object": finger_1_w_object,
+                                "finger_2_w_object": finger_2_w_object,
+                                }
+    
+    # Updated contact matrix
+    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5])
 
     return cfg

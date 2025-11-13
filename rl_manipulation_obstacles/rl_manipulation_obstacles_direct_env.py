@@ -216,7 +216,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
         self.correspondences = ['w','s','a','d','o','l']
-        self.inc = 0.01
+        self.inc = 0.1
 
 
         # Crear listener
@@ -228,8 +228,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         try:
             if key.char in self.correspondences:
                 idx = self.correspondences.index(key.char)
+                
+                print("---------\n\n\n")
+                prim_idx = int(idx/2)
+                print(prim_idx)
 
-                self.prim_action[:, int(idx/2)] += (2 * int(idx%2 == 0) - 1) * self.inc
+                prim_inc = (2 * int(idx%2 == 0) - 1)
+                print(prim_inc)
+                print(prim_inc * self.inc)
+
+                self.prim_action = self.prim_action.clone()
+                self.prim_action[:, prim_idx] = prim_inc * self.inc
 
             
         except AttributeError:
@@ -275,7 +284,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
-        # self.scene.sensors["camera_2"] = TiledCamera(self.cfg.tiled_camera_2)
 
 
         # Add lights
@@ -510,8 +518,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         output_dir = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/"
 
         trans = torch.tensor([[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]).repeat(self.num_envs, 1).to(self.device)
-        # rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).repeat(self.num_envs, 1).to(self.device)
-        rot = torch.tensor([[-0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916, -0.3825884841399441]]).repeat(self.num_envs, 1).to(self.device)
+        rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).repeat(self.num_envs, 1).to(self.device)
 
         camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
         
@@ -520,11 +527,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         self.scene.sensors["camera"].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
 
-        # [0.1231539748184402, 0.09738024537036244, 0.015012247696052522]
-        
-        # X, Y, Z, W
-        # [-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]
-
+   
         # Obtain images from the sensor
         image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3]
 
