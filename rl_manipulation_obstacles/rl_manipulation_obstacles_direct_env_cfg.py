@@ -3,6 +3,8 @@ from __future__ import annotations
 from math import pi
 import torch
 import copy
+import numpy as np
+from scipy.spatial.transform import Rotation
 
 from isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation_obstacles.robots_cfg import *
 
@@ -13,7 +15,7 @@ from isaaclab.envs import DirectRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.math import euler_xyz_from_quat
+from isaaclab.utils.math import euler_xyz_from_quat, subtract_frame_transforms, combine_frame_transforms
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
@@ -63,7 +65,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -173,6 +175,10 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         # update_latest_camera_pose = True
     )
 
+    camera_trans = [[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]
+    camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
+
+
 
     # ---- Joint information ----
     # Robot joint names
@@ -246,6 +252,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Which robot apply the sampling poses
     apply_range = [False, False, False, False]
 
+    ee_translation = [0.0, 0.0, 0.18]
+    ee_rotation = [1.0, 0.0, 0.0, 0.0]
+
 
 
     # ---- Target poses ----
@@ -263,21 +272,21 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     object_base_pose = [-0.7800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
-    # Left
-    # -0.6000, -0.3900,  0.6500,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000, -0.3900,  0.3500,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000, -0.3900,  0.0500,  1.0000,  0.0000,  0.0000,  0.0000
 
-    # Center
-    # -0.6000,  0.0900,  0.6400,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000,  0.0900,  0.3400,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000,  0.0900,  0.0400,  1.0000,  0.0000,  0.0000,  0.0000
+    # Object pose adjustments
+    object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
+    rot_neg90_y = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_pos135_z = torch.tensor([(Rotation.from_rotvec((pi/2+pi/4) * np.array([0, 0, 1]))).as_quat()])        # Positive 135 degrees rotation in Y axis 
+    rot_neg90_y[:, 0], rot_neg90_y[:, 1:] = rot_neg90_y.clone()[:, 3], rot_neg90_y.clone()[:, :3]
+    rot_pos135_z[:, 0], rot_pos135_z[:, 1:] = rot_pos135_z.clone()[:, 3], rot_pos135_z.clone()[:, :3]
+    
+    object_translation, object_rotation = combine_frame_transforms(t01 = object_translation, q01 = rot_neg90_y ,
+                                                                   t12 = torch.zeros_like(object_translation), q12 = rot_pos135_z)
 
+    object_translation = object_translation[0].numpy().tolist()
+    object_rotation = object_rotation[0].numpy().tolist()
 
-    # Right
-    # -0.6000,  0.6200,  0.6500,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000,  0.6200,  0.3500,  1.0000,  0.0000,  0.0000,  0.0000
-    # -0.6000,  0.6200,  0.0500,  1.0000,  0.0000,  0.0000,  0.0000
+    rot_neg90_y, rot_pos135_z = None, None
 
 
 
@@ -309,6 +318,12 @@ def update_cfg(cfg, num_envs, device):
     cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
     cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
+    cfg.camera_trans = torch.tensor(cfg.camera_trans).repeat(num_envs, 1).to(device)
+    cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
+    cfg.ee_translation = torch.tensor(cfg.ee_translation).repeat(num_envs, 1).to(device)
+    cfg.ee_rotation = torch.tensor(cfg.ee_rotation).repeat(num_envs, 1).to(device)
+    cfg.object_translation = torch.tensor(cfg.object_translation).repeat(num_envs, 1).to(device)
+    cfg.object_rotation = torch.tensor(cfg.object_rotation).repeat(num_envs, 1).to(device)
 
     return cfg
 
@@ -322,7 +337,7 @@ def update_collisions(cfg, num_envs):
 
     # Contact between robot 2 finger pads and object
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_link_3_contact",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -330,7 +345,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_link_3_contact",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -338,7 +353,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_link_3_contact",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,

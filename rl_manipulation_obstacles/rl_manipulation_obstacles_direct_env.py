@@ -166,6 +166,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Target reached flag
         self.target_reached = torch.zeros(self.num_envs).to(self.device).bool()
+        self.home_reached = torch.zeros(self.num_envs).to(self.device).bool()
 
         # --- Lie algebra ---
         # List of mappings
@@ -212,16 +213,18 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
     
         # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
+        self.reset_robot_poses_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
-        
+
+        # ----------- AUX --------------        
         self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
         self.correspondences = ['w','s','a','d','o','l']
         self.inc = 0.1
 
-
         # Crear listener
         listener = keyboard.Listener(on_press=self.on_press)
         listener.start()  # ✅ No bloquea
+        # --------------------------------
 
 
     def on_press(self, key):
@@ -462,12 +465,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''
 
         # --- Robot poses ---
-        # Obtain the pose of the GEN3 end effector in world frame
+        # Obtain the pose of the UR5e end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
 
-        # Obtain the pose of the end effector in GEN3 root frame
+        # Obtain the pose of the end effector in UR5e root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
+
 
         # Fix double cover
         neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
@@ -476,10 +480,18 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # --- Target pose ---
+        # Get object world pose
         self.debug_target_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 0:7]
 
+        # Obtain the relative pose w.r.t. the robot root frame
         target_pos_r, target_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                 t02 = self.debug_target_pose_w[:, :3], q02 = self.debug_target_pose_w[:, 3:])
+        
+        target_pos_r, target_quat_r = combine_frame_transforms(t01 = target_pos_r,                   q01 = target_quat_r,
+                                                               t12 = self.cfg.object_translation,    q12 = self.cfg.object_rotation)
+        
+        self.debug_target_pose_w = torch.cat((target_pos_r, target_quat_r), dim = -1)
+
 
         # Fix double cover
         neg_idx = target_quat_r[:, 0] < 0.0
@@ -505,6 +517,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.hand_pose = torch.round(self.hand_joints_pos[:, 2] / self.cfg.m[0], decimals = 0) / 140.0
 
 
+
+        # Put actual end effector pose on the gripper
+        robot_rot_ee_pos_r, robot_rot_ee_quat_r = combine_frame_transforms(t01 = robot_rot_ee_pos_r,       q01 = robot_rot_ee_quat_r,
+                                                                           t12 = self.cfg.ee_translation,  q12 = self.cfg.ee_rotation)
+        
+        self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+        self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
+
+
+
     def _get_images(self, camera_key = "camera"):
         '''
         In:
@@ -517,13 +539,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.count += 1
         output_dir = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/"
 
-        trans = torch.tensor([[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]).repeat(self.num_envs, 1).to(self.device)
-        rot = torch.tensor([[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]).repeat(self.num_envs, 1).to(self.device)
-
+        
         camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
         
-        new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3], q01 = camera_pose[:, 3:7],
-                                                                    t12 = trans,              q12 = rot)
+        new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
+                                                                    t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
         
         self.scene.sensors["camera"].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
 
@@ -588,13 +608,23 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''  
 
         # ---- Distance computation ----
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)                                                                   
+        dist_target = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)
+        dist_home = self.dist_function(self.target_pose_r_group, self.reset_robot_poses_group_r, self.log, self.diff_operator)  
+
+        dist = dist_target * torch.logical_not(self.target_reached) + dist_home * self.target_reached                                                                 
 
         # Obtains wether the agent is approaching or not
         mod = (2*(dist < self.prev_dist).int() - 1).float()
 
+
+        aux_tgt_reached = self.target_reached.clone()
+
         # Target reached flag
-        self.target_reached = dist < self.cfg.distance_thres
+        self.target_reached = torch.logical_and(dist_target < self.cfg.distance_thres, self.target_reached)
+        self.home_reached = dist_home < self.cfg.distance_thres
+
+        apply_bonus = torch.logical_and(self.target_reached, torch.logical_not(aux_tgt_reached))
+
 
         # ---- Distance reward ----
         # Reward for the approaching
@@ -602,7 +632,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward +  self.target_reached * self.cfg.bonus_tgt_reached
+        reward = reward +  torch.logical_or(apply_bonus, self.home_reached) * self.cfg.bonus_tgt_reached
 
         # Update previous distances
         self.prev_dist = dist
@@ -629,7 +659,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached)
+        terminated = torch.logical_or(time_out, self.home_reached)
 
         return truncated, terminated
     
@@ -680,6 +710,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Save sampled pose
         self.reset_robot_poses_r[env_ids] = ee_init_pose[env_ids]
+        self.reset_robot_poses_group_r[env_ids] = self.convert_to_group(ee_init_pose[:, :3], ee_init_pose[:, 3:])
 
         # Sets the command to the DifferentialIKController
         self.controller.set_command(ee_init_pose)
@@ -758,6 +789,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.home_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
 
