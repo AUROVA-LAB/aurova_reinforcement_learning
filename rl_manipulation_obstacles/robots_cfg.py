@@ -107,7 +107,7 @@ UR5e_4f_CFG = ArticulationCfg(
 
 UR5e_3f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/ur5e_3f_ros2.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/ur5e_3f_contacts.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
