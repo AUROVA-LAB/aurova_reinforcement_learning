@@ -29,7 +29,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 40              # Maximum steps in an episode
+    max_steps = 40000000              # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
@@ -66,7 +66,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = True       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
+    save_imgs = True           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -164,6 +164,19 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     tiled_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth"],
+        depth_clipping_behavior = "max",
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        ),
+        width=img_width,
+        height=img_height,
+        # update_latest_camera_pose = True
+    )
+
+    tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_ext",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
         data_types=["rgb", "depth"],
         depth_clipping_behavior = "max",

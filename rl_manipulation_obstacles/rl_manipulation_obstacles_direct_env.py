@@ -242,13 +242,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             if key.char in self.correspondences:
                 idx = self.correspondences.index(key.char)
                 
-                print("---------\n\n\n")
                 prim_idx = int(idx/2)
-                print(prim_idx)
 
                 prim_inc = (2 * int(idx%2 == 0) - 1)
-                print(prim_inc)
-                print(prim_inc * self.inc)
 
                 self.prim_action = self.prim_action.clone()
                 self.prim_action[:, prim_idx] = prim_inc * self.inc
@@ -297,6 +293,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+        self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -390,8 +387,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         grip_action = actions[:, -1]
         actions = actions[:, :-1]
-        actions = self.prim_action
-        self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
+        # actions = self.prim_action
+        # self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
 
         # Perform increment in the algebra and exponential map -> (plus operator)
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
@@ -586,18 +583,21 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
                                                                     t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
         
-        self.scene.sensors["camera"].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
+        self.scene.sensors[camera_key].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
+        self.scene.sensors["camera_ext"].set_world_poses(positions = self.prim_action[:, :3], orientations = new_camera_rot)
 
    
         # Obtain images from the sensor
         image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3]
+        image_tensor_ = self.scene.sensors["camera_ext"].data.output["rgb"][:, ..., :3]
+
 
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
             if self.count % 5 == 0:
             # Function to save images (in utils)
-                save_images_grid(images = [image_tensor[0]],
+                save_images_grid(images = [image_tensor_[0]],
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
