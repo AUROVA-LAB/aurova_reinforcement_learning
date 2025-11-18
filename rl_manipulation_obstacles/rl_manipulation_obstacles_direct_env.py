@@ -5,7 +5,7 @@ import torch
 from collections.abc import Sequence
 import copy
 
-from .rl_manipulation_obstacles_direct_env_cfg import RLManipulationObstaclesDirectCfg, update_cfg
+from .rl_manipulation_obstacles_direct_env_cfg import RLManipulationObstaclesDirectCfg, update_cfg, update_collisions
 
 from .py_dq.src.dq import *
 from .py_dq.src.distances import *
@@ -25,7 +25,7 @@ from isaaclab.controllers import DifferentialIKController, DifferentialIKControl
 from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
 from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
 from isaaclab.markers import VisualizationMarkers
-from isaaclab.sensors import TiledCamera
+from isaaclab.sensors import TiledCamera, ContactSensor
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -156,10 +156,20 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Update configuration class
         self.cfg = update_cfg(cfg = cfg, num_envs = self.num_envs, device = self.device)
 
+        # Obtain the number of contact sensors per environment
+        self.num_contacts = 0
+        for __ in self.cfg.contact_sensors_dict:
+            self.num_contacts += 1
+
+        # Variable to store contacts between prims
+        self.contacts = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)
+
+
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
-        self.box_ranges = torch.tensor([[self.cfg.box_range[0], self.cfg.box_range[1]]]).repeat(self.num_envs, 1).to(self.device)
+        self.box_ranges_x = torch.tensor([[self.cfg.box_range_x[0], self.cfg.box_range_x[1]]]).repeat(self.num_envs, 1).to(self.device)
+        self.box_ranges_y = torch.tensor([[self.cfg.box_range_y[0], self.cfg.box_range_y[1]]]).repeat(self.num_envs, 1).to(self.device)
 
         # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
@@ -287,6 +297,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+
+        # Correct collision sensors 
+        self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
+        for idx, sensor_cfg in self.cfg.contact_sensors_dict.items():
+            self.scene.sensors[idx] = ContactSensor(sensor_cfg)
 
 
         # Add lights
@@ -454,6 +469,25 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                 marker_indices=marker_indices)
 
 
+    # Method to filter collisions according to the force matrix
+    def filter_collisions(self):
+        '''
+        In:
+            - None
+        
+        Out:
+            - None
+        '''
+
+        # Loop through all the contact sensors configuration for the indexes
+        for idx, (key, __) in enumerate(self.cfg.contact_sensors_dict.items()):
+
+            # Obtain the matrix -> reshape it -> sum the last two dimensions -> 
+            #    -> if the value is greater than 0, there is force so  there is contact
+            self.contacts[:, idx] = torch.abs(self.scene.sensors[key].data.force_matrix_w).view(self.num_envs, -1, 3).sum(dim = (1,2), keepdim = True).squeeze((-2, -1)) > 0.0
+
+
+
     # Updates the poses of the object and robot so they can match when performing the grasp
     def update_new_poses(self):
         '''
@@ -490,7 +524,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         target_pos_r, target_quat_r = combine_frame_transforms(t01 = target_pos_r,                   q01 = target_quat_r,
                                                                t12 = self.cfg.object_translation,    q12 = self.cfg.object_rotation)
         
-        self.debug_target_pose_w = torch.cat((target_pos_r, target_quat_r), dim = -1)
+        target_pos_w, target_quat_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],        q01 = self.root_robot_pose[:, 3:],
+                                                               t12 = target_pos_r,                       q12 = target_quat_r)
+        
+        self.debug_target_pose_w = torch.cat((target_pos_w, target_quat_w), dim = -1)
 
 
         # Fix double cover
@@ -523,7 +560,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                            t12 = self.cfg.ee_translation,  q12 = self.cfg.ee_rotation)
         
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
-        self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
+
+        robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
+                                                                           t12 = robot_rot_ee_pos_r,          q12 = robot_rot_ee_quat_r)
+
+        self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
 
 
 
@@ -616,11 +657,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtains wether the agent is approaching or not
         mod = (2*(dist < self.prev_dist).int() - 1).float()
 
+        # --- Contacts ---
+        contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
+        is_contact = contacts_w > 4
+
 
         aux_tgt_reached = self.target_reached.clone()
 
         # Target reached flag
-        self.target_reached = torch.logical_and(dist_target < self.cfg.distance_thres, self.target_reached)
+        self.target_reached = torch.logical_or(torch.logical_and(dist_target < self.cfg.distance_thres, is_contact), self.target_reached)
         self.home_reached = dist_home < self.cfg.distance_thres
 
         apply_bonus = torch.logical_and(self.target_reached, torch.logical_not(aux_tgt_reached))
@@ -628,7 +673,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist)
+        reward = mod * self.cfg.rew_scale_dist * torch.exp(-2*dist) + contacts_w
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
@@ -791,25 +836,36 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.home_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
+        # Reset contacts
+        self.contacts[env_ids] = torch.empty(self.num_envs, self.num_contacts).fill_(False).to(self.device)[env_ids]
+        
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
 
         self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
         
         # Updates the poses 
-        self.update_new_poses()  
+        self.update_new_poses() 
 
-        box_pos = sample_uniform(
-            self.box_ranges[:, 0],
-            self.box_ranges[:, 1],
-            [self.num_envs, 2],
+
+        box_pos_x = sample_uniform(
+            self.box_ranges_x[:, 0],
+            self.box_ranges_x[:, 1],
+            [self.num_envs, 1],
+            self.device,
+        )
+
+        box_pos_y = sample_uniform(
+            self.box_ranges_y[:, 0],
+            self.box_ranges_y[:, 1],
+            [self.num_envs, 1],
             self.device,
         )
 
 
         new_incs = self.cfg.object_increments.clone()
         
-        new_incs[:, 1] *= box_pos[:, 0].int()
-        new_incs[:, 2] *= box_pos[:, 1].int()
+        new_incs[:, 1] *= box_pos_x[:, 0].int()
+        new_incs[:, 2] *= box_pos_y[:, 1].int()
 
 
 
@@ -825,6 +881,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((new_obj_pose_w), dim = -1), env_ids = env_ids)
         self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
 
+        
         
 
 

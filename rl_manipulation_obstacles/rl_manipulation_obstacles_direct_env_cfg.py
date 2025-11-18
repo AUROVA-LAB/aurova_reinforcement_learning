@@ -191,7 +191,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
             [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
              "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
-             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3"],
+             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3",],
              []]
 
     # Link names for the robots
@@ -268,7 +268,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range = [0,2]
+    box_range_x = [0,3]
+    box_range_y = [0,2]
     object_base_pose = [-0.7800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
@@ -324,6 +325,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.ee_rotation = torch.tensor(cfg.ee_rotation).repeat(num_envs, 1).to(device)
     cfg.object_translation = torch.tensor(cfg.object_translation).repeat(num_envs, 1).to(device)
     cfg.object_rotation = torch.tensor(cfg.object_rotation).repeat(num_envs, 1).to(device)
+    cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
 
     return cfg
 
@@ -332,12 +334,9 @@ def update_cfg(cfg, num_envs, device):
 # Add the collision sensors to the configuration class according to the number of environments
 def update_collisions(cfg, num_envs):
 
-
-
-
     # Contact between robot 2 finger pads and object
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_link_3_contact",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_link_3",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -345,7 +344,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_link_3_contact",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_link_3",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -353,7 +352,7 @@ def update_collisions(cfg, num_envs):
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_link_3_contact",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_link_3",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
@@ -361,23 +360,24 @@ def update_collisions(cfg, num_envs):
     )
 
     robot_w_shelf: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot],
+        prim_path="/World/envs/env_.*/shelf",
         update_period=0.001, 
         history_length=1, 
         debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/shelf" for i in range(num_envs)],
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/"+cfg.keys[cfg.robot] for i in range(num_envs)],
     )
 
 
 
     # Dictionary of contact sensors configurations
-    cfg.contact_sensors_dict = {"finger_middle_w_object": finger_middle_w_object,
+    cfg.contact_sensors_dict = {
+                                "finger_middle_w_object": finger_middle_w_object,
                                 "finger_1_w_object": finger_1_w_object,
                                 "finger_2_w_object": finger_2_w_object,
                                 "robot_w_shelf": robot_w_shelf ,
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -5.0])
+    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -6.0])
 
     return cfg
