@@ -624,8 +624,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         image[image == float('inf')] = 255.0
         image /= 255.0
 
-        # Builds the tensor with all the observations in a single row tensor (N, 7+7+1)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), image), dim = -1)
+        # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}

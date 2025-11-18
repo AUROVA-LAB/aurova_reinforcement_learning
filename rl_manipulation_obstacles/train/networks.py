@@ -112,6 +112,8 @@ class customMlpExtractor(MlpExtractor):
         self.latent_dim_pi = feature_dim
         self.latent_dim_vf = feature_dim
 
+        self.linear_obs = 7 + 3
+
         # # Create networks
         # # If the list of layers is empty, the network will just act as an Identity module
         # self.policy_net = nn.Sequential(*policy_net).to(device)
@@ -127,8 +129,8 @@ class customMlpExtractor(MlpExtractor):
     
 
     def extract_features(self, features:th.Tensor) -> th.Tensor:
-        geom_obs = features[:, :7]
-        img_obs = features[:, 7:].reshape(-1, 1, 80, 80)
+        geom_obs = features[:, :self.linear_obs]
+        img_obs = features[:, self.linear_obs:].reshape(-1, 1, 80, 80)
 
         return geom_obs, img_obs
 
