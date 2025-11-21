@@ -680,7 +680,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
-        is_contact = contacts_w > 4
+        is_contact = contacts_w > 5
 
 
         aux_tgt_reached = self.target_reached.clone()
