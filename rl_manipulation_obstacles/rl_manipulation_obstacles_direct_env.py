@@ -225,13 +225,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # ----------- AUX --------------        
-        self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
-        self.correspondences = ['w','s','a','d','o','l']
-        self.inc = 0.1
+        # self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
+        # self.correspondences = ['w','s','a','d','o','l']
+        # self.inc = 0.1
 
-        # Crear listener
-        listener = keyboard.Listener(on_press=self.on_press)
-        listener.start()  # ✅ No bloquea
+        # # Crear listener
+        # listener = keyboard.Listener(on_press=self.on_press)
+        # listener.start()  # ✅ No bloquea
         # --------------------------------
 
 
