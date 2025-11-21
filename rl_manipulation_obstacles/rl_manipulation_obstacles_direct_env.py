@@ -168,9 +168,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
-        self.box_ranges_x = torch.tensor([[self.cfg.box_range_x[0], self.cfg.box_range_x[1]]]).repeat(self.num_envs, 1).to(self.device)
-        self.box_ranges_y = torch.tensor([[self.cfg.box_range_y[0], self.cfg.box_range_y[1]]]).repeat(self.num_envs, 1).to(self.device)
-
+        
         # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
 
@@ -237,6 +235,25 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --------------------------------
 
 
+
+        self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+                                                                                      t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
+        
+        self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+                                                                                      t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
+        
+
+        new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
+                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
+        self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
+   
+        
+        
+        new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
+                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
+        self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
+
+
     def on_press(self, key):
         try:
             if key.char in self.correspondences:
@@ -294,6 +311,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
         self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
+        self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -584,14 +602,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                     t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
         
         self.scene.sensors[camera_key].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
-        self.scene.sensors["camera_ext"].set_world_poses(positions = self.prim_action[:, :3], orientations = new_camera_rot)
 
+        
+        
    
         # Obtain images from the sensor
-        image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3]
-        image_tensor_ = self.scene.sensors["camera_ext"].data.output["rgb"][:, ..., :3]
+        image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
+        image_tensor_ext = self.scene.sensors["camera_ext"].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
+        image_tensor_ext_2 = self.scene.sensors["camera_ext_2"].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
 
-
+        image_tensor = torch.cat((image_tensor, image_tensor_ext, image_tensor_ext_2), dim = -1)
+        image_tensor_ = image_tensor.reshape(self.num_envs, 1, 80*3, 80).permute(0, 2, 3, 1)
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
@@ -620,7 +641,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
         
-        image = self._get_images().permute(0, 3, 1, 2).reshape(self.num_envs, -1)
+        image = self._get_images()
         image[image == float('inf')] = 255.0
         image /= 255.0
 
@@ -847,25 +868,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses() 
 
 
-        box_pos_x = sample_uniform(
-            self.box_ranges_x[:, 0],
-            self.box_ranges_x[:, 1],
-            [self.num_envs, 1],
-            self.device,
-        )
-
-        box_pos_y = sample_uniform(
-            self.box_ranges_y[:, 0],
-            self.box_ranges_y[:, 1],
-            [self.num_envs, 1],
-            self.device,
-        )
+        box_pos_x = (self.cfg.box_range_x[1] - self.cfg.box_range_x[0]) * torch.rand((self.num_envs)).to(self.device) + self.cfg.box_range_x[0]
+        box_pos_y = (self.cfg.box_range_y[1] - self.cfg.box_range_y[0]) * torch.rand((self.num_envs)).to(self.device) + self.cfg.box_range_y[0]
 
 
         new_incs = self.cfg.object_increments.clone()
         
-        new_incs[:, 1] *= box_pos_x[:, 0].int()
-        new_incs[:, 2] *= box_pos_y[:, 1].int()
+        new_incs[:, 1] *= box_pos_x.int()
+        new_incs[:, 2] *= box_pos_y.int()
 
 
 

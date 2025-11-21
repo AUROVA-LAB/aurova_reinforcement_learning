@@ -16,6 +16,42 @@ from stable_baselines3.common.utils import (
 )
 
 
+class ImageFeatureExtractor(th.nn.Module):
+    def __init__(self, in_features: int, arch: list[int], n_cameras: int):
+        super().__init__()
+
+        list_cnn = [
+            th.nn.Conv2d(in_features, arch[0], kernel_size = 3),
+            th.nn.BatchNorm2d(arch[0]),
+            th.nn.Tanh()]
+        
+        for idx, layer in enumerate(arch[1:-1]):
+            list_cnn += [
+                th.nn.Conv2d(arch[idx], layer, kernel_size = 3),
+                th.nn.BatchNorm2d(layer),
+                th.nn.Tanh()]
+
+
+        list_cnn.append(th.nn.Flatten())
+
+        self.cnn_1 = th.nn.Sequential(*list_cnn)
+        self.cnn_2 = copy.deepcopy(self.cnn_1)
+        self.cnn_3 = copy.deepcopy(self.cnn_1)
+        self.n_cameras = n_cameras
+
+    def forward(self, obs: th.Tensor) -> th.Tensor:
+        obs = obs.reshape(obs.shape[0], 1, 80 * self.n_cameras, 80)
+        obs_1 = obs[:, :, :80, :]
+        obs_2 = obs[:, :, 80  :80*2, :]
+        obs_3 = obs[:, :, 80*2:80*3, :]
+
+        feat_1 = self.cnn_1(obs_1)
+        feat_2 = self.cnn_1(obs_2)
+        feat_3 = self.cnn_1(obs_3)
+
+        return th.cat((feat_1, feat_2, feat_3), dim = -1)
+
+
 
 
 class customMlpExtractor(MlpExtractor):
@@ -53,66 +89,35 @@ class customMlpExtractor(MlpExtractor):
         super().__init__(feature_dim, net_arch, activation_fn)
         device = get_device(device)
 
-        # # save dimensions of layers in policy and value nets
-        # if isinstance(net_arch, dict):
-        #     # Note: if key is not specified, assume linear network
-        #     pi_layers_dims = net_arch.get("pi", [])  # Layer sizes of the policy network
-        #     vf_layers_dims = net_arch.get("vf", [])  # Layer sizes of the value network
-        # else:
-        #     pi_layers_dims = vf_layers_dims = net_arch
-        # # Iterate through the policy layers and build the policy net
-        # for curr_layer_dim in pi_layers_dims:
-        #     policy_net.append(nn.Linear(last_layer_dim_pi, curr_layer_dim))
-        #     policy_net.append(activation_fn())
-        #     last_layer_dim_pi = curr_layer_dim
-        # # Iterate through the value layers and build the value net
-        # for curr_layer_dim in vf_layers_dims:
-        #     value_net.append(nn.Linear(last_layer_dim_vf, curr_layer_dim))
-        #     value_net.append(activation_fn())
-        #     last_layer_dim_vf = curr_layer_dim
 
         self.policy_net_img = th.nn.Sequential(
-            th.nn.Conv2d(1, 16, kernel_size = 3),
-            th.nn.BatchNorm2d(16),
-            th.nn.Tanh(),
+            ImageFeatureExtractor(1, [16, 32, 64], 3),
 
-            th.nn.Conv2d(16, 32, kernel_size = 3),
-            th.nn.BatchNorm2d(32),
-            th.nn.Tanh(),
-
-            th.nn.Conv2d(32, 64, kernel_size = 3),
-            th.nn.BatchNorm2d(64),
-            th.nn.Tanh(),
-
-            # th.nn.Conv2d(64, 128, kernel_size = 3),
-            # th.nn.BatchNorm2d(128),
-            # th.nn.Tanh(),
-
-            th.nn.Flatten(),
-
-            th.nn.Linear(350464, 256),
+            # th.nn.Linear(1051392, 256),
+            th.nn.Linear(554496, 256),
             th.nn.LayerNorm(256),
             th.nn.Tanh(),
         )
 
         self.value_net_img = copy.deepcopy(self.policy_net_img)
 
+        self.linear_obs = 6 + 1 + 3
+        
         self.policy_net = th.nn.Sequential(
-            th.nn.Linear(7, 128),
-            th.nn.LayerNorm(128),
-            th.nn.Tanh(),
+                th.nn.Linear(self.linear_obs, 128),
+                th.nn.LayerNorm(128),
+                th.nn.Tanh(),
 
-            th.nn.Linear(128, 128),
-            th.nn.LayerNorm(128),
-            th.nn.Tanh(),
-        )
+                th.nn.Linear(128, 128),
+                th.nn.LayerNorm(128),
+                th.nn.Tanh(),
+            )
         self.value_net = copy.deepcopy(self.policy_net)
 
         # Save dim, used to create the distributions
         self.latent_dim_pi = feature_dim
         self.latent_dim_vf = feature_dim
 
-        self.linear_obs = 7 + 3
 
         # # Create networks
         # # If the list of layers is empty, the network will just act as an Identity module
@@ -130,7 +135,7 @@ class customMlpExtractor(MlpExtractor):
 
     def extract_features(self, features:th.Tensor) -> th.Tensor:
         geom_obs = features[:, :self.linear_obs]
-        img_obs = features[:, self.linear_obs:].reshape(-1, 1, 80, 80)
+        img_obs = features[:, self.linear_obs:].reshape(-1, 1, 80*3, 80)
 
         return geom_obs, img_obs
 
@@ -239,4 +244,185 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             pi_features = super().extract_features(obs, self.pi_features_extractor)
             vf_features = super().extract_features(obs, self.vf_features_extractor)
             return pi_features, vf_features
+
+
+
+# import torch as th
+# import torch.nn as nn
+# import copy
+
+
+# class ImageFeatureExtractor(nn.Module):
+#     def __init__(self, in_features: int, arch: list[int], n_cameras: int):
+#         super().__init__()
+
+#         layers = [
+#             nn.Conv2d(1, arch[0], kernel_size=3),
+#             nn.BatchNorm2d(arch[0]),
+#             nn.Tanh(),
+#         ]
+
+#         for idx, layer in enumerate(arch[1:]):
+#             layers += [
+#                 nn.Conv2d(arch[idx], layer, kernel_size=3),
+#                 nn.BatchNorm2d(layer),
+#                 nn.Tanh(),
+#             ]
+
+#         layers.append(nn.Flatten())
+
+#         self.cnn_1 = nn.Sequential(*layers)
+#         self.cnn_2 = copy.deepcopy(self.cnn_1)
+#         self.cnn_3 = copy.deepcopy(self.cnn_1)
+#         self.n_cameras = n_cameras
+
+#     def forward(self, obs: th.Tensor) -> th.Tensor:
+#         obs = obs.reshape(obs.shape[0], 1, 80 * self.n_cameras, 80)
+#         obs_1 = obs[:, :, :80, :]
+#         obs_2 = obs[:, :, 80:160, :]
+#         obs_3 = obs[:, :, 160:240, :]
+
+#         feat_1 = self.cnn_1(obs_1)
+#         feat_2 = self.cnn_2(obs_2)
+#         feat_3 = self.cnn_3(obs_3)
+
+#         return th.cat((feat_1, feat_2, feat_3), dim=-1)
+
+
+# class CustomMlpExtractor(nn.Module):
+#     def __init__(
+#         self,
+#         feature_dim: int,
+#         net_arch: list[int] | dict[str, list[int]],
+#         activation_fn=nn.Tanh,
+#         device="cpu",
+#     ):
+#         super().__init__()
+
+#         self.device = th.device(device)
+
+#         # CNN → Image latent
+#         self.policy_net_img = nn.Sequential(
+#             ImageFeatureExtractor(1, [16, 32, 64], 3),
+#             nn.Linear(1051392, 256),
+#             nn.LayerNorm(256),
+#             nn.Tanh(),
+#         )
+
+#         self.value_net_img = copy.deepcopy(self.policy_net_img)
+
+#         self.linear_obs = 6 + 1 + 3  # 6 geom + 1 gripper + 3 contacts
+        
+#         # Geometric input MLP
+#         self.policy_net = nn.Sequential(
+#             nn.Linear(self.linear_obs, 128),
+#             nn.LayerNorm(128),
+#             nn.Tanh(),
+
+#             nn.Linear(128, 128),
+#             nn.LayerNorm(128),
+#             nn.Tanh(),
+#         )
+#         self.value_net = copy.deepcopy(self.policy_net)
+
+#         # Save dim, used to create the distributions
+#         self.latent_dim_pi = feature_dim
+#         self.latent_dim_vf = feature_dim
+
+#     def extract_features(self, features: th.Tensor):
+#         geom = features[:, :self.linear_obs]
+#         img = features[:, self.linear_obs:].reshape(-1, 1, 80*3, 80)
+        
+#         return geom, img
+
+#     def forward_actor(self, features: th.Tensor):
+#         geom, img = self.extract_features(features)
+
+#         return th.cat((self.policy_net(geom), self.policy_net_img(img)), dim=1)
+
+#     def forward_critic(self, features: th.Tensor):
+#         geom, img = self.extract_features(features)
+
+#         return th.cat((self.value_net(geom), self.value_net_img(img)), dim=1)
+
+#     def forward(self, features: th.Tensor):
+#         return self.forward_actor(features), self.forward_critic(features)
+
+
+# class CustomActorCritic(nn.Module):
+#     def __init__(
+#         self,
+#         obs_dim,
+#         action_dim,
+#         net_arch=None,
+#         device="cpu"
+#     ):
+#         super().__init__()
+
+#         self.device = th.device(device)
+
+#         # Your custom extractor
+#         self.mlp_extractor = CustomMlpExtractor(
+#             feature_dim=256 + 128,
+#             net_arch=net_arch,
+#             activation_fn=nn.Tanh,
+#             device=device
+#         )
+
+#         features = 256 + 128  # concatenated geometric+image latent
+
+#         # Actor head
+#         self.actor = nn.Sequential(
+#             nn.Linear(features, action_dim),
+#             nn.Tanh()
+#         )
+
+#         # Critic head
+#         self.critic = nn.Sequential(
+#             nn.Linear(features, 1),
+#             nn.Tanh()
+#         )
+
+#     #     self.apply(self._init_weights)
+
+#     # def _init_weights(self, m):
+#     #     if isinstance(m, nn.Linear):
+#     #         nn.init.orthogonal_(m.weight, gain=0.01)
+#     #         nn.init.zeros_(m.bias)
+
+#     def forward(self, obs):
+#         latent_pi, latent_vf = self.mlp_extractor(obs)
+
+#         action_logits = self.actor(latent_pi)
+#         value = self.critic(latent_vf)
+#         return action_logits, value
+
+#     # # Optional: Gaussian sampling for actions
+#     # def act(self, obs, deterministic=False):
+#     #     latent_pi, latent_vf = self.mlp_extractor(obs)
+
+#     #     logits = self.actor(latent_pi)
+
+#     #     if deterministic:
+#     #         action = logits
+#     #         log_prob = None
+#     #     else:
+#     #         dist = th.distributions.Normal(logits, 1.0)
+#     #         action = dist.rsample()
+#     #         log_prob = dist.log_prob(action).sum(-1)
+
+#     #     value = self.critic(latent_vf)
+#     #     return action, value, log_prob
+
+
+# model = CustomActorCritic(obs_dim=6+1+3+80*80*3, action_dim=7, net_arch=[32,64,128])
+
+# obs_linear = th.rand((3, 6+1+3))
+# obs_img = th.rand((3,3*80*80))
+
+# obs = th.cat((obs_linear, obs_img), dim = -1)
+
+# model(obs)
+
+
 

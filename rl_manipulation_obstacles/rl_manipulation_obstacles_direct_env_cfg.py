@@ -29,7 +29,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 40000000              # Maximum steps in an episode
+    max_steps = 600             # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
@@ -60,13 +60,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     action_space = 7             # Number of actions per environment (overridden)
-    observation_space = 7 + 3 + img_height*img_width       # Number of observations per environment (overridden)
+    observation_space = 7 + 3 + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
+    debug_markers = False       # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -188,8 +188,39 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         # update_latest_camera_pose = True
     )
 
+    tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_ext_2",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth"],
+        depth_clipping_behavior = "max",
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        ),
+        width=img_width,
+        height=img_height,
+        # update_latest_camera_pose = True
+    )
+
+
+
     camera_trans = [[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]
     camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
+
+    camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
+    camera_ext_rot = [[1.0, 0.0, 0.0, 0.0]]
+
+    rot_neg90_xy = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([-1, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy[:, 0], rot_neg90_xy[:, 1:] = rot_neg90_xy.clone()[:, 3], rot_neg90_xy.clone()[:, :3]
+    rot_neg90_xy = rot_neg90_xy.numpy().tolist()
+
+
+
+    camera_ext_trans_2 = [[0.2778,  -0.9,  1.2721]]
+    camera_ext_rot_2 = [[1.0, 0.0, 0.0, 0.0]]
+
+    rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(pi/2 * np.array([-1, -1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy_2[:, 0], rot_neg90_xy_2[:, 1:] = rot_neg90_xy_2.clone()[:, 3], rot_neg90_xy_2.clone()[:, :3]
+    rot_neg90_xy_2 = rot_neg90_xy_2.numpy().tolist()
 
 
 
@@ -283,7 +314,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     box_range_x = [0,3]
     box_range_y = [0,2]
-    object_base_pose = [-0.7800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
+    object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
 
@@ -334,11 +365,17 @@ def update_cfg(cfg, num_envs, device):
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
     cfg.camera_trans = torch.tensor(cfg.camera_trans).repeat(num_envs, 1).to(device)
     cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_trans = torch.tensor(cfg.camera_ext_trans).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_rot = torch.tensor(cfg.camera_ext_rot).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_trans_2 = torch.tensor(cfg.camera_ext_trans_2).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_rot_2 = torch.tensor(cfg.camera_ext_rot_2).repeat(num_envs, 1).to(device)
     cfg.ee_translation = torch.tensor(cfg.ee_translation).repeat(num_envs, 1).to(device)
     cfg.ee_rotation = torch.tensor(cfg.ee_rotation).repeat(num_envs, 1).to(device)
     cfg.object_translation = torch.tensor(cfg.object_translation).repeat(num_envs, 1).to(device)
     cfg.object_rotation = torch.tensor(cfg.object_rotation).repeat(num_envs, 1).to(device)
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
+    cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
+    cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
 
     return cfg
 
