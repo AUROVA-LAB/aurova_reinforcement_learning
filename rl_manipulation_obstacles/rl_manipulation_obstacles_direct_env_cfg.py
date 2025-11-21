@@ -55,7 +55,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5
 
-    img_width, img_height = 60, 60
+    img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
