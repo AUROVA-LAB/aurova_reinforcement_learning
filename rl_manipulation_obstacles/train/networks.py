@@ -107,10 +107,6 @@ class customMlpExtractor(MlpExtractor):
                 th.nn.Linear(self.linear_obs, 128),
                 th.nn.LayerNorm(128),
                 th.nn.Tanh(),
-
-                th.nn.Linear(128, 128),
-                th.nn.LayerNorm(128),
-                th.nn.Tanh(),
             )
         self.value_net = copy.deepcopy(self.policy_net)
 
