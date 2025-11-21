@@ -30,7 +30,7 @@ from isaaclab.sensors import TiledCamera, ContactSensor
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pynput import keyboard
+# from pynput import keyboard
 
 
 
