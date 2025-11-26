@@ -53,14 +53,14 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
-    grip_scaling = 5
+    grip_scaling = 5*2
 
     img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
     action_space = 7             # Number of actions per environment (overridden)
-    observation_space = 7 + 3 + img_height*img_width*3       # Number of observations per environment (overridden)
+    observation_space = 6 + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -327,8 +327,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [1,1]#[0,3]
-    box_range_y = [1,1]#[0,2]
+    box_range_x = [0,3]
+    box_range_y = [0,2]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 

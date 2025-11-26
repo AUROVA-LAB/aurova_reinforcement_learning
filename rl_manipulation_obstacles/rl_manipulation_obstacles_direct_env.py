@@ -238,23 +238,23 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --------------------------------
 
 
-
-        self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
+        # --- Camera poses ---
+        # self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+        #                                                                               t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
         
-        self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
+        # self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+        #                                                                               t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
         
 
-        new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
-                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
-        self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
+        # new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
+        #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
+        # self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
    
         
         
-        new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
-                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
-        self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
+        # new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
+        #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
+        # self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
 
 
         self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
@@ -322,9 +322,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
-        self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
-        self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
-        self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
+        # self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+        # self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
+        # self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -664,12 +664,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        image = self._get_images()
-        image[image == float('inf')] = 255.0
-        image /= 255.0
+        # image = self._get_images()
+        # image[image == float('inf')] = 255.0
+        # image /= 255.0
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
+        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3]), dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}

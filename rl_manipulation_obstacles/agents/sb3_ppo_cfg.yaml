@@ -46,4 +46,4 @@ policy_kwargs:
   squash_output: False
 vf_coef: 1.0
 max_grad_norm: 1.0
-device: "cuda:0"
+device: "cpu"
