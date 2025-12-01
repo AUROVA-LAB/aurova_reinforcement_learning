@@ -22,7 +22,7 @@ parser.add_argument("--video", action="store_true", default=False, help="Record 
 parser.add_argument("--video_length", type=int, default=600, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=1000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--train", type=bool, default=True, help="Number of environments to simulate.")
+parser.add_argument("--train", type=bool, default=False, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent", type=str, default="sb3_cfg_entry_point", help="Name of the RL agent configuration entry point."
@@ -107,20 +107,20 @@ from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_lea
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
-# from pynput import keyboard
+from pynput import keyboard
 
-# end_sim = False
+end_sim = False
 
-# def on_press(key):
-#     global end_sim
-#     try:
-#         if key.char == 'q':
-#             end_sim = True
-#     except AttributeError:
-#         pass
+def on_press(key):
+    global end_sim
+    try:
+        if key.char == 'q':
+            end_sim = True
+    except AttributeError:
+        pass
 
-# listener = keyboard.Listener(on_press=on_press)
-# listener.start()  # ✅ No bloquea
+listener = keyboard.Listener(on_press=on_press)
+listener.start()  # ✅ No bloquea
 
 
 # directory for logging into
@@ -254,12 +254,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size+1))
         action = torch.tensor([[0,0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
 
-        # # Simulate physics
-        # while not end_sim:
-        #     with torch.inference_mode():
+        # Simulate physics
+        while not end_sim:
+            with torch.inference_mode():
 
-        #         # Step the environment
-        #         ret = env.step(action)
+                # Step the environment
+                ret = env.step(action)
                 
 
     # close the simulator
