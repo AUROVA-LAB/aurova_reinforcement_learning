@@ -59,13 +59,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = size             # Number of actions per environment (overridden)
-    observation_space = size     #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    action_space = 6             # Number of actions per environment (overridden)
+    observation_space = 6     #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -79,7 +79,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     UR5e_3f = 2
     UR5e_NOGRIP = 3
     
-    robot = UR5e_3f
+    robot = UR5e_NOGRIP
 
     keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
     ee_link = ['tool0',         # Names for the end effector of each robot

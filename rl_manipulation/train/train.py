@@ -22,7 +22,7 @@ parser.add_argument("--video", action="store_true", default=False, help="Record 
 parser.add_argument("--video_length", type=int, default=600, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=1000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--train", type=bool, default=False, help="Number of environments to simulate.")
+parser.add_argument("--train", type=bool, default=True, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent", type=str, default="sb3_cfg_entry_point", help="Name of the RL agent configuration entry point."
@@ -221,7 +221,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     print(agent_cfg)
     # create agent from stable baselines
-    agent = PPO(policy_arch, env, verbose=1, tensorboard_log=log_dir, **agent_cfg)
+
+    policy_dict = {"activation_fn": torch.nn.Tanh, "net_arch": [256, 128, 64], "squash_output": True, "share_features_extractor": True, }
+
+
+    agent = PPO("MlpPolicy", env, verbose=1, tensorboard_log=log_dir, seed = 14, n_steps = 16, batch_size = 4096, gae_lambda = 0.95, gamma = 0.99, n_epochs = 20, ent_coef = 0.01, learning_rate = 1e-04, clip_range = 0.2, use_sde = True, policy_kwargs = policy_dict, vf_coef = 1.0, max_grad_norm = 1.0, device = 'cuda')
     if args_cli.checkpoint is not None:
         agent = agent.load(args_cli.checkpoint, env, print_system_info=True)
 
@@ -252,8 +256,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         obs = env.reset()
                              
-        action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size+1))
-        action = torch.tensor([[0,0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
+        action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
+        action = torch.tensor([[0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
 
         # Simulate physics
         while not end_sim:
