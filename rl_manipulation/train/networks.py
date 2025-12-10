@@ -1,6 +1,87 @@
+import torch as th
 from torch import nn
 from stable_baselines3.common.policies import ActorCriticPolicy
+from stable_baselines3 import PPO
+from stable_baselines3.common.torch_layers import MlpExtractor
+from stable_baselines3.common.type_aliases import Schedule
+import os
+import gymnasium as gym
+import copy
 
+# Custom MlpFeatureExtractor
+class CustomMlpExtractor(MlpExtractor):
+    def __init__(self, feature_dim, net_arch, activation_fn, device, phase, option, prev_feature_extractor = nn.Sequential()):
+        super().__init__(feature_dim, net_arch, activation_fn, device)
+
+        # Filter by phases and options
+        if phase == 1:
+            
+            # Uses Option 1 arquitecture
+            if option == 1:
+
+                # Feature extractor from Approach phase
+                self.prev_policy_net = prev_feature_extractor["policy_net"].to(device)
+                self.prev_value_net = prev_feature_extractor["value_net"].to(device)
+                
+                # Builds combined feature extractor
+                last_layer = self.prev_policy_net[-1].out_features + 16
+                combined_extractor = []
+
+                for curr_layer in net_arch:
+                    combined_extractor.append(nn.Sequential(nn.Linear(last_layer, curr_layer)))
+                    combined_extractor.append(activation_fn())
+                    last_layer = curr_layer
+
+                # Declares policy and value net
+                self.policy_net = nn.Sequential(*combined_extractor).to(device)
+                self.value_net = nn.Sequential(*copy.deepcopy(combined_extractor)).to(device)
+
+                self.forward_actor = self.forward_actor_1
+                self.forward_critic = self.forward_critic_1
+     
+     # Forward function for the actor
+    def forward_actor_1(self, features: th.Tensor) -> th.Tensor:
+        '''
+        In:
+            - features - torch.Tensor(batch, 7+7 ó 7+7+16): observations from the environment.
+
+        Out:
+            - latent - torch.Tensor(batch, net_arch[-1]): latent features processed from the observations. 
+        '''
+        
+        # Process end effector and object position with previous feature extractor
+        ee_obj = self.prev_policy_net(features[:, :14])
+
+        # Return latent activations
+        return self.policy_net(th.cat((ee_obj, features[:, 14:]), dim = -1))
+    
+    # Forward function for the critic
+    def forward_critic_1(self, features: th.Tensor) -> th.Tensor:
+        '''
+        In:
+            - features - torch.Tensor(batch, 7+7 ó 7+7+16): observations from the environment.
+
+        Out:
+            - latent - torch.Tensor(batch, net_arch[-1]): latent features processed from the observations. 
+        '''
+        
+        # Process end effector and object position with previous feature extractor
+        ee_obj = self.prev_value_net(features[:, :14])
+
+        # Return latent activations
+        return self.value_net(th.cat((ee_obj, features[:, 14:]), dim = -1))
+
+
+
+def insert_bn_dropout(seq):
+    layers = []
+    for i, layer in enumerate(seq):
+        layers.append(layer)
+        if isinstance(layer, nn.Linear):
+            layers.append(nn.BatchNorm1d(layer.out_features))
+        # if isinstance(layer, nn.Tanh):
+        #     layers.append(nn.Dropout(p=0.0))  # Dropout after Tanh
+    return nn.Sequential(*layers)
 
 # Define a custom policy
 class CustomActorCriticPolicy(ActorCriticPolicy):
@@ -15,7 +96,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
-        # Feature size
+       
         features = 64
         action_shape = 2
 
@@ -32,3 +113,6 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
         # Reinitialize parameters (important)
         self.action_net.apply(self.init_weights)
+
+        # self.mlp_extractor.policy_net = insert_bn_dropout(self.mlp_extractor.policy_net)
+        # self.mlp_extractor.value_net = insert_bn_dropout(self.mlp_extractor.value_net)

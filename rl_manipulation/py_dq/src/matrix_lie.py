@@ -2,7 +2,7 @@ import math
 import torch
 from .matrix import *
 from .dq import q_is_norm
-from omni.isaac.lab.utils.math import quat_from_matrix
+from isaaclab.utils.math import quat_from_matrix
 
 
 

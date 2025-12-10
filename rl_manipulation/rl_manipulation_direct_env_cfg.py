@@ -2,69 +2,41 @@ from __future__ import annotations
 
 from math import pi
 import torch
+import copy
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .py_dq.src.lie import *
-
-import copy
-
-from omni.isaac.lab_tasks.manager_based.classic.aurova_reinforcement_learning.rl_manipulation.robots_cfg import UR5e_4f_CFG, UR5e_3f_CFG, GEN3_4f_CFG, UR5e_NOGRIP_CFG
-
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import Articulation
-from omni.isaac.lab.envs import DirectRLEnvCfg
-from omni.isaac.lab.scene import InteractiveSceneCfg
-from omni.isaac.lab.sim import SimulationCfg
-from omni.isaac.lab.utils import configclass
-from omni.isaac.lab.utils.math import euler_xyz_from_quat
-from omni.isaac.lab.sensors import ContactSensorCfg
-from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
-from omni.isaac.lab.markers import VisualizationMarkersCfg
-from omni.isaac.lab.assets import RigidObjectCfg
+from isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation.robots_cfg import *
 
 
-# Function to change a Euler angles to a quaternion as a tensor
-def rot2tensor(rot: Rotation) -> torch.tensor:
-    '''
-    In:
-        - rot - scipy.Rotation(3): rotation expressed in Euler angles.
-
-    Out:
-        - rot_tensor_quat - torch.tensor - (4): rotation expressed a quaternion in a tensor.
-    '''
-
-    # Transform rotation to tensor
-    rot_tensor = torch.tensor(rot.as_quat())
-    rot_tensor_quat = torch.zeros((4))
-
-    # Scipy uses the notation (x,y,z,w) whilst IsaacLab uses (w,x,y,z), so that is changed
-    rot_tensor_quat[0], rot_tensor_quat[1:] = rot_tensor[-1].clone(), rot_tensor[:3].clone()
-    
-    return rot_tensor_quat
-
-# Rotations respecto to the end effector robot link frame for object spawning
-rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
-
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
+from isaaclab.envs import DirectRLEnvCfg
+from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sim import SimulationCfg
+from isaaclab.utils import configclass
+from isaaclab.utils.math import euler_xyz_from_quat, subtract_frame_transforms, combine_frame_transforms
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
 
 
 
 # Configuration class for the environment
 @configclass
 class RLManipulationDirectCfg(DirectRLEnvCfg):
-
+    
     # ---- Env variables ----
-    decimation = 3              # Number of control action updates @ sim dt per policy dt.
+    decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 320              # Maximum steps in an episode
-   
+    max_steps = 600             # Maximum steps in an episode
+
     # Pre-trained models that act as master for the RL agent
     models = [["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-09-12_10-23-50/model"]]
-
+   
     # --- Mapping configuration ---
     DQ = 0
     EULER = 1
@@ -74,32 +46,36 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = MAT
+    representation = DQ
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 0
+    distance = 1
     path_to_pretrained = models[representation][mapping] # Path to the pre-trained approaching model
 
-    # Scale factors for the actions
-    scalings = [[[0.01, 0.001], [0.07,  0.003], [0.01, 0.007]],
+    # Scalings for each action
+    scalings = [[[0.01, 0.001], [0.03,  0.006], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
-    
-    grip_scaling = 5
 
     action_scaling = scalings[representation][mapping]
+    grip_scaling = 5*2
+
+    img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
-    num_actions = size + 1           # Number of actions per environment (overridden)
-    num_observations = size + 1      # Number of observations per environment (overridden)
-
+    action_space = size + 1             # Number of actions per environment (overridden)
+    observation_space = size + 1        #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True        # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
+    render_imgs = False          # Activate image rendering
+    render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
 
@@ -118,12 +94,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                'tool0',
                'wrist_3_link']
     
-
-    # Robotiq 3f control
+     # Robotiq 3f control
     grip_theta_max = [1.2218, 1.5708]
     m = [grip_theta_max[0]/140, grip_theta_max[1]/100]
 
-    def_pos = [0.0, 0.0496, 0.0, -0.0523]
+    def_pos = [0.0, 0.05, 0.0, -0.053]
 
     open = [def_pos[1], 
             def_pos[0], def_pos[0],
@@ -141,18 +116,19 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     close[-2] = -0.65
     close[-5] = -0.65
 
-    moving_joints_gripper = [0.0, 
-                             0.0, m[0], 
+    moving_joints_gripper = [m[0], 
                              m[0],
-                             m[0], 0.0,
-                             0.0,
-                             0.0, -m[0],
-                             -m[0], -m[0]]
-    
+                             m[0], 0*m[0],
+                             
+                             -m[0]*0,
+                             0.0, 0.0,
+                             -m[0]*0, -m[0]*0]
+
+
 
     # ---- Configurations ----
     # Simulation
-    sim: SimulationCfg = SimulationCfg(dt = 1/max_steps, render_interval = decimation)
+    sim: SimulationCfg = SimulationCfg(dt = 1/100, render_interval = decimation)
     # SimulationCfg: configuration for simulation physics 
     #    dt: time step of the simulation (seconds)
     #    render_interval: number of physics steps per rendering steps
@@ -162,6 +138,23 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     robot_cfg_2: Articulation = GEN3_4f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[GEN3])
     robot_cfg_3: Articulation = UR5e_3f_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_3f])
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
+
+    # shelf_cfg: RigidObject = SHELF.replace(prim_path="/World/envs/env_.*/shelf")
+    # object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
+    object_cfg: RigidObject = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/object",
+
+        spawn=sim_utils.CylinderCfg(
+            radius = 0.05,
+            height = 0.11,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+                                                            contact_offset=0.001),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+    )
 
     
     # Markers
@@ -178,11 +171,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
-            "target_point2": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
         }
     )
     # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
@@ -195,27 +183,69 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     #    num_envs: Number of environment instances handled by the scene.
     #    env_spacing: Spacing between environments. --> Positions are automatically handled
     #    replicate_physics: Enable/disable replication of physics schemas when using the Cloner APIs. If True, the simulation will have the same asset instances (USD prims) in all the cloned environments.
-    
-    # Object
-    object_cfg: RigidObjectCfg = RigidObjectCfg(
-        prim_path="/World/envs/env_.*/Cuboid",
 
-        spawn=sim_utils.CuboidCfg(
-            size=(0.045, 0.3, 0.08),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
-            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.0075),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+    tiled_camera: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
+        depth_clipping_behavior = "max",
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+        width=img_width,
+        height=img_height,
+        # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True,
     )
-    # RigidObjectCfg: Configuration parameters for a rigid object.
-    #    spawn: Spawn configuration for the asset. --> Deciding which object type it is spawned
-    #       CuboidCfg: Configuration parameters for a cuboid prim.
-    #          size: Size of the cuboid.
-    #          rigid_props / mass_props / collision_props / visual_material: properties of the prim declaration
-    #    init_state: Initial state of the rigid object. --> Initial pose
+
+    tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_ext",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
+        depth_clipping_behavior = "max",
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        ),
+        width=img_width,
+        height=img_height,
+        # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True
+    )
+
+    tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_ext_2",
+        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
+        depth_clipping_behavior = "max",
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        ),
+        width=img_width,
+        height=img_height,
+        # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True
+    )
+
+
+
+    camera_trans = [[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]
+    camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
+
+    camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
+    camera_ext_rot = [[1.0, 0.0, 0.0, 0.0]]
+
+    rot_neg90_xy = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([-1, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy[:, 0], rot_neg90_xy[:, 1:] = rot_neg90_xy.clone()[:, 3], rot_neg90_xy.clone()[:, :3]
+    rot_neg90_xy = rot_neg90_xy.numpy().tolist()
+
+
+
+    camera_ext_trans_2 = [[0.2778,  -0.9,  1.2721]]
+    camera_ext_rot_2 = [[1.0, 0.0, 0.0, 0.0]]
+
+    rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(pi/2 * np.array([-1, -1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy_2[:, 0], rot_neg90_xy_2[:, 1:] = rot_neg90_xy_2.clone()[:, 3], rot_neg90_xy_2.clone()[:, :3]
+    rot_neg90_xy_2 = rot_neg90_xy_2.numpy().tolist()
 
 
 
@@ -228,7 +258,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # Hand joint names
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
-            [['robotiq_finger_middle_joint_1', 'robotiq_palm_finger_1_joint', 'robotiq_palm_finger_2_joint', 'robotiq_finger_middle_joint_2',  'robotiq_finger_1_joint_1', 'robotiq_finger_2_joint_1', 'robotiq_finger_middle_joint_3', 'robotiq_finger_1_joint_2',  'robotiq_finger_2_joint_2', 'robotiq_finger_1_joint_3', 'robotiq_finger_2_joint_3'],
+            [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
+             "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
+             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3",],
              []]
 
     # Link names for the robots
@@ -264,7 +296,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-0.2830,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
     
     # Obtain Euler angles from the quaternion
@@ -287,17 +319,20 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                     [-0.5,  0.5]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, True, False, False]
+    apply_range = [False, False, False, False]
+
+    ee_translation = [0.0, 0.0, 0.18]
+    ee_rotation = [1.0, 0.0, 0.0, 0.0]
 
 
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.25,  0.25],
-                         [-0.25,  0.25],
-                         [-0.42,   -0.42],
-                         [-2*pi/5*0,  2*pi/5*0],
-                         [-2*pi/5*0,  2*pi/5*0],
+    target_poses_incs = [[-0.2,  0.2],
+                         [-0.2,   0.2],
+                         [-0.35,   0.225],
+                         [-3*pi/5,  3*pi/5],
+                         [-3*pi/5,  3*pi/5],
                          [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.25,  0.25],
@@ -309,33 +344,38 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    # Transform to quaternions
-    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
-    rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
+    box_range_x = [0,3]
+    box_range_y = [0,2]
+    object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
+    object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
+
+
+    # Object pose adjustments
+    object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
+    rot_neg90_y = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_pos135_z = torch.tensor([(Rotation.from_rotvec((pi/2+pi/4) * np.array([0, 0, 1]))).as_quat()])        # Positive 135 degrees rotation in Y axis 
+    rot_neg90_y[:, 0], rot_neg90_y[:, 1:] = rot_neg90_y.clone()[:, 3], rot_neg90_y.clone()[:, :3]
+    rot_pos135_z[:, 0], rot_pos135_z[:, 1:] = rot_pos135_z.clone()[:, 3], rot_pos135_z.clone()[:, :3]
+    
+    object_translation, object_rotation = combine_frame_transforms(t01 = object_translation, q01 = rot_neg90_y ,
+                                                                   t12 = torch.zeros_like(object_translation), q12 = rot_pos135_z)
+
+    object_translation = object_translation[0].numpy().tolist()
+    object_rotation = object_rotation[0].numpy().tolist()
+
+    rot_neg90_y, rot_pos135_z = None, None
+
+
 
     # ---- Reward variables ----
     # reward scales
     rew_scale_dist: float= 1.0
-    rew_scale_vel: float= 0.4
-
-    dist_scale = 0.1545
-    vel_scale = 1.2104
-
 
     # Position threshold for ending the episode
-    distance_thres = 0.027 # 0.08 # 0.03
-    height_thres = 0.8
-
+    distance_thres = 0.05 # 0.08 # 0.03
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 300
-    bonus_lifting = 30
-
-
-    # Contacts
-    contact_sensors_dict = {}
-    contact_matrix = {}
-
+    bonus_tgt_reached = 100
 
 
 # Function to update the variables in the configuration class
@@ -351,19 +391,23 @@ def update_cfg(cfg, num_envs, device):
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
 
-    # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
-
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
-    cfg.open = torch.tensor(cfg.open).repeat(num_envs, 1).to(device)
-    cfg.close = torch.tensor(cfg.close).repeat(num_envs, 1).to(device)
-
-    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
-    cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
-
-    cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
-
+    cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
+    cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
-
+    cfg.camera_trans = torch.tensor(cfg.camera_trans).repeat(num_envs, 1).to(device)
+    cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_trans = torch.tensor(cfg.camera_ext_trans).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_rot = torch.tensor(cfg.camera_ext_rot).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_trans_2 = torch.tensor(cfg.camera_ext_trans_2).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_rot_2 = torch.tensor(cfg.camera_ext_rot_2).repeat(num_envs, 1).to(device)
+    cfg.ee_translation = torch.tensor(cfg.ee_translation).repeat(num_envs, 1).to(device)
+    cfg.ee_rotation = torch.tensor(cfg.ee_rotation).repeat(num_envs, 1).to(device)
+    cfg.object_translation = torch.tensor(cfg.object_translation).repeat(num_envs, 1).to(device)
+    cfg.object_rotation = torch.tensor(cfg.object_rotation).repeat(num_envs, 1).to(device)
+    cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
+    cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
+    cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
 
     return cfg
 
@@ -373,42 +417,49 @@ def update_cfg(cfg, num_envs, device):
 def update_collisions(cfg, num_envs):
 
 
-
-
-    # Contact between robot 2 finger pads and object
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2.*",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
+    )
+
+    robot_w_shelf: ContactSensorCfg = ContactSensorCfg(
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_.*",
+        update_period=0.001, 
+        history_length=1, 
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/shelf" for i in range(num_envs)],
     )
 
 
 
     # Dictionary of contact sensors configurations
-    cfg.contact_sensors_dict = {"finger_middle_w_object": finger_middle_w_object,
+    cfg.contact_sensors_dict = {
+                                "finger_middle_w_object": finger_middle_w_object,
                                 "finger_1_w_object": finger_1_w_object,
                                 "finger_2_w_object": finger_2_w_object,
+                                "robot_w_shelf": robot_w_shelf ,
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5])
+    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -10])
 
     return cfg

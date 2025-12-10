@@ -1,8 +1,8 @@
 """Configuration for the UR5e robot"""
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.actuators import ImplicitActuatorCfg
-from omni.isaac.lab.assets import ArticulationCfg
+import isaaclab.sim as sim_utils
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg
 from math import pi
 ## 
 # Configuration
@@ -10,7 +10,7 @@ from math import pi
 
 GEN3_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/config/usd/gen3_4f.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/config/usd/gen3_4f.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
@@ -52,7 +52,7 @@ GEN3_4f_CFG = ArticulationCfg(
 
 UR5e_4f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_4f_ros2.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_4f_ros2.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
@@ -107,7 +107,7 @@ UR5e_4f_CFG = ArticulationCfg(
 
 UR5e_3f_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_position_ros2_3f.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_position_ros2_3f.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
@@ -122,12 +122,12 @@ UR5e_3f_CFG = ArticulationCfg(
             "wrist_1_joint": -pi/2,
             "wrist_2_joint": pi/2,
             "wrist_3_joint": -pi/4,
-            "robotiq_finger_middle_joint_1": 0.049,
-            "robotiq_finger_1_joint_1": 0.049,
-            "robotiq_finger_2_joint_1": 0.049,
-            "robotiq_finger_middle_joint_3": -0.052,
-            "robotiq_finger_1_joint_3": -0.052,
-            "robotiq_finger_2_joint_3": -0.052,
+            "robotiq_finger_middle_joint_1": 0.05,
+            "robotiq_finger_1_joint_1": 0.05,
+            "robotiq_finger_2_joint_1": 0.05,
+            "robotiq_finger_middle_joint_3": -0.06,
+            "robotiq_finger_1_joint_3": -0.06,
+            "robotiq_finger_2_joint_3": -0.06,
         },
     ),
     actuators={
@@ -154,7 +154,7 @@ UR5e_3f_CFG = ArticulationCfg(
 
 UR5e_NOGRIP_CFG = ArticulationCfg(
     spawn = sim_utils.UsdFileCfg(
-        usd_path="/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_ros2_grippless.usd",
+        usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/config/usd/ur5e_ros2_grippless.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,

@@ -1,5 +1,5 @@
 import torch
-from omni.isaac.lab.utils.math import euler_xyz_from_quat, quat_from_euler_xyz
+from isaaclab.utils.math import euler_xyz_from_quat, quat_from_euler_xyz
 
 
 def convert_euler_to_Lab(x: torch.Tensor):

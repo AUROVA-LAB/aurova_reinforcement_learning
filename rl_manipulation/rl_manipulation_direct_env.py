@@ -16,17 +16,17 @@ from .py_dq.src.quat_trans_lie import *
 from .py_dq.src.matrix_lie import *
 from .py_dq.src.euler import *
 
-import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import Articulation
-from omni.isaac.lab.envs import DirectRLEnv
-from omni.isaac.lab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
-from omni.isaac.lab.utils.math import sample_uniform
-from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
-from omni.isaac.lab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from omni.isaac.lab.utils.math import quat_from_euler_xyz
-from omni.isaac.lab.sensors import ContactSensor
-from omni.isaac.lab.markers import VisualizationMarkers
-from omni.isaac.lab.assets import RigidObject
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation
+from isaaclab.envs import DirectRLEnv
+from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
+from isaaclab.utils.math import sample_uniform
+from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
+from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
+from isaaclab.utils.math import quat_from_euler_xyz
+from isaaclab.sensors import ContactSensor
+from isaaclab.markers import VisualizationMarkers
+from isaaclab.assets import RigidObject
 
 from stable_baselines3 import PPO
 
@@ -169,8 +169,13 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_group = torch.tensor(self.identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
 
 
-        teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+        teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        # teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+
+        # For v5.0.0
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+
+
 
         # Pretrained model
         self.teacher_model = PPO.load(os.path.join(teacher_path, self.cfg.path_to_pretrained))
