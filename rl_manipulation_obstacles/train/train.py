@@ -22,7 +22,7 @@ parser.add_argument("--video", action="store_true", default=False, help="Record 
 parser.add_argument("--video_length", type=int, default=600, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=1000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--train", type=bool, default=True, help="Number of environments to simulate.")
+parser.add_argument("--train", type=bool, default=False, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent", type=str, default="sb3_cfg_entry_point", help="Name of the RL agent configuration entry point."
@@ -107,6 +107,22 @@ from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_lea
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
+from pynput import keyboard
+
+end_sim = False
+
+def on_press(key):
+    global end_sim
+    try:
+        if key.char == 'q':
+            end_sim = True
+    except AttributeError:
+        pass
+
+listener = keyboard.Listener(on_press=on_press)
+listener.start()  # ✅ No bloquea
+
+
 # directory for logging into
 path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train"
 log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -137,7 +153,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
     print(f"Exact experiment name requested from command line: {run_info}")
-    log_dir = os.path.join(log_root_path, run_info)
+    # log_dir = os.path.join(log_root_path, run_info)
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
@@ -204,7 +220,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # create agent from stable baselines
-    agent = PPO(CustomActorCriticPolicy, env, verbose=1, tensorboard_log=log_dir, **agent_cfg)
+    agent = PPO(policy_arch, env, verbose=1, tensorboard_log=log_dir, **agent_cfg)
     if args_cli.checkpoint is not None:
         agent = agent.load(args_cli.checkpoint, env, print_system_info=True)
 
@@ -239,7 +255,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         action = torch.tensor([[0,0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
 
         # Simulate physics
-        while simulation_app.is_running():
+        while not end_sim:
             with torch.inference_mode():
 
                 # Step the environment

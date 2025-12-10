@@ -30,7 +30,7 @@ from isaaclab.sensors import TiledCamera, ContactSensor
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from pynput import keyboard
+from pynput import keyboard
 
 
 
@@ -225,17 +225,20 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # ----------- AUX --------------        
-        # self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
-        # self.correspondences = ['w','s','a','d','o','l']
-        # self.inc = 0.1
+        self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
+        self.correspondences = ['w','s','a','d','o','l']
+        self.gripper = ['0', '1']
+        self.gripper_inc = 5
+        self.prim_g_action = torch.tensor([0.0]).repeat(self.num_envs, 1).to(self.device)
+        self.inc = 0.01
 
-        # # Crear listener
-        # listener = keyboard.Listener(on_press=self.on_press)
-        # listener.start()  # ✅ No bloquea
+        # Crear listener
+        listener = keyboard.Listener(on_press=self.on_press)
+        listener.start()  # ✅ No bloquea
         # --------------------------------
 
 
-
+        # --- Camera poses ---
         self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
                                                                                       t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
         
@@ -254,6 +257,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
 
 
+        self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
+
+
+
     def on_press(self, key):
         try:
             if key.char in self.correspondences:
@@ -265,6 +272,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 self.prim_action = self.prim_action.clone()
                 self.prim_action[:, prim_idx] = prim_inc * self.inc
+
+
+            if key.char in self.gripper:
+                inc = 2*int(key.char) - 1
+
+                self.prim_g_action = torch.tensor(inc).repeat(self.num_envs, 1).to(self.device)
 
             
         except AttributeError:
@@ -405,16 +418,25 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         grip_action = actions[:, -1]
         actions = actions[:, :-1]
-        # actions = self.prim_action
-        # self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
 
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
-        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
+
+
+
+        grip_action = self.prim_g_action
+        action_pose_lab[:, :3] += self.prim_action[:, :3]
+        self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
+        self.prim_g_action = torch.zeros_like(self.prim_g_action).to(self.device)
+
+
+
+
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(action_pose_lab)
@@ -432,9 +454,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 125.0
+        # move_hand = (self.hand_pose*140) < 125.0
 
-        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
         
 
@@ -612,7 +634,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         image_tensor_ext_2 = self.scene.sensors["camera_ext_2"].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
 
         image_tensor = torch.cat((image_tensor, image_tensor_ext, image_tensor_ext_2), dim = -1)
-        image_tensor_ = image_tensor.reshape(self.num_envs, 1, 80*3, 80).permute(0, 2, 3, 1)
+        image_tensor_ = self.scene.sensors[camera_key].data.output["instance_id_segmentation_fast"][:, ..., :3]
+
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
@@ -640,13 +663,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Updates the poses of the GEN3 end effector and the object so they match
         self.update_new_poses()
+        self.filter_collisions()
         
         image = self._get_images()
-        image[image == float('inf')] = 255.0
-        image /= 255.0
+        # image[image == float('inf')] = 255.0
+        # image /= 255.0
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
+        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3]), dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -679,8 +704,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         mod = (2*(dist < self.prev_dist).int() - 1).float()
 
         # --- Contacts ---
-        contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
-        is_contact = contacts_w > 5
+        contacts_weight = (self.contacts * self.cfg.contact_matrix)
+        contacts_w = contacts_weight.sum(-1)
+
+        is_contact = (contacts_weight[:, :-1] > self.contact_thres).sum(-1)
 
 
         aux_tgt_reached = self.target_reached.clone()

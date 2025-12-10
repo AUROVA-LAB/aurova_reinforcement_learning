@@ -142,10 +142,9 @@ UR5e_3f_CFG = ArticulationCfg(
         "hand": ImplicitActuatorCfg(
             joint_names_expr=["robotiq.*"],
             velocity_limit = 100.0,
-            effort_limit = 0.5,
-            stiffness = 3.0,
-            damping = 0.1,
-            friction = 0.01,
+            effort_limit = 87.0,
+            stiffness = 800.0,
+            damping = 40.0,
         ), 
     },
 
@@ -239,10 +238,11 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
 MASTER_CHEF_CAN = RigidObjectCfg(
     spawn = sim_utils.UsdFileCfg(
         usd_path="/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/config/usd/master_chef_can.usd",
-        rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
-            max_depenetration_velocity=1.0,
-        ),
+        rigid_props=None,
+        # sim_utils.RigidBodyPropertiesCfg(
+        #     disable_gravity=False,
+        #     max_depenetration_velocity=1.0,
+        # ),
         activate_contact_sensors=True,
         collision_props=sim_utils.CollisionPropertiesCfg(
             collision_enabled = True,

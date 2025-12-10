@@ -10,7 +10,7 @@ from isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation_
 
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import Articulation, RigidObject
+from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
 from isaaclab.envs import DirectRLEnvCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim import SimulationCfg
@@ -53,20 +53,20 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
-    grip_scaling = 5
+    grip_scaling = 5*2
 
     img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
     action_space = 7             # Number of actions per environment (overridden)
-    observation_space = 7 + 3 + img_height*img_width*3       # Number of observations per environment (overridden)
+    observation_space = 6 + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
+    save_imgs = True           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -110,11 +110,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     close[-5] = -0.65
 
     moving_joints_gripper = [m[0], 
-                             0.0,
-                             m[0], m[0],
-                             -m[0],
+                             m[0],
+                             m[0], 0*m[0],
+                             
+                             -m[0]*0,
                              0.0, 0.0,
-                             -m[0], -m[0]]
+                             -m[0]*0, -m[0]*0]
 
 
 
@@ -132,7 +133,21 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
 
     shelf_cfg: RigidObject = SHELF.replace(prim_path="/World/envs/env_.*/shelf")
-    object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
+    # object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
+    object_cfg: RigidObject = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/object",
+
+        spawn=sim_utils.CylinderCfg(
+            radius = 0.05,
+            height = 0.11,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+                                                            contact_offset=0.001),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+    )
 
     
     # Markers
@@ -165,7 +180,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     tiled_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
@@ -173,12 +188,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True,
     )
 
     tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
@@ -186,12 +202,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True
     )
 
     tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext_2",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
@@ -199,6 +216,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
+        colorize_instance_id_segmentation = True
     )
 
 
@@ -384,37 +402,37 @@ def update_cfg(cfg, num_envs, device):
 # Add the collision sensors to the configuration class according to the number of environments
 def update_collisions(cfg, num_envs):
 
-    # Contact between robot 2 finger pads and object
+
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_link_3",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
+        debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_link_3",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_1_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
+        debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_link_3",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_2_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
+        debug_vis=False,
         filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     robot_w_shelf: ContactSensorCfg = ContactSensorCfg(
-        prim_path="/World/envs/env_.*/shelf",
+        prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_.*",
         update_period=0.001, 
         history_length=1, 
-        debug_vis=True,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/"+cfg.keys[cfg.robot] for i in range(num_envs)],
+        debug_vis=False,
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/shelf" for i in range(num_envs)],
     )
 
 
@@ -428,6 +446,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -6.0])
+    cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -10])
 
     return cfg

@@ -1,6 +1,6 @@
 import argparse
 
-from omni.isaac.lab.app import AppLauncher
+from isaaclab.app import AppLauncher
 
 # Add argparse arguments
 parser = argparse.ArgumentParser(description="UR5e RL environment")
@@ -23,7 +23,7 @@ simulation_app = app_launcher.app
 """Rest everything follows"""
 
 import torch
-from omni.isaac.lab_tasks.utils import parse_env_cfg
+from isaaclab_tasks.utils import parse_env_cfg
 import gymnasium as gym
 import os
 from stable_baselines3 import PPO
@@ -41,7 +41,7 @@ def main():
     env = gym.make(args_cli.task, cfg = env_cfg)
     
     # Filter models
-    path_to_train = "/workspace/isaaclab/source/extensions/omni.isaac.lab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
+    path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/logs"
 
     dir = os.path.join(path_to_train, args_cli.model_dir)
 
@@ -53,7 +53,7 @@ def main():
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         
-        model_name_ = "model.zip"
+        model_name_ = "model_13312000_steps.zip"
 
         # Loading model
         model = PPO.load(os.path.join(dir, model_name_))
