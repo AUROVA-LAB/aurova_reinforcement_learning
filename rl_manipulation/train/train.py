@@ -104,8 +104,8 @@ from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_lea
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 
-# import wandb
-# from wandb.integration.sb3 import WandbCallback
+import wandb
+from wandb.integration.sb3 import WandbCallback
 
 # from pynput import keyboard
 
