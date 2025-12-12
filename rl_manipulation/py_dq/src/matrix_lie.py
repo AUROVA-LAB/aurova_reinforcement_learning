@@ -1,5 +1,6 @@
 import torch
 from .matrix import *
+import torch.nn.functional as F
 
 
 def hat(vec):
@@ -90,9 +91,6 @@ def log_se3(T: torch.Tensor):
     xi = torch.cat([phi, rho], dim=-1)
     return torch.round(xi, decimals =3)
 
-
-
-
 def exp_se3(xi: torch.Tensor):
     """
     Exponential map of a Homogeneous Transformation Matrix.
@@ -130,3 +128,70 @@ def exp_se3(xi: torch.Tensor):
     return torch.round(homo_from_rt(R, t).view(B, -1), decimals =3)
 
 
+
+def log_gram(R: torch.Tensor):
+    # print("Inside Log:\n", R[:, :, :-1])
+    # print("Inside Log After reshape:\n", R[:, :, :-1].reshape(R.shape[0], -1))
+    # print("Inside Log After transpose:\n", R[:, :, :-1].transpose(-1,-2))
+    # print("Inside Log After reshape:\n", R[:, :, :-1].transpose(-1,-2).reshape(1,-1))
+    return R[:, :, :-1].transpose(-1, -2)
+
+def exp_gram(R_: torch.Tensor, eps = 1e-08):
+    """
+    R_: (B, 6) 6D rotation representation
+    returns: (B, 3, 3) batch of valid rotation matrices
+    """
+
+    a1 = R_[:, 0:3]             # (B, 3)
+    a2 = R_[:, 3:6]             # (B, 3)
+
+    print("a1: ", a1)
+    print("a2: ", a2)
+
+    # Normalize first vector
+    b1 = F.normalize(a1, dim=1, eps=eps)
+
+    # Gram–Schmidt: remove component of a2 along b1
+    dot = torch.sum(b1 * a2, dim=1, keepdim=True)   # (B, 1)
+    a2_orth = a2 - dot * b1
+
+    print("b2: ", a2_orth)
+
+    # Normalize second vector
+    b2 = F.normalize(a2_orth, dim=1, eps=eps)
+
+    print("b2 norm: ", b2)
+
+    # Third basis vector via cross product
+    b3 = torch.cross(b1, b2, dim=1)
+
+    # Stack into rotation matrix
+    R = torch.stack([b1, b2, b3], dim=2)  # (B, 3, 3)
+    print(R.view(-1, 3,3))
+    return R
+
+
+
+def log_gram_se3(T: torch.Tensor):
+    B = T.shape[0]
+
+    T = T.view(-1, 4, 4)
+
+    R = T[:,:3,:3]
+    t = T[:,:3, 3]
+
+    R_ = log_gram(R = R).reshape(B, -1)
+
+    return torch.cat((R_, t), dim = -1)
+
+def exp_gram_se3(T_: torch.Tensor):
+    B = T_.shape[0]
+
+    R_ = T_[:, :6]
+    t = T_[:, 6:]
+
+
+    R = exp_gram(R_ = R_)
+
+    
+    return torch.round(homo_from_rt(R, t).view(B, -1), decimals =5)
