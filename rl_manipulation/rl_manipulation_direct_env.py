@@ -173,7 +173,7 @@ class RLManipulationDirect(DirectRLEnv):
         # teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         # For v5.0.0
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
 
 
 
@@ -709,7 +709,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.pose_group_r[env_ids] = self.convert_to_group(self.reset_robot_poses_r[:, :3], self.reset_robot_poses_r[:, 3:])[env_ids]
         self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
 
-        self.obs_seq_vel_lie[env_ids] = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()[env_ids]
+        # self.obs_seq_vel_lie[env_ids] = torch.zeros((self.num_envs, self.cfg.seq_len, 6)).to(self.device).float()[env_ids]
 
         # --- Reset controller ---
         self.controller.reset()
@@ -755,9 +755,9 @@ class RLManipulationDirect(DirectRLEnv):
         # Relative poses
         obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
-        self.obs_seq_pose_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
-                                                                     self.cfg.seq_len, 
-                                                                     dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
+        # self.obs_seq_pose_lie_rel[env_ids] = torch.repeat_interleave(self.log(obs_rel), 
+        #                                                              self.cfg.seq_len, 
+        #                                                              dim=0).view(self.num_envs,self.cfg.seq_len,-1)[env_ids]
 
         # --- Reset previous values ---
         # Reset previous distances
