@@ -219,13 +219,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             clip_reward=np.inf,
         )
 
-    print(agent_cfg)
     # create agent from stable baselines
+    policy_dict = {"activation_fn": torch.nn.Tanh, "net_arch": [64, 128, 256], "squash_output": True, "share_features_extractor": True, }
 
-    policy_dict = {"activation_fn": torch.nn.Tanh, "net_arch": [256, 128, 64], "squash_output": True, "share_features_extractor": True, }
 
-
-    agent = PPO("MlpPolicy", env, verbose=1, tensorboard_log=log_dir, seed = 14, n_steps = 16, batch_size = 4096, gae_lambda = 0.95, gamma = 0.99, n_epochs = 20, ent_coef = 0.01, learning_rate = 1e-04, clip_range = 0.2, use_sde = True, policy_kwargs = policy_dict, vf_coef = 1.0, max_grad_norm = 1.0, device = 'cuda')
+    agent = PPO(CustomActorCriticPolicy, env, verbose=1, tensorboard_log=log_dir, seed = 14, n_steps = 16, batch_size = 4096, gae_lambda = 0.95, gamma = 0.99, n_epochs = 20, ent_coef = 0.01, learning_rate = 1e-04, clip_range = 0.2, use_sde = True, policy_kwargs = policy_dict, vf_coef = 1.0, max_grad_norm = 1.0, device = 'cuda')
     if args_cli.checkpoint is not None:
         agent = agent.load(args_cli.checkpoint, env, print_system_info=True)
 
