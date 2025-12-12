@@ -145,8 +145,8 @@ def exp_gram(R_: torch.Tensor, eps = 1e-08):
     a1 = R_[:, 0:3]             # (B, 3)
     a2 = R_[:, 3:6]             # (B, 3)
 
-    print("a1: ", a1)
-    print("a2: ", a2)
+    # print("a1: ", a1)
+    # print("a2: ", a2)
 
     # Normalize first vector
     b1 = F.normalize(a1, dim=1, eps=eps)
@@ -155,19 +155,19 @@ def exp_gram(R_: torch.Tensor, eps = 1e-08):
     dot = torch.sum(b1 * a2, dim=1, keepdim=True)   # (B, 1)
     a2_orth = a2 - dot * b1
 
-    print("b2: ", a2_orth)
+    # print("b2: ", a2_orth)
 
     # Normalize second vector
     b2 = F.normalize(a2_orth, dim=1, eps=eps)
 
-    print("b2 norm: ", b2)
+    # print("b2 norm: ", b2)
 
     # Third basis vector via cross product
     b3 = torch.cross(b1, b2, dim=1)
 
     # Stack into rotation matrix
     R = torch.stack([b1, b2, b3], dim=2)  # (B, 3, 3)
-    print(R.view(-1, 3,3))
+    # print(R.view(-1, 3,3))
     return R
 
 
