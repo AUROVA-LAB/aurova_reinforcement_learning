@@ -136,6 +136,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.diff_operator = diff_operators[cfg.representation]
         self.mul_operator = mul_operators[cfg.representation]
         self.normalize = normalizes[cfg.representation]
+
+        self.log_dist = map_list[cfg.MAT][1][1]
+        self.diff_operator_dist = diff_operators[cfg.MAT]
     
         # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
@@ -398,7 +401,7 @@ class RLManipulationDirect(DirectRLEnv):
         '''  
 
         # ---- Distance computation ----
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)                                                                   
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log_dist, self.diff_operator_dist)                                                                   
 
         # Obtains wether the agent is approaching or not
         mod = (2*(dist < self.prev_dist).int() - 1).float()
