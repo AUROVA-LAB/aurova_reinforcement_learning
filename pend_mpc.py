@@ -24,7 +24,7 @@ from tqdm import tqdm
 params = torch.tensor((10., 0.))
 dx = RobotDx(params, simple=True)
 
-n_batch, T, mpc_T = 4, 200, 5
+n_batch, T, mpc_T = 4, 300, 5
 
 def uniform(shape, low, high):
     r = high-low
@@ -32,7 +32,7 @@ def uniform(shape, low, high):
 
 torch.manual_seed(0)
 th = uniform((n_batch, 3), -0.3, 0.3)
-thdot = uniform((n_batch, 3), -1., 1.)
+thdot = uniform((n_batch, 3), -1., 1.)*0
 # print(th)
 # print(thdot.shape)
 # raise
@@ -49,34 +49,39 @@ mode = 'swingup'
 # mode = 'spin'
 
 if mode == 'swingup':
-    goal_weights = torch.Tensor([3., 3., 3,
-                                0.1, 0.1, 0.1])
-    # goal_pos = torch.rand()
-    goal_state = torch.Tensor((0.3, 0.3 ,0.,
-                               0., 0., 0.))
+    goal_weights = torch.Tensor([1,1,1,
+                                0.1, 0.1, 0.1]).repeat(n_batch, 1)
+    print("GOAL WEIGHTS: ", goal_weights)
+    goal_pos = torch.rand(n_batch, 3)*2 - 1
+    print("GOAL POS: ", goal_pos)
+    goal_ctrl = torch.zeros_like(goal_pos)
+    goal_state = torch.cat((goal_pos, goal_ctrl), dim = -1)
+    print("GOAL STATE: ", goal_state)
     ctrl_penalty = 0.001
+    print(goal_weights.shape)
+    print((ctrl_penalty*torch.ones((n_batch, dx.n_ctrl))).shape)
     q = torch.cat((
         goal_weights,
-        ctrl_penalty*torch.ones(dx.n_ctrl)
-    ))
+        ctrl_penalty*torch.ones((n_batch, dx.n_ctrl))
+    ), dim = -1)
+    print("q: ", q)
 
 
 
 
     px = -torch.sqrt(goal_weights)*goal_state
-    p = torch.cat((px, torch.zeros(dx.n_ctrl)))
+    print("PX: ", px)
+    p = torch.cat((px, torch.zeros(n_batch, dx.n_ctrl)), dim = -1)
     print("p: ", p.shape)
-
-
-    Q = torch.diag(q).unsqueeze(0).unsqueeze(0).repeat(
+    Q = torch.diag(q[0]).unsqueeze(0).unsqueeze(0).repeat(
         mpc_T, n_batch, 1, 1
     )
-
-    p = p.unsqueeze(0).repeat(mpc_T, n_batch, 1)
-    print("Q: ", torch.diag(q).shape)
     print("Q: ", Q.shape)
+
+    p = p.unsqueeze(0).repeat(mpc_T, 1, 1)
     print("p: ", p.shape)
-    raise
+    
+
 
 
 
@@ -100,7 +105,7 @@ for t in tqdm(range(T)):
         grad_method=GradMethods.AUTO_DIFF,
         eps=1e-2,
     )(x, QuadCost(Q, p), dx)
-    print(x)
+    
     # print(type(Q.data))
     # print(type(Q))
     # print(p.shape)
@@ -112,11 +117,11 @@ for t in tqdm(range(T)):
     u_init[-2] = u_init[-3]
     x = dx(x, next_action)
 
-    n_row, n_col = 4, 4
+    n_row, n_col = n_batch//2, n_batch//2
     fig, axs = plt.subplots(n_row, n_col, figsize=(3*n_col,3*n_row))
     axs = axs.reshape(-1)
     for i in range(n_batch):
-        dx.get_frame(x[i], goal_state, ax=axs[i])
+        dx.get_frame(x[i], goal_state[i], ax=axs[i])
         axs[i].get_xaxis().set_visible(False)
         axs[i].get_yaxis().set_visible(False)
     fig.tight_layout()
@@ -128,10 +133,10 @@ vid_fname = 'pendulum-{}.mp4'.format(mode)
 if os.path.exists(vid_fname):
     os.remove(vid_fname)
     
-# cmd = (
-#         '/usr/bin/ffmpeg -y -r 32 -i %03d.png '
-#         '-vcodec libx264 -crf 25 -pix_fmt yuv420p {}'
-#     ).format(vid_fname)
+cmd = (
+        '/usr/bin/ffmpeg -y -r 32 -i %03d.png '
+        '-vcodec libx264 -crf 25 -pix_fmt yuv420p {}'
+    ).format(vid_fname)
 
-# os.system(cmd)
-# print('Saving video to: {}'.format(vid_fname))
+os.system(cmd)
+print('Saving video to: {}'.format(vid_fname))
