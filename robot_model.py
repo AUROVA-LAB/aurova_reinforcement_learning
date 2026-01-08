@@ -20,9 +20,9 @@ class RobotDx(nn.Module):
         super().__init__()
         self.simple = simple
 
-        self.max_vel = 0.1
+        self.max_vel = 0.5
         self.dt = 0.05
-        self.n_state = 6
+        self.n_state = 7
         self.n_ctrl = 3
 
         if params is None:
@@ -38,7 +38,8 @@ class RobotDx(nn.Module):
         assert len(self.params) == 2 if simple else 5
 
         self.goal_state = torch.Tensor([1., 0., 0.,
-                                        0.0, 0.0, 0.0])        # [state, ctrl] -> [X, Y, Z, X_, Y_, Z_]
+                                        0.0, 0.0, 0.0])        # [state, ctrl] -> [X, Y, Z, 
+                                                               #                   X_, Y_, Z_]
         self.goal_weights = torch.Tensor([1., 1., 1,
                                           0.1, 0.1, 0.1])
         self.ctrl_penalty = 0.001
@@ -57,7 +58,8 @@ class RobotDx(nn.Module):
 
         assert x.ndimension() == 2
         assert x.shape[0] == u.shape[0]
-        assert x.shape[1] == self.n_state
+        
+        # assert x.shape[1] == self.n_state
         assert u.shape[1] == self.n_ctrl
         assert u.ndimension() == 2
 
@@ -75,19 +77,9 @@ class RobotDx(nn.Module):
 
 
 
-        # cos_th, sin_th, dth = torch.unbind(x, dim=1)
-        # th = torch.atan2(sin_th, cos_th)
-        # if not hasattr(self, 'simple') or self.simple:
-        #     newdth = dth + self.dt*(-3.*g/(2.*l) * (-sin_th) + 3. * u / (m*l**2))
-        # else:
-        #     sin_th_bias = torch.sin(th + b)
-        #     newdth = dth + self.dt*(
-        #         -3.*g/(2.*l) * (-sin_th_bias) + 3. * u / (m*l**2) - d*th)
-
         newth = x[:, :3] + u*self.dt
         # print(newth.shape)
-        state = torch.cat((newth, u), dim=-1)
-        # print(state.shape)
+        state = torch.cat((newth, u, torch.zeros(x.shape[0], 1)), dim=-1)
 
 
 
@@ -99,12 +91,14 @@ class RobotDx(nn.Module):
             state = state.squeeze(0)
         return state
 
-    def get_frame(self, x, target=[0.0, 0.0], ax=None):
+    def get_frame(self, x, target, obst, ax=None):
         x = util.get_data_maybe(x.view(-1))
-        assert len(x) == 6
+        assert len(x) == self.n_state
+        
 
         X, Y = x[0], x[1]
         X_tgt, Y_tgt = target[0], target[1]
+        
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(6, 6))
@@ -117,6 +111,7 @@ class RobotDx(nn.Module):
 
         # Plot goal position
         ax.scatter(X_tgt, Y_tgt, s = 40, c='g', zorder = 3)
+        ax.scatter(obst[0], obst[1], s = 40, c='b', zorder = 3)
 
         # Optional: draw origin
         ax.scatter(0, 0, c='r', s=40, zorder=3)
