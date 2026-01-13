@@ -40,17 +40,14 @@ def get_frame(x, tgt, obst, ax):
     # Plot robot position
     ax.scatter(X, Y, s=80, c='k', zorder=3)
 
-    # Ellipsoid 1
+    # Plot goal position
     theta = np.linspace(0, 2*np.pi, 200)
-    xe1 = Xo1 + a1 * np.cos(theta)
-    ye1 = Yo1 + b1 * np.sin(theta)
-    ax.plot(xe1, ye1, 'b--', linewidth=2)
+    xe = Xo + 0.3 * np.cos(theta)
+    ye = Yo + 0.15 * np.sin(theta)
+    ax.plot(xe, ye, 'b--', linewidth=2)
 
-    # Ellipsoid 2
-    xe2 = Xo2 + a2 * np.cos(theta)
-    ye2 = Yo2 + b2 * np.sin(theta)
-    ax.plot(xe2, ye2, 'm--', linewidth=2)
-
+    ax.scatter(X_tgt, Y_tgt, s = 80, c='g', zorder = 3)
+    ax.scatter(obst[0], obst[1], s = 80, c='b', zorder = 3)
 
     # Optional: draw origin
     ax.scatter(0, 0, c='r', s=80, zorder=3)
@@ -66,27 +63,41 @@ def get_frame(x, tgt, obst, ax):
     return fig, ax
 
 
-
 # ======================================================
 # Create model
 # ======================================================
 model = Model(plot_backend='bokeh')
 
 # States
-x = model.set_dynamical_states(['X', 'Y', 'Vx', 'Vy'])
+x = model.set_dynamical_states(['X', 'Y',    'Z', 'X_', 'Y_', 'Z_', 
+                                'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'])
 X = x[0]
 Y = x[1]
-Vx = x[2]
-Vy = x[3]
+Z = x[2]
+X_ = x[3]
+Y_ = x[4]
+Z_ = x[5]
+
+Vx = x[6]
+Vy = x[7]
+Vz = x[8]
+Wx = x[9]
+Wy = x[10]
+Wz = x[11]
 
 # Measurements
-model.set_measurements(['yX', 'yY', 'yVx', 'yVy'])
+model.set_measurements(['yX', 'yY', 'yZ', 'yX_', 'yY_', 'yZ_',
+                        'yVx', 'yVy', 'yVz', 'yWx', 'yWy', 'yWz'])
 model.set_measurement_equations(x)
 
 # Inputs
-u = model.set_inputs(['ax', 'ay'])
+u = model.set_inputs(['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'])
 ax = u[0]
 ay = u[1]
+az = u[2]
+ax_ = u[3]
+ay_ = u[4]
+az_ = u[5]
 
 # ======================================================
 # Dynamics
@@ -94,8 +105,16 @@ ay = u[1]
 dx = ca.vertcat(
     Vx,
     Vy,
+    Vz,
+    Wx,
+    Wy,
+    Wz,
     ax,
-    ay
+    ay,
+    az,
+    ax_,
+    ay_,
+    az_,
 )
 model.set_dynamical_equations(dx)
 
@@ -106,39 +125,55 @@ model.set_dynamical_equations(dx)
 # ======================================================
 # Obstacle avoidance via algebraic constraint
 # ======================================================
+
+# Shelf poses
+p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
+p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
+
+shelf_poses = [p1, p2]
+
+for i in range(2):
+    p_ = copy.deepcopy(shelf_poses[i])
+    
+    for j in range(4):
+
+        if j != 0:
+            p_[1] += 0.5
+            shelf_poses.append(copy.deepcopy(p_))
+        
+        p__ = copy.deepcopy(p_)
+
+        for k in range(2):
+            p__[2] += 0.5
+            shelf_poses.append(copy.deepcopy(p__))
+
+
+ellipsoid_r = [0.15, 0.05, 0.25]
+
+z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(shelf_poses))])
+
+
+rhs = []
 # Obstacle parameters
-# Obstacle 1
-Xo1 = 0.5
-Yo1 = 0.5
-a1 = 0.3
-b1 = 0.15
+for idx, o in enumerate(shelf_poses):
 
-# Obstacle 2
-Xo2 = 0.2
-Yo2 = 0.8
-a2 = 0.25
-b2 = 0.2
+    # Algebraic state (constraint slack, optional)
 
-r_safe = 0.05
+    # Constraint equation: c_obs = (X-Xo)^2 + (Y-Yo)^2 - r^2 ->
+    '''
+    sería algo así como:
+        rhs = (z = (X-Xo)^2 + (Y-Yo)^2 - r^2)
+
+    pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
+    '''
+    
+    rhs.append((X - o[0])**2 / ellipsoid_r[0]**2 + (Y - o[1])**2 / ellipsoid_r[1]**2 + (Z - o[2])**2 / ellipsoid_r[2]**2 - 1 - z[idx])
+
+model.set_algebraic_equations(ca.vertcat(*rhs))
 
 
 
-# Algebraic state (constraint slack, optional)
-z = model.set_algebraic_states(['c_obs1', 'c_obs2'])
-z1 = z[0]
-z2 = z[1]
 
-# Constraint equation: c_obs = (X-Xo)^2 + (Y-Yo)^2 - r^2 ->
-'''
-sería algo así como:
-    rhs = (z = (X-Xo)^2 + (Y-Yo)^2 - r^2)
-
-pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-'''
-rhs1 = (X - Xo1)**2 / (a1 + r_safe)**2 + (Y - Yo1)**2 / (b1 + r_safe)**2 - 1 - z1
-rhs2 = (X - Xo2)**2 / (a2 + r_safe)**2 + (Y - Yo2)**2 / (b2 + r_safe)**2 - 1 - z2
-
-model.set_algebraic_equations(ca.vertcat(rhs1, rhs2))
 
 
 # ======================================================
@@ -155,16 +190,31 @@ nmpc = NMPC(model)
 # Target
 X_ref = 1.0
 Y_ref = 1.0
+Z_ref = 1.0
+X__ref = 1.0
+Y__ref = 1.0
+Z__ref = 1.0
+
+Vx_ref = 0.0
+Vy_ref = 0.0
+Vz_ref = 0.0
+Wx_ref = 0.0
+Wy_ref = 0.0
+Wz_ref = 0.0
 
 nmpc.quad_stage_cost.add_states(
-    names=['X', 'Y', 'Vx', 'Vy'],
-    ref=[X_ref, Y_ref, 0, 0],
-    weights=[50, 50, 5, 5]
+    names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
+            'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
+
+    ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
+            Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
+    weights=[50, 50, 50, 50, 50, 50,
+                5, 5, 5, 5, 5, 5]
 )
 
 nmpc.quad_stage_cost.add_inputs(
-    names=['ax', 'ay'],
-    weights=[0.1, 0.1]
+    names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
+    weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 )
 
 # Horizon
@@ -172,19 +222,20 @@ nmpc.horizon = 30
 
 # Box constraints
 nmpc.set_box_constraints(
-    x_lb=[-10, -10, -5, -5],
-    x_ub=[10, 10, 5, 5],
-    u_lb=[-2, -2],
-    u_ub=[2, 2],
-    z_lb=[0.0, 0.0],
-    z_ub=[ca.inf, ca.inf]
-
+    x_lb=[-10, -10, -10, -10, -10, -10, 
+          -10, -10, -10, -10, -10, -10],
+    x_ub=[10, 10, 10, 10, 10, 10,
+          10, 10, 10, 10, 10, 10],
+    u_lb=[-2, -2, -2, -2, -2, -2],
+    u_ub=[2, 2, 2, 2, 2, 2],
+    z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
+    z_ub=[ca.inf]*24
 )
 
 # Initial conditions
-x0 = [0, 0, 0, 0]
-z0 = [1.0, 1.0]   # start feasible
-u0 = [0, 0]
+x0 = [0]*12
+z0 = [1.0]*24   # start feasible
+u0 = [0]*6
 
 model.set_initial_conditions(x0=x0, z0=z0)
 nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
