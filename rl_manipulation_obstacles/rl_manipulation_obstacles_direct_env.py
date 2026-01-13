@@ -32,6 +32,12 @@ import matplotlib.pyplot as plt
 
 from pynput import keyboard
 
+import sys
+sys.path.append('../../../')
+
+from hilo_mpc import NMPC, Model
+import casadi as ca
+
 
 
 
@@ -90,6 +96,156 @@ def save_images_grid(
 
     # Close the figure
     plt.close()
+
+def drop_NMPC_setup(obst_list, ellipsoid_r):
+    # ======================================================
+    # Create model
+    # ======================================================
+    model = Model(plot_backend='bokeh')
+
+    # States
+    x = model.set_dynamical_states(['X', 'Y',    'Z', 'X_', 'Y_', 'Z_', 
+                                    'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'])
+    X = x[0]
+    Y = x[1]
+    Z = x[2]
+    X_ = x[3]
+    Y_ = x[4]
+    Z_ = x[5]
+
+    Vx = x[6]
+    Vy = x[7]
+    Vz = x[8]
+    Wx = x[9]
+    Wy = x[10]
+    Wz = x[11]
+
+    # Measurements
+    model.set_measurements(['yX', 'yY', 'yZ', 'yX_', 'yY_', 'yZ_',
+                            'yVx', 'yVy', 'yVz', 'yWx', 'yWy', 'yWz'])
+    model.set_measurement_equations(x)
+
+    # Inputs
+    u = model.set_inputs(['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'])
+    ax = u[0]
+    ay = u[1]
+    az = u[2]
+    ax_ = u[3]
+    ay_ = u[4]
+    az_ = u[5]
+
+    # ======================================================
+    # Dynamics
+    # ======================================================
+    dx = ca.vertcat(
+        Vx,
+        Vy,
+        Vz,
+        Wx,
+        Wy,
+        Wz,
+        ax,
+        ay,
+        az,
+        ax_,
+        ay_,
+        az_,
+    )
+    model.set_dynamical_equations(dx)
+
+
+
+
+
+    # ======================================================
+    # Obstacle avoidance via algebraic constraint
+    # ======================================================
+    # Obstacle parameters
+    for idx, o in enumerate(obst_list):
+
+        # Algebraic state (constraint slack, optional)
+        z = model.set_algebraic_states(['c_obs' + str(idx)])
+
+        # Constraint equation: c_obs = (X-Xo)^2 + (Y-Yo)^2 - r^2 ->
+        '''
+        sería algo así como:
+            rhs = (z = (X-Xo)^2 + (Y-Yo)^2 - r^2)
+
+        pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
+        '''
+        rhs = (X - o[0])**2 / ellipsoid_r[0]**2 + (Y - o[1])**2 / ellipsoid_r[1]**2 + (Z - o[2])**2 / ellipsoid_r[2]**2 - 1 - z
+        model.set_algebraic_equations(copy.deepcopy(rhs))
+
+
+
+
+
+
+    # ======================================================
+    # Setup model
+    # ======================================================
+    dt = 0.1
+    model.setup(dt=dt)
+
+    # ======================================================
+    # NMPC
+    # ======================================================
+    nmpc = NMPC(model)
+
+    # Target
+    X_ref = 1.0
+    Y_ref = 1.0
+    Z_ref = 1.0
+    X__ref = 1.0
+    Y__ref = 1.0
+    Z__ref = 1.0
+
+    Vx_ref = 0.0
+    Vy_ref = 0.0
+    Vz_ref = 0.0
+    Wx_ref = 0.0
+    Wy_ref = 0.0
+    Wz_ref = 0.0
+
+    nmpc.quad_stage_cost.add_states(
+        names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
+                'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
+
+        ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
+             Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
+        weights=[50, 50, 50, 50, 50, 50,
+                 5, 5, 5, 5, 5, 5]
+    )
+
+    nmpc.quad_stage_cost.add_inputs(
+        names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
+        weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    )
+
+    # Horizon
+    nmpc.horizon = 30
+
+    # Box constraints
+    nmpc.set_box_constraints(
+        x_lb=[-10, -10, -10, -10, -10, -10, ],
+        x_ub=[10, 10, 10, 10, 10, 10,       ],
+        u_lb=[-2, -2, -2, -2, -2, -2],
+        u_ub=[2, 2, 2, 2, 2, 2],
+        z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
+        z_ub=[ca.inf]*24
+    )
+
+    # Initial conditions
+    x0 = [0]*12
+    z0 = [1.0]*24   # start feasible
+    u0 = [0]*6
+
+    model.set_initial_conditions(x0=x0, z0=z0)
+    nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
+
+    nmpc.setup(options={'print_level': 0})
+
+    return model, nmpc
 
 
 
@@ -258,6 +414,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
+
+        # self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r)
 
 
 
@@ -492,16 +650,38 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - Pose of the object.
         '''
         
+        # print(self.scene.rigid_objects["shelf"].data.body_state_w[:, 0, :3])
+        shelf_pose = self.scene.rigid_objects["shelf"].data.body_state_w[:, 0, :7]
+        # shelf_pose[:, 0] -= 0.15
+        # shelf_pose[:, 1] -= 0.15
+        # shelf_pose[:, 2] += 0.25
+        # print("Posicion balda:", shelf_pose[:, :3])
+
+        '''
+        Pose de la estanteria:
+            · -6.0000e-01, -6.0000e-01, -1.1921e-07
+        
+        Pose de eslabones:
+            · X: 0.1        -> ancho            -> semi-eje  = 0.1
+            · Y: -0.15      -> profundidad      -> semi-eje  = 0.15
+            · Z: +0.25       -> alto             -> semi-eje = 0.25
+            · Rango de seguridad -> 0.1 + diámetro de la esfera alrededor de la pinza
+        '''
+        
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
-                                                                         self.debug_target_pose_w[:, :3])), 
+                                                                         self.debug_target_pose_w[:, :3],
+                                                                         shelf_pose[:, :3],
+                                                                         self.cfg.shelf_poses[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
-                                                                          self.debug_target_pose_w[:,3:])), 
+                                                                          self.debug_target_pose_w[:,3:],
+                                                                          shelf_pose[:, 3:],
+                                                                          self.cfg.shelf_poses[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 

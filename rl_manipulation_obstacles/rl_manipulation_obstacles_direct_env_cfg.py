@@ -65,8 +65,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
+    debug_markers = True       # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
@@ -160,6 +160,110 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 visible = debug_markers
             ),
             "target_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "shelf_pose": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+
+            "shelf_pose1": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "shelf_pose2": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose3": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose4": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose5": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose6": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose7": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose8": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose9": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose10": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose11": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose12": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose13": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose14": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose15": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose16": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose17": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose18": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose19": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose20": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose21": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose22": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose23": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),"shelf_pose24": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -336,6 +440,38 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
 
+    # Shelf poses
+    p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
+    p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
+
+    shelf_poses = [p1, p2]
+
+    for i in range(2):
+        print("i: ", i)
+        p_ = copy.deepcopy(shelf_poses[i])
+        
+        for j in range(4):
+            print(j)
+
+            if j != 0:
+                p_[1] += 0.5
+                shelf_poses.append(copy.deepcopy(p_))
+            
+            p__ = copy.deepcopy(p_)
+
+            for k in range(2):
+                p__[2] += 0.5
+                shelf_poses.append(copy.deepcopy(p__))
+                print(p__)
+    print("------")
+    for i in shelf_poses:
+        print(i)
+
+    ellipsoid_r = [0.15, 0.05, 0.25]
+    
+                
+
+
     # Object pose adjustments
     object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
     rot_neg90_y = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
@@ -394,6 +530,8 @@ def update_cfg(cfg, num_envs, device):
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
+
+    cfg.shelf_poses = torch.tensor(cfg.shelf_poses).repeat(num_envs, 1).to(device)
 
     return cfg
 
