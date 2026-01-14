@@ -242,33 +242,77 @@ nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
 
 nmpc.setup(options={'print_level': 0})
 
-# ======================================================
-# Simulation loop
-# ======================================================
-n_steps = 300
-sol = model.solution
 
-t_dir = "."
+'''
+SHELF POSES:
+tensor([[-0.7500, -0.6000,  0.2500],
+        [-0.7500, -0.3500,  0.0000],
+        [-0.7500, -0.6000,  0.7500],
+        [-0.7500, -0.6000,  1.2500],
+        [-0.7500, -0.1000,  0.2500],
+        [-0.7500, -0.1000,  0.7500],
+        [-0.7500, -0.1000,  1.2500],
+        [-0.7500,  0.4000,  0.2500],
+        [-0.7500,  0.4000,  0.7500],
+        [-0.7500,  0.4000,  1.2500],
+        [-0.7500,  0.9000,  0.2500],
+        [-0.7500,  0.9000,  0.7500],
+        [-0.7500,  0.9000,  1.2500],
+        [-0.7500, -0.3500,  0.5000],
+        [-0.7500, -0.3500,  1.0000],
+        [-0.7500,  0.1500,  0.0000],
+        [-0.7500,  0.1500,  0.5000],
+        [-0.7500,  0.1500,  1.0000],
+        [-0.7500,  0.6500,  0.0000],
+        [-0.7500,  0.6500,  0.5000],
+        [-0.7500,  0.6500,  1.0000],
+        [-0.7500,  1.1500,  0.0000],
+        [-0.7500,  1.1500,  0.5000],
+        [-0.7500,  1.1500,  1.0000]], device='cuda:0')
 
-for k in range(n_steps):
-    u_opt = nmpc.optimize(x0)
-    model.simulate(u=u_opt, steps=1)
-    x0 = sol['x:f']
+ELLIPSOID RAIUS:
+[0.01, 0.01, 0.01]
+
+INITIAL STATE (LIE):
+tensor([[-0.9457, -0.2658,  0.9429, -0.1459,  0.0647,  0.3141,  0.0000,  0.0000,
+          0.0000,  0.0000,  0.0000,  0.0000]], device='cuda:0')
+
+TARGET
+tensor([[ 0.0000,  0.0000,  0.0000, -0.3400, -0.1850,  0.3200]],
+
+
+'''
+
+
+
+
+# # ======================================================
+# # Simulation loop
+# # ======================================================
+# n_steps = 300
+# sol = model.solution
+
+# t_dir = "."
+
+# for k in range(n_steps):
+#     u_opt = nmpc.optimize(x0)
+#     model.simulate(u=u_opt, steps=1)
+#     x0 = sol['x:f']
     
 
-    # Visuals
+#     # Visuals
     
-    fig, axs = plt.subplots(1, 1, figsize=(10,10))
+#     fig, axs = plt.subplots(1, 1, figsize=(10,10))
     
 
-    print(x0, [X_ref, Y_ref], )
+#     print(x0, [X_ref, Y_ref], )
 
-    get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
-    axs.get_xaxis().set_visible(True)
-    axs.get_yaxis().set_visible(True)
+#     get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
+#     axs.get_xaxis().set_visible(True)
+#     axs.get_yaxis().set_visible(True)
 
-    fig.tight_layout()
-    fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
-    plt.close(fig)
+#     fig.tight_layout()
+#     fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
+#     plt.close(fig)
 
-print("Simulation finished")
+# print("Simulation finished")
