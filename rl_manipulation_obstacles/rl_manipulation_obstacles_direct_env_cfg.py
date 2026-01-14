@@ -447,11 +447,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     shelf_poses = [p1, p2]
 
     for i in range(2):
-        print("i: ", i)
         p_ = copy.deepcopy(shelf_poses[i])
         
         for j in range(4):
-            print(j)
 
             if j != 0:
                 p_[1] += 0.5
@@ -462,12 +460,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             for k in range(2):
                 p__[2] += 0.5
                 shelf_poses.append(copy.deepcopy(p__))
-                print(p__)
-    print("------")
-    for i in shelf_poses:
-        print(i)
 
-    ellipsoid_r = [0.15, 0.05, 0.25]
+
+    ellipsoid_r = [0.01, 0.01, 0.01]
     
                 
 
