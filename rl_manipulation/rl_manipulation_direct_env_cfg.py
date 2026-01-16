@@ -42,7 +42,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
     return rot_tensor_quat
 
 
-rot_180_z_pos = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
+rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
 rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
 
 # Configuration class for the environment
@@ -55,7 +55,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     max_steps = 600             # Maximum steps in an episode
 
     # Pre-trained models that act as master for the RL agent
-    models = [["2025-05-06_18-49-55/model", "2025-12-10_16-55-07/model_9216000_steps", "2025-05-06_18-49-55/model"],
+    models = [["2025-05-06_18-49-55/model", "2025-12-12_10-04-45/model_122880000_steps", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-09-12_10-23-50/model"]]
@@ -89,13 +89,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = size             # Number of actions per environment (overridden)
-    observation_space = size        #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    action_space = size + 1             # Number of actions per environment (overridden)
+    observation_space = size + 1        #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -139,13 +139,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     close[-2] = -0.65
     close[-5] = -0.65
 
-    moving_joints_gripper = [m[0], 
-                             m[0],
-                             m[0], 0*m[0],
-                             
-                             -m[0]*0,
-                             0.0, 0.0,
-                             -m[0]*0, -m[0]*0]
+    moving_joints_gripper = [0, 0, 
+                             m[0], m[0], m[0], 
+                             0, 0, 0, 
+                             -m[0], -m[0], -m[0]]
 
 
 
@@ -167,13 +164,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     object_cfg: RigidObject = RigidObjectCfg(
         prim_path="/World/envs/env_.*/object",
 
-        spawn=sim_utils.CylinderCfg(
-            radius = 0.05,
-            height = 0.11,
+        spawn=sim_utils.CuboidCfg(
+            size = [0.075, 0.25, 0.075],
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.001),
+                                                            contact_offset=0.015),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
@@ -190,6 +186,16 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 visible = debug_markers
             ),
             "target_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "interm_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "interm_point2": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -219,7 +225,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     hand_joints = [['joint_' + str(i) + '_0' for i in range(0,16)] for i in range(2)] + \
             [["robotiq_finger_1_joint_1", "robotiq_finger_1_joint_2", "robotiq_finger_1_joint_3",
              "robotiq_finger_2_joint_1", "robotiq_finger_2_joint_2", "robotiq_finger_2_joint_3",
-             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3",],
+             "robotiq_finger_middle_joint_1", "robotiq_finger_middle_joint_2", "robotiq_finger_middle_joint_3",
+             "robotiq_palm_finger_1_joint", "robotiq_palm_finger_2_joint"],
              []]
 
     # Link names for the robots
@@ -283,20 +290,20 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # ---- Target poses ----
-    target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
+    target_pose = [-0.4919, 0.1333, 0.075, 0,pi,0]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
                          [-0.35,   0.225],
-                         [-3*pi/5,  3*pi/5],
-                         [-3*pi/5,  3*pi/5],
+                         [-3*pi/5*0,  3*pi/5*0],
+                         [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.25,  0.25],
                          [-0.25,  0.25],
                          [-0.15,   0.1],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5]]
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-pi/2,  pi/2]]
 
     apply_range_tgt = True
 
@@ -310,10 +317,14 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    interm_distance_thres = 0.025 # 0.08 # 0.03
+    distance_thres = 0.025 # 0.08 # 0.03
+
+    height_thres = 0.5
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
+    
 
 
 # Function to update the variables in the configuration class
@@ -358,7 +369,6 @@ def update_cfg(cfg, num_envs, device):
 
 
     return cfg
-    return cfg
 
 
 
@@ -371,7 +381,7 @@ def update_collisions(cfg, num_envs):
         update_period=0.001, 
         history_length=1, 
         debug_vis=False,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_1_w_object: ContactSensorCfg = ContactSensorCfg(
@@ -379,7 +389,7 @@ def update_collisions(cfg, num_envs):
         update_period=0.001, 
         history_length=1, 
         debug_vis=False,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
     finger_2_w_object: ContactSensorCfg = ContactSensorCfg(
@@ -387,7 +397,7 @@ def update_collisions(cfg, num_envs):
         update_period=0.001, 
         history_length=1, 
         debug_vis=False,
-        filter_prim_paths_expr = [f"/World/envs/env_{i}/Cuboid" for i in range(num_envs)],
+        filter_prim_paths_expr = [f"/World/envs/env_{i}/object" for i in range(num_envs)],
     )
 
 
