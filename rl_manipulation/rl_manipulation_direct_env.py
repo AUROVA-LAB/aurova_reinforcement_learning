@@ -350,9 +350,8 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Separate the robot action from the gripper action        
-        grip_action = torch.tensor(self.h).to(self.device) # actions[:, -1]
-        actions = self.teacher_action# [:, :-1]
-        # self.h = 0
+        grip_action = actions[:, -1]
+        actions = actions[:, :-1]
 
         # Lie increment -> plus operator
         action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
@@ -362,9 +361,6 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
-
-        action_pose_lab[:, 2] += self.a
-        self.a = 0
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(action_pose_lab)
