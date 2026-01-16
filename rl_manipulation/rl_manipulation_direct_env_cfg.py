@@ -95,7 +95,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -317,7 +317,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    interm_distance_thres = 0.025 # 0.08 # 0.03
+    interm_distance_thres = 0.0375 # 0.08 # 0.03
     distance_thres = 0.025 # 0.08 # 0.03
 
     height_thres = 0.5
