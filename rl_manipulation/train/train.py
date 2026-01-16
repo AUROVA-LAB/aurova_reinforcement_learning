@@ -255,15 +255,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         obs = env.reset()
                              
-        # action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
-        # action = torch.tensor([[0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
+        action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
+        action = torch.tensor([[0,0,0,0,0,0, 0]]).repeat(env_cfg.scene.num_envs, 1)
+        end_sim = False
+        # Simulate physics
+        while not end_sim:
+            with torch.inference_mode():
 
-        # # Simulate physics
-        # while not end_sim:
-        #     with torch.inference_mode():
-
-        #         # Step the environment
-        #         ret = env.step(action)
+                # Step the environment
+                ret = env.step(action)
                 
 
     # close the simulator
