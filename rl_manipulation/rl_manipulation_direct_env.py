@@ -30,7 +30,7 @@ from isaaclab.assets import RigidObject
 
 from stable_baselines3 import PPO
 
-from pynput import keyboard
+# from pynput import keyboard
 
 
 
@@ -197,12 +197,12 @@ class RLManipulationDirect(DirectRLEnv):
         self.teacher_action = self.actions.clone()
 
 
-        # Crear listener
-        self.h = 0
-        self.a = 0 
-        listener = keyboard.Listener(on_press=self.on_press)
-        listener.start()  # ✅ No bloquea
-        # --------------------------------
+        # # Crear listener
+        # self.h = 0
+        # self.a = 0 
+        # listener = keyboard.Listener(on_press=self.on_press)
+        # listener.start()  # ✅ No bloquea
+        # # --------------------------------
     
     def on_press(self, key):
         try:
