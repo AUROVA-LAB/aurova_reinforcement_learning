@@ -523,8 +523,8 @@ class RLManipulationDirect(DirectRLEnv):
         diff_interm = self.diff_operator(self.interm_target_pose_r_group, self.pose_group_r)
         self.interm_robot_rot_ee_pose_r_lie_rel = self.log(diff_interm)
 
-        self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached) + \
-                                self.robot_rot_ee_pose_r_lie_rel * self.interm_reached
+        self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
+                                self.robot_rot_ee_pose_r_lie_rel * self.interm_reached.unsqueeze(-1)
 
         
 
