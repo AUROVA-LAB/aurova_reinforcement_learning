@@ -41,9 +41,9 @@ GEN3_4f_CFG = ArticulationCfg(
         "hand": ImplicitActuatorCfg(
             joint_names_expr=[".*_0"],
             velocity_limit = 100.0,
-            effort_limit = 0.5,
-            stiffness = 3.0,
-            damping = 0.1,
+            effort_limit = 15,
+            stiffness = 100.0,
+            damping = 1,
             friction = 0.01,
         ), 
     },
