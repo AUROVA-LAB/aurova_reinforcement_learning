@@ -590,7 +590,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
-        self.target_reached = torch.logical_or(dist < self.cfg.distance_thres, self.target_reached)
+        self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.interm_reached)
         self.height_reached = self.target_pose_r[:, 2] >= self.cfg.height_thres
 
         # Bonus flag for reaching the object
@@ -605,7 +605,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + interm_apply_bonus * self.cfg.bonus_tgt_reached 
+        reward = reward #+ interm_apply_bonus * self.cfg.bonus_tgt_reached 
         reward = reward + apply_bonus * self.interm_reached * self.cfg.bonus_tgt_reached
 
         reward = reward + contacts_w * self.interm_reached
