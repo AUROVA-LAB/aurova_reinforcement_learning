@@ -14,7 +14,7 @@ clip_range: !!float 0.2       # Clipping parameter for the value function
 use_sde: True                 # Mandatory if "squash_output" is activated
 policy_kwargs: "dict(
                   activation_fn=nn.Tanh,
-                  net_arch=[64, 128, 256],
+                  net_arch=[64, 128, 256, 512],
                   squash_output=True,
                   share_features_extractor = True,
                 )"
