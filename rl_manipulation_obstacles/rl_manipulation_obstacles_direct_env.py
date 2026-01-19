@@ -163,27 +163,27 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # Obstacle avoidance via algebraic constraint
     # ======================================================
 
-    z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
+    # z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
 
 
-    rhs = []
+    # rhs = []
     
-    # Obstacle parameters
-    for idx, o in enumerate(obst_list):
+    # # Obstacle parameters
+    # for idx, o in enumerate(obst_list):
 
-        # Algebraic state (constraint slack, optional)
+    #     # Algebraic state (constraint slack, optional)
 
-        # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
-        '''
-        sería algo así como:
-            rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
+    #     # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
+    #     '''
+    #     sería algo así como:
+    #         rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
 
-        pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-        '''
+    #     pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
+    #     '''
         
-        rhs.append((X - o[0].item())**2 / ellipsoid_r[0]**2 + (Y - o[1].item())**2 / ellipsoid_r[1]**2 + (Z - o[2].item())**2 / ellipsoid_r[2]**2 - 1 - z[idx])
+    #     rhs.append((X - o[0].item())**2 / ellipsoid_r[0]**2 + (Y - o[1].item())**2 / ellipsoid_r[1]**2 + (Z - o[2].item())**2 / ellipsoid_r[2]**2 - 1 - z[idx])
 
-    model.set_algebraic_equations(ca.vertcat(*rhs))
+    # model.set_algebraic_equations(ca.vertcat(*rhs))
 
 
     # ======================================================
@@ -198,12 +198,26 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     nmpc = NMPC(model)
 
     # Target
-    X_ref = ref[0, 0].item()
-    Y_ref = ref[0, 1].item()
-    Z_ref = ref[0, 2].item()
-    X__ref = ref[0, 3].item()
-    Y__ref = ref[0, 4].item()
-    Z__ref = ref[0, 5].item()
+    # X_ref = ref[0, 0].item()
+    # Y_ref = ref[0, 1].item()
+    # Z_ref = ref[0, 2].item()
+    # X__ref = ref[0, 3].item()
+    # Y__ref = ref[0, 4].item()
+    # Z__ref = ref[0, 5].item()
+
+    # Vx_ref = 0.0
+    # Vy_ref = 0.0
+    # Vz_ref = 0.0
+    # Wx_ref = 0.0
+    # Wy_ref = 0.0
+    # Wz_ref = 0.0
+
+    X_ref = -0.8800
+    Y_ref = -0.3645
+    Z_ref = 0.8800
+    X__ref = -0.3400
+    Y__ref = -0.1850
+    Z__ref = 0.3616
 
     Vx_ref = 0.0
     Vy_ref = 0.0
@@ -238,17 +252,16 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
             10, 10, 10, 10, 10, 10],
         u_lb=[-0.01, -0.01, -0.01, -0.01, -0.01, -0.01],
         u_ub=[0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
-        z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
-        z_ub=[ca.inf]*24
+        # z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
+        # z_ub=[ca.inf]*24
     )
 
     # Initial conditions
     x0 = ini[0].cpu().numpy().tolist()
-    print(x0)
-    z0 = [1.0]*24   # start feasible
+    z0 = [1.0]# [1.0]*24   # start feasible
     u0 = [0]*6
 
-    model.set_initial_conditions(x0=x0, z0=z0)
+    model.set_initial_conditions(x0=x0)
     nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
 
     nmpc.setup(options={'print_level': 0})
@@ -609,12 +622,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
         self.model.simulate(u=u_opt, steps=1)
         x0 = self.model.solution['x:f']
+        print(x0)
+        # print(torch.tensor([[float(x0[3]), float(x0[4]), float(x0[5]), 
+        #                      float(x0[0]), float(x0[1]), float(x0[2])]]).to(self.device))
 
-        print(torch.tensor([[float(x0[3]), float(x0[4]), float(x0[5]), 
-                             float(x0[0]), float(x0[1]), float(x0[2])]]).to(self.device))
-
-        x0 = self.exp(torch.tensor([[float(x0[3]), float(x0[4]), float(x0[5]), 
-                                     float(x0[0]), float(x0[1]), float(x0[2])]]).to(self.device))
+        x0 = self.exp(torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
+                                     float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device))
         
         x0 = self.convert_to_Lab(x0)
 
@@ -785,6 +798,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
         self.target_pose_r_group = self.convert_to_group(target_pos_r, target_quat_r)
+
+        # print(self.log(self.target_pose_r_group))
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
@@ -1127,7 +1142,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
 
         
-        obj_pose_r = self.log(self.convert_to_group(new_obj_pose_r[0], new_obj_pose_r[1]))
+        obj_pose_r = self.log(self.convert_to_group(new_obj_pose_w[0], new_obj_pose_w[1]))
         
         vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
         vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, vel), dim = -1)
@@ -1135,13 +1150,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # NMPC model creation
         self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r, ini = vel_pos, ref = obj_pose_r)
 
-        print(self.cfg.shelf_poses[:, :3])
-        print(self.cfg.ellipsoid_r)
-        print(vel_pos)
-        print(obj_pose_r)
+        # print(self.cfg.shelf_poses[:, :3])
+        # print(self.cfg.ellipsoid_r)
+        # print(vel_pos)
+        # print(obj_pose_r)
 
-        raise
-
+        
 
 
 

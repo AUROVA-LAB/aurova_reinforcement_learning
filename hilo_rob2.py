@@ -148,28 +148,28 @@ for i in range(2):
             shelf_poses.append(copy.deepcopy(p__))
 
 
-ellipsoid_r = [0.15, 0.05, 0.25]
+# ellipsoid_r = [0.15, 0.05, 0.25]
 
-z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(shelf_poses))])
+# z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(shelf_poses))])
 
 
-rhs = []
-# Obstacle parameters
-for idx, o in enumerate(shelf_poses):
+# rhs = []
+# # Obstacle parameters
+# for idx, o in enumerate(shelf_poses):
 
-    # Algebraic state (constraint slack, optional)
+#     # Algebraic state (constraint slack, optional)
 
-    # Constraint equation: c_obs = (X-Xo)^2 + (Y-Yo)^2 - r^2 ->
-    '''
-    sería algo así como:
-        rhs = (z = (X-Xo)^2 + (Y-Yo)^2 - r^2)
+#     # Constraint equation: c_obs = (X-Xo)^2 + (Y-Yo)^2 - r^2 ->
+#     '''
+#     sería algo así como:
+#         rhs = (z = (X-Xo)^2 + (Y-Yo)^2 - r^2)
 
-    pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-    '''
+#     pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
+#     '''
     
-    rhs.append((X - o[0])**2 / ellipsoid_r[0]**2 + (Y - o[1])**2 / ellipsoid_r[1]**2 + (Z - o[2])**2 / ellipsoid_r[2]**2 - 1 - z[idx])
+#     rhs.append((X - o[0])**2 / ellipsoid_r[0]**2 + (Y - o[1])**2 / ellipsoid_r[1]**2 + (Z - o[2])**2 / ellipsoid_r[2]**2 - 1 - z[idx])
 
-model.set_algebraic_equations(ca.vertcat(*rhs))
+# model.set_algebraic_equations(ca.vertcat(*rhs))
 
 
 
@@ -187,13 +187,14 @@ model.setup(dt=dt)
 # ======================================================
 nmpc = NMPC(model)
 
+# -0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.3616
 # Target
-X_ref = 1.0
-Y_ref = 1.0
-Z_ref = 1.0
-X__ref = 1.0
-Y__ref = 1.0
-Z__ref = 1.0
+X_ref = -0.8800
+Y_ref = -0.3645
+Z_ref = 0.8800
+X__ref = -0.3400
+Y__ref = -0.1850
+Z__ref = 0.3616
 
 Vx_ref = 0.0
 Vy_ref = 0.0
@@ -228,16 +229,17 @@ nmpc.set_box_constraints(
           10, 10, 10, 10, 10, 10],
     u_lb=[-2, -2, -2, -2, -2, -2],
     u_ub=[2, 2, 2, 2, 2, 2],
-    z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
-    z_ub=[ca.inf]*24
+    # z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
+    # z_ub=[ca.inf]*24
 )
 
 # Initial conditions
-x0 = [0]*12
+x0 = [-0.9457, -0.2658,  0.9429, -0.1459,  0.0647,  0.3141,  
+       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
 z0 = [1.0]*24   # start feasible
 u0 = [0]*6
 
-model.set_initial_conditions(x0=x0, z0=z0)
+model.set_initial_conditions(x0=x0)
 nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
 
 nmpc.setup(options={'print_level': 0})
@@ -278,7 +280,7 @@ tensor([[-0.9457, -0.2658,  0.9429, -0.1459,  0.0647,  0.3141,  0.0000,  0.0000,
           0.0000,  0.0000,  0.0000,  0.0000]], device='cuda:0')
 
 TARGET
-tensor([[ 0.0000,  0.0000,  0.0000, -0.3400, -0.1850,  0.3200]],
+tensor([[ -0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.3616]],
 
 
 '''
@@ -286,33 +288,34 @@ tensor([[ 0.0000,  0.0000,  0.0000, -0.3400, -0.1850,  0.3200]],
 
 
 
-# # ======================================================
-# # Simulation loop
-# # ======================================================
-# n_steps = 300
-# sol = model.solution
+# ======================================================
+# Simulation loop
+# ======================================================
+n_steps = 300
+sol = model.solution
 
-# t_dir = "."
+t_dir = "."
 
-# for k in range(n_steps):
-#     u_opt = nmpc.optimize(x0)
-#     model.simulate(u=u_opt, steps=1)
-#     x0 = sol['x:f']
+for k in range(n_steps):
+    u_opt = nmpc.optimize(x0)
+    model.simulate(u=u_opt, steps=1)
+    x0 = sol['x:f']
+    print(x0)
     
 
-#     # Visuals
+    # Visuals
     
-#     fig, axs = plt.subplots(1, 1, figsize=(10,10))
+    # fig, axs = plt.subplots(1, 1, figsize=(10,10))
     
 
-#     print(x0, [X_ref, Y_ref], )
+    # print(x0, [X_ref, Y_ref], )
 
-#     get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
-#     axs.get_xaxis().set_visible(True)
-#     axs.get_yaxis().set_visible(True)
+    # get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
+    # axs.get_xaxis().set_visible(True)
+    # axs.get_yaxis().set_visible(True)
 
-#     fig.tight_layout()
-#     fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
-#     plt.close(fig)
+    # fig.tight_layout()
+    # fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
+    # plt.close(fig)
 
-# print("Simulation finished")
+print("Simulation finished")
