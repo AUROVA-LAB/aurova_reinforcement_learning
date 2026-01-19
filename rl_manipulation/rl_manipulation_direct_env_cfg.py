@@ -318,7 +318,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     interm_distance_thres = 0.0375 # 0.08 # 0.03
-    distance_thres = 0.025 # 0.08 # 0.03
+    distance_thres = 0.035 # 0.08 # 0.03
 
     height_thres = 0.5
 
@@ -409,6 +409,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([1.5, 1.5, 1.5,])
+    cfg.contact_matrix = torch.tensor([2, 2, 2,])
 
     return cfg

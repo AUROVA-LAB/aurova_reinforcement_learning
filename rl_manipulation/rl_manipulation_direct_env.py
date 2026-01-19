@@ -392,7 +392,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 105.0
+        move_hand = (self.hand_pose*140) < 115.0
 
         self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
@@ -634,7 +634,9 @@ class RLManipulationDirect(DirectRLEnv):
         # Phase reward plus bonuses
         reward = reward + apply_bonus * self.interm_reached * self.cfg.bonus_tgt_reached
 
-        reward = reward + contacts_w * self.interm_reached
+        # Gripper
+        reward = reward + self.target_reached * (contacts_w)
+        reward = reward - torch.logical_not(self.target_reached) * self.hand_pose
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
