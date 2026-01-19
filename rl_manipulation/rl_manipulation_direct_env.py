@@ -627,7 +627,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions + torch.abs(diff_actions) * self.target_reached
+        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact)
 
 
         # ---- Reward composition ----
@@ -636,7 +636,6 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Gripper
         reward = reward + self.target_reached * (contacts_w)
-        reward = reward - torch.logical_not(self.target_reached) * self.hand_pose
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
