@@ -51,7 +51,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 3.0      # Length of the episode in seconds
+    episode_length_s = 12.0      # Length of the episode in seconds
     max_steps = 1200             # Maximum steps in an episode
 
     # Pre-trained models that act as master for the RL agent
