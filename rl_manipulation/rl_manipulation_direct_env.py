@@ -141,8 +141,9 @@ class RLManipulationDirect(DirectRLEnv):
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
 
         # Target reached flag
-        self.target_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.interm_reached = torch.zeros(self.num_envs).to(self.device).bool()
+        self.target_reached = torch.zeros(self.num_envs).to(self.device).bool()
+        self.grasp_reached = torch.zeros(self.num_envs).to(self.device).bool()
         self.end_reached = torch.zeros(self.num_envs).to(self.device).bool()
 
 
@@ -615,27 +616,32 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Previously reached
         aux_reached = self.target_reached.clone()
+        aux_grasp_reached = self.grasp_reached.clone()
 
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.interm_reached)
-        self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
+        self.grasp_reached = torch.logical_and(self.target_reached, is_contact)
+        self.end_reached = torch.logical_and(self.grasp_reached, end_dist < self.cfg.interm_distance_thres)
 
         # Bonus flag for reaching the object
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
+        apply_bonus_grasp = torch.logical_and(torch.logical_not(aux_grasp_reached), self.grasp_reached)
 
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact)
+        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact) - self.hand_pose * torch.logical_not(self.interm_reached)
 
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.interm_reached * self.cfg.bonus_tgt_reached
+        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 140)
+        reward = reward + apply_bonus_grasp * (self.cfg.bonus_tgt_reached)
 
         # Gripper
-        reward = reward + self.target_reached * (contacts_w)
+        reward = reward + self.target_reached * self.hand_pose * 3
+        reward = reward + self.grasp_reached * (contacts_w)
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
@@ -868,10 +874,10 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
-        self.interm_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
-        self.end_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]        
-        self.end_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]        
+        self.interm_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.grasp_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.end_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
 
         # Robot root poses
         robot_root_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
