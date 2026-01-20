@@ -83,7 +83,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.02,  0.004], [0.03,  0.006]]]
 
     action_scaling = scalings[representation][mapping]
-    grip_scaling = 5*2
+    grip_scaling = 5
 
     img_width, img_height = 80, 80
 
@@ -318,12 +318,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     interm_distance_thres = 0.0375 # 0.08 # 0.03
-    distance_thres = 0.035 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.08 # 0.03
 
     height_thres = 0.5
 
     # Bonus for reaching the target
-    bonus_tgt_reached = 100
+    bonus_tgt_reached = 200
     
 
 
