@@ -434,8 +434,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [0,3]
-    box_range_y = [0,2]
+    box_range_x = [1,1]
+    box_range_y = [1,1]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
@@ -468,7 +468,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
     # Object pose adjustments
-    object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
+    object_translation = torch.tensor([np.array([0.0, 0.0, 0.0])])
     rot_neg90_y = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
     rot_pos135_z = torch.tensor([(Rotation.from_rotvec((pi/2+pi/4) * np.array([0, 0, 1]))).as_quat()])        # Positive 135 degrees rotation in Y axis 
     rot_neg90_y[:, 0], rot_neg90_y[:, 1:] = rot_neg90_y.clone()[:, 3], rot_neg90_y.clone()[:, :3]

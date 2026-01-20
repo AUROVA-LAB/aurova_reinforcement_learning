@@ -189,7 +189,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # ======================================================
     # Setup model
     # ======================================================
-    dt = 0.1
+    dt = 0.01
     model.setup(dt=dt)
 
     # ======================================================
@@ -212,12 +212,23 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # Wy_ref = 0.0
     # Wz_ref = 0.0
 
-    X_ref = -0.8800
-    Y_ref = -0.3645
-    Z_ref = 0.8800
-    X__ref = -0.3400
-    Y__ref = -0.1850
-    Z__ref = 0.3616
+    # -0.8948, -0.3471,  0.8949, -0.3400,  0.0687,  0.3558
+
+    # X_ref = -0.8800
+    # Y_ref = -0.3645
+    # Z_ref = 0.8800
+    # X__ref = -0.3400
+    # Y__ref = -0.1850
+    # Z__ref = 0.3616
+
+
+
+    X_ref = -0.2968
+    Y_ref = -0.0151
+    Z_ref = 0.4611
+    X__ref = -3.0582
+    Y__ref = 0.9217
+    Z__ref = 2.6561
 
     Vx_ref = 0.0
     Vy_ref = 0.0
@@ -268,7 +279,70 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
     return model, nmpc
 
+def get_frame(x, tgt, ax=None):
+    """
+    x     : current state (at least X,Y,Z)
+    tgt   : [Xt, Yt, Zt]
+    obst  : [Xo, Yo, Zo]
+    traj  : list or array of past positions [[x,y,z], ...]
+    ax    : matplotlib 3D axis
+    """
 
+
+    X, Y, Z = float(x[0,3]), float(x[0,4]), float(x[0,5])
+    Xt, Yt, Zt = tgt
+
+    # Create axis if needed
+    if ax is None:
+        fig = plt.figure(figsize=(7, 7))
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        fig = ax.get_figure()
+        ax.cla()
+
+
+
+    # =========================
+    # Plot current robot pose
+    # =========================
+    ax.scatter(X, Y, Z, c='k', s=80, label="Robot", zorder=5)
+
+    # =========================
+    # Plot target
+    # =========================
+    ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
+
+    # =========================
+    # Plot obstacle
+    # =========================
+
+    # =========================
+    # Plot origin
+    # =========================
+    ax.scatter(0, 0, 0, c='r', s=80, label="Origin")
+
+    # =========================
+    # Axis limits
+    # =========================
+    xs = [X, Xt, 0]
+    ys = [Y, Yt, 0]
+    zs = [Z, Zt, 0]
+    margin = 0.5
+
+    ax.set_xlim(min(xs) - margin, max(xs) + margin)
+    ax.set_ylim(min(ys) - margin, max(ys) + margin)
+    ax.set_zlim(min(zs) - margin, max(zs) + margin)
+
+    # =========================
+    # Formatting
+    # =========================
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title("3D Robot Trajectory")
+    ax.legend(loc="upper left")
+
+    return fig, ax
 
 # Class for the Bimanual Direct Environment
 class RLManipulationObstaclesDirect(DirectRLEnv):
@@ -435,6 +509,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
+
+        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
 
 
@@ -615,21 +691,49 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # print(self.robot_rot_ee_pose_r_lie[0])
         # print(self.robot_rot_ee_pose_r_lie[0].cpu().numpy())
 
-        vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
-        vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, vel), dim = -1)
+
+        print(torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])))
+
+        target_euler = torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])).unsqueeze(0).to(self.device)
+        robot_euler = torch.tensor(euler_xyz_from_quat(self.pose_group_r[:, 3:])).unsqueeze(0).to(self.device)
         
+        print("Obj pose: ",   torch.cat((self.target_pose_r[:, :3], target_euler), dim = -1))
+        print("Robot pose: ", torch.cat((self.target_pose_r[:, :3], robot_euler), dim = -1))
+        
+
+        
+
+        vel_pos = torch.cat((self.target_pose_r[:, :3], robot_euler, self.u_opt), dim = -1)
 
         u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
         self.model.simulate(u=u_opt, steps=1)
         x0 = self.model.solution['x:f']
-        print(x0)
+
         # print(torch.tensor([[float(x0[3]), float(x0[4]), float(x0[5]), 
         #                      float(x0[0]), float(x0[1]), float(x0[2])]]).to(self.device))
 
-        x0 = self.exp(torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-                                     float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device))
+        x0 = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
+                            float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device)
+        self.u_opt = torch.tensor([[float(u_opt[0]), float(u_opt[1]), float(u_opt[2]), 
+                                    float(u_opt[3]), float(u_opt[4]), float(u_opt[5])]]).to(self.device)
         
-        x0 = self.convert_to_Lab(x0)
+        quat = quat_from_euler_xyz(roll = x0[:, 3], pitch = x0[:, 4], yaw = x0[:, 5])
+
+        x0 = torch.cat((x0[:, :3], quat), dim = -1)
+        print("quat: ", quat)
+
+
+
+        fig, ax = get_frame(
+            x0,
+            tgt=[-0.3400, 0.0687, 0.3558],
+            ax=None
+        )
+
+        self.count += 1
+
+        fig.savefig(f"{self.count:03d}.png")
+        plt.close(fig)
 
         
 
@@ -803,6 +907,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+        self.target_pose_r_lie = self.log(self.target_pose_r_group)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
@@ -975,7 +1080,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.home_reached)
+        terminated = torch.logical_or(time_out*0, self.home_reached)
 
         return truncated, terminated
     
@@ -1147,6 +1252,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
         vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, vel), dim = -1)
 
+        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+
         # NMPC model creation
         self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r, ini = vel_pos, ref = obj_pose_r)
 
@@ -1154,6 +1261,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # print(self.cfg.ellipsoid_r)
         # print(vel_pos)
         # print(obj_pose_r)
+        # raise
 
         
 

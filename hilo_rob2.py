@@ -14,53 +14,81 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 
-def get_frame(x, tgt, obst, ax):
-    
-
-    X, Y = float(x[0]), float(x[1])
-    X_tgt, Y_tgt = tgt[0], tgt[1]
-
-    margin = 1.0
-
-    xs = [X, X_tgt, obst[0], 0]
-    ys = [Y, Y_tgt, obst[1], 0]
-
-    ax.set_xlim(min(xs) - margin, max(xs) + margin)
-    ax.set_ylim(min(ys) - margin, max(ys) + margin)
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+import matplotlib.pyplot as plt
 
 
+def get_frame(x, tgt, traj=None, ax=None):
+    """
+    x     : current state (at least X,Y,Z)
+    tgt   : [Xt, Yt, Zt]
+    obst  : [Xo, Yo, Zo]
+    traj  : list or array of past positions [[x,y,z], ...]
+    ax    : matplotlib 3D axis
+    """
 
+    X, Y, Z = float(x[0+3]), float(x[1+3]), float(x[2+3])
+    Xt, Yt, Zt = tgt
 
+    # Create axis if needed
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig = plt.figure(figsize=(7, 7))
+        ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.get_figure()
         ax.cla()
 
-    # Plot robot position
-    ax.scatter(X, Y, s=80, c='k', zorder=3)
+    # =========================
+    # Plot trajectory
+    # =========================
+    if traj is not None and len(traj) > 1:
+        traj = np.array(traj)
+        ax.plot(traj[:, 0], traj[:, 1], traj[:, 2],
+                'k-', linewidth=2, alpha=0.7, label="Trajectory")
 
-    # Plot goal position
-    theta = np.linspace(0, 2*np.pi, 200)
-    xe = Xo + 0.3 * np.cos(theta)
-    ye = Yo + 0.15 * np.sin(theta)
-    ax.plot(xe, ye, 'b--', linewidth=2)
+    # =========================
+    # Plot current robot pose
+    # =========================
+    ax.scatter(X, Y, Z, c='k', s=80, label="Robot", zorder=5)
 
-    ax.scatter(X_tgt, Y_tgt, s = 80, c='g', zorder = 3)
-    ax.scatter(obst[0], obst[1], s = 80, c='b', zorder = 3)
+    # =========================
+    # Plot target
+    # =========================
+    ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
 
-    # Optional: draw origin
-    ax.scatter(0, 0, c='r', s=80, zorder=3)
+    # =========================
+    # Plot obstacle
+    # =========================
 
+    # =========================
+    # Plot origin
+    # =========================
+    ax.scatter(0, 0, 0, c='r', s=80, label="Origin")
+
+    # =========================
+    # Axis limits
+    # =========================
+    xs = [X, Xt, 0]
+    ys = [Y, Yt, 0]
+    zs = [Z, Zt, 0]
+    margin = 0.5
+
+    ax.set_xlim(min(xs) - margin, max(xs) + margin)
+    ax.set_ylim(min(ys) - margin, max(ys) + margin)
+    ax.set_zlim(min(zs) - margin, max(zs) + margin)
+
+    # =========================
     # Formatting
-    ax.set_aspect('equal')
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-2, 2)
+    # =========================
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
-    ax.set_title("Robot Position")
+    ax.set_zlabel("Z")
+    ax.set_title("3D Robot Trajectory")
+    ax.legend(loc="upper left")
 
     return fig, ax
+
 
 
 # ======================================================
@@ -179,7 +207,7 @@ for i in range(2):
 # ======================================================
 # Setup model
 # ======================================================
-dt = 0.1
+dt = 0.01
 model.setup(dt=dt)
 
 # ======================================================
@@ -187,14 +215,16 @@ model.setup(dt=dt)
 # ======================================================
 nmpc = NMPC(model)
 
-# -0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.3616
+# EULER: -0.2968, -0.0151,  0.4611, -3.0582,  0.9217,  2.6561
+# LIE: 0.8948  -0.3471  0.8949  -0.34   0.0687   0.3558
+
 # Target
-X_ref = -0.8800
-Y_ref = -0.3645
-Z_ref = 0.8800
-X__ref = -0.3400
-Y__ref = -0.1850
-Z__ref = 0.3616
+X_ref = -0.2968
+Y_ref = -0.0151
+Z_ref = 0.4611
+X__ref = -3.0582
+Y__ref = 0.9217
+Z__ref = 2.6561
 
 Vx_ref = 0.0
 Vy_ref = 0.0
@@ -234,7 +264,7 @@ nmpc.set_box_constraints(
 )
 
 # Initial conditions
-x0 = [-0.9457, -0.2658,  0.9429, -0.1459,  0.0647,  0.3141,  
+x0 = [-0.2968, -0.0151,  0.4611, -0.5917,  0.0475, -0.0954,  
        0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
 z0 = [1.0]*24   # start feasible
 u0 = [0]*6
@@ -296,11 +326,26 @@ sol = model.solution
 
 t_dir = "."
 
+trajectory = []
+
 for k in range(n_steps):
     u_opt = nmpc.optimize(x0)
     model.simulate(u=u_opt, steps=1)
     x0 = sol['x:f']
     print(x0)
+
+    trajectory.append([x0[0+3], x0[1+3], x0[2+3]])
+
+    fig, ax = get_frame(
+        x0,
+        tgt=[X__ref, Y__ref, Z__ref],
+        traj=trajectory,
+        ax=None
+    )
+
+    fig.savefig(f"{k:03d}.png")
+    plt.close(fig)
+
     
 
     # Visuals
