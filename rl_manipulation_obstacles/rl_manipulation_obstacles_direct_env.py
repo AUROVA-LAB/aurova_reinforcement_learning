@@ -222,13 +222,12 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # Z__ref = 0.3616
 
 
-
-    X_ref = -0.2968
-    Y_ref = -0.0151
-    Z_ref = 0.4611
-    X__ref = -3.0582
-    Y__ref = 0.9217
-    Z__ref = 2.6561
+    X_ref = -0.6800
+    Y_ref = 0.1300
+    Z_ref = 0.6194
+    X__ref = -1.5708
+    Y__ref = 0.7854
+    Z__ref = 1.5708
 
     Vx_ref = 0.0
     Vy_ref = 0.0
@@ -253,7 +252,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     )
 
     # Horizon
-    nmpc.horizon = 30
+    nmpc.horizon = 5
 
     # Box constraints
     nmpc.set_box_constraints(
@@ -268,7 +267,8 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     )
 
     # Initial conditions
-    x0 = ini[0].cpu().numpy().tolist()
+    print("\n\n\nNMPC initial: ", ini)
+    x0 = [-0.2918,  0.1293,  0.6283, -1.5634,  0.9994,  1.5536, 0,0,0,0,0,0] # ini[0].cpu().numpy().tolist()
     z0 = [1.0]# [1.0]*24   # start feasible
     u0 = [0]*6
 
@@ -692,18 +692,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # print(self.robot_rot_ee_pose_r_lie[0].cpu().numpy())
 
 
-        print(torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])))
-
-        target_euler = torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])).unsqueeze(0).to(self.device)
-        robot_euler = torch.tensor(euler_xyz_from_quat(self.pose_group_r[:, 3:])).unsqueeze(0).to(self.device)
-        
-        print("Obj pose: ",   torch.cat((self.target_pose_r[:, :3], target_euler), dim = -1))
-        print("Robot pose: ", torch.cat((self.target_pose_r[:, :3], robot_euler), dim = -1))
-        
+        robot_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
+        obj_pose = self.debug_target_pose_w
 
         
+        object_euler = torch.tensor(euler_xyz_from_quat(obj_pose[:, 3:])).unsqueeze(0).to(self.device)
+        robot_euler = torch.tensor(euler_xyz_from_quat(robot_pose[:, 3:])).unsqueeze(0).to(self.device)
+        
 
-        vel_pos = torch.cat((self.target_pose_r[:, :3], robot_euler, self.u_opt), dim = -1)
+        vel_pos = torch.cat((robot_pose[:, :3], robot_euler, self.u_opt), dim = -1)
+
+        print("Object Pose: ", torch.cat((obj_pose[:, :3], object_euler, self.u_opt), dim = -1))
 
         u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
         self.model.simulate(u=u_opt, steps=1)
@@ -717,10 +716,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.u_opt = torch.tensor([[float(u_opt[0]), float(u_opt[1]), float(u_opt[2]), 
                                     float(u_opt[3]), float(u_opt[4]), float(u_opt[5])]]).to(self.device)
         
+        print("Robot Pose: ", vel_pos)
+        print("Command: ", x0)
+        print("u_opt: ", self.u_opt)
+        print("-----")
+        
+        
+        
         quat = quat_from_euler_xyz(roll = x0[:, 3], pitch = x0[:, 4], yaw = x0[:, 5])
 
         x0 = torch.cat((x0[:, :3], quat), dim = -1)
-        print("quat: ", quat)
 
 
 
