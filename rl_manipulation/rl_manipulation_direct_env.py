@@ -393,7 +393,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 115.0
+        move_hand = (self.hand_pose*140) < 65.0
 
         self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
@@ -504,7 +504,7 @@ class RLManipulationDirect(DirectRLEnv):
         
         
         self.interm_target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
-        self.interm_target_pose_r[:, 2] += 0.2
+        self.interm_target_pose_r[:, 2] += 0.3
 
         self.interm_target_pose_r_group = self.convert_to_group(self.interm_target_pose_r[:, :3], self.interm_target_pose_r[:, 3:])
         self.interm_target_pose_r_lie = self.log(self.interm_target_pose_r_group)
@@ -632,7 +632,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact)
+        reward = diff_actions 
 
 
         # ---- Reward composition ----
@@ -641,6 +641,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward = reward + apply_bonus_grasp * (self.cfg.bonus_tgt_reached)
 
         # Gripper
+        reward = reward - torch.logical_not(self.target_reached) * contacts_w
         reward = reward + self.target_reached * self.hand_pose * 3
         reward = reward + self.target_reached * (contacts_w)
 
