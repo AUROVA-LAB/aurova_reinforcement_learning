@@ -642,7 +642,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Gripper
         reward = reward + self.target_reached * self.hand_pose * 3
-        reward = reward + self.target_reached * (contacts_w + self.hand_pose * 3)
+        reward = reward + self.target_reached * (contacts_w)
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
