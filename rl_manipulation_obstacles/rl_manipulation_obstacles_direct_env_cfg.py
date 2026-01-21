@@ -27,7 +27,7 @@ from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
 class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
-    decimation = 1              # Number of control action updates @ sim dt per policy dt.
+    decimation = 3              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 600             # Maximum steps in an episode
    
@@ -183,10 +183,6 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
-            ),"shelf_pose4": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
             ),"shelf_pose5": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
@@ -199,9 +195,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
-            ),"shelf_pose8": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
+            ),"limit_": sim_utils.SphereCfg(
+                radius = 0.0275,
+                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
                 visible = debug_markers
             ),"shelf_pose9": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
@@ -268,6 +264,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            
         }
     )
     # VisualizationMarkersCfg: A class to configure a VisualizationMarkers.
@@ -434,8 +431,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [1,1]
-    box_range_y = [1,1]
+    box_range_x = [0,2]
+    box_range_y = [0,2]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
@@ -462,7 +459,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 shelf_poses.append(copy.deepcopy(p__))
 
 
-    ellipsoid_r = [0.01, 0.01, 0.01]
+    ellipsoid_r = [0.275, 0.075, 0.28]
     
                 
 
