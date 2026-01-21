@@ -538,8 +538,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Transform to the Lie algebra leveraging symmetry
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff) * torch.logical_not(self.target_reached).unsqueeze(-1) + \
-                                           self.robot_rot_ee_pose_r_lie_rel * self.target_reached.unsqueeze(-1)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(diff) * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                                           self.robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
 
         diff_interm = self.diff_operator(self.interm_target_pose_r_group, self.pose_group_r)
         self.interm_robot_rot_ee_pose_r_lie_rel = self.log(diff_interm)
@@ -641,7 +641,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward = reward + apply_bonus_grasp * (self.cfg.bonus_tgt_reached)
 
         # Gripper
-        reward = reward - torch.logical_not(self.target_reached) * contacts_w
+        # reward = reward - torch.logical_not(self.target_reached) * contacts_w
         reward = reward + self.target_reached * self.hand_pose * 3
         reward = reward + self.target_reached * (contacts_w)
 
