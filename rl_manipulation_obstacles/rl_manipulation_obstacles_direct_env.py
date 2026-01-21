@@ -97,252 +97,7 @@ def save_images_grid(
     # Close the figure
     plt.close()
 
-def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
-                                                   0,0,0,0,0,0], ref = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0]):
-    
-    # ======================================================
-    # Create model
-    # ======================================================
-    model = Model(plot_backend='bokeh')
 
-    # States
-    x = model.set_dynamical_states(['X', 'Y',    'Z', 'X_', 'Y_', 'Z_', 
-                                    'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'])
-    X = x[0]
-    Y = x[1]
-    Z = x[2]
-    X_ = x[3]
-    Y_ = x[4]
-    Z_ = x[5]
-
-    Vx = x[6]
-    Vy = x[7]
-    Vz = x[8]
-    Wx = x[9]
-    Wy = x[10]
-    Wz = x[11]
-
-    # Measurements
-    model.set_measurements(['yX', 'yY', 'yZ', 'yX_', 'yY_', 'yZ_',
-                            'yVx', 'yVy', 'yVz', 'yWx', 'yWy', 'yWz'])
-    model.set_measurement_equations(x)
-
-    # Inputs
-    u = model.set_inputs(['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'])
-    ax = u[0]
-    ay = u[1]
-    az = u[2]
-    ax_ = u[3]
-    ay_ = u[4]
-    az_ = u[5]
-
-    # ======================================================
-    # Dynamics
-    # ======================================================
-    dx = ca.vertcat(
-        Vx,
-        Vy,
-        Vz,
-        Wx,
-        Wy,
-        Wz,
-        ax,
-        ay,
-        az,
-        ax_,
-        ay_,
-        az_,
-    )
-    model.set_dynamical_equations(dx)
-
-
-
-
-
-    # ======================================================
-    # Obstacle avoidance via algebraic constraint
-    # ======================================================
-
-    # z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
-
-
-    # rhs = []
-    
-    # # Obstacle parameters
-    # for idx, o in enumerate(obst_list):
-
-    #     # Algebraic state (constraint slack, optional)
-
-    #     # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
-    #     '''
-    #     sería algo así como:
-    #         rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
-
-    #     pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-    #     '''
-        
-    #     rhs.append((X - o[0].item())**2 / ellipsoid_r[0]**2 + (Y - o[1].item())**2 / ellipsoid_r[1]**2 + (Z - o[2].item())**2 / ellipsoid_r[2]**2 - 1 - z[idx])
-
-    # model.set_algebraic_equations(ca.vertcat(*rhs))
-
-
-    # ======================================================
-    # Setup model
-    # ======================================================
-    dt = 0.01
-    model.setup(dt=dt)
-
-    # ======================================================
-    # NMPC
-    # ======================================================
-    nmpc = NMPC(model)
-
-    # Target
-    # X_ref = ref[0, 0].item()
-    # Y_ref = ref[0, 1].item()
-    # Z_ref = ref[0, 2].item()
-    # X__ref = ref[0, 3].item()
-    # Y__ref = ref[0, 4].item()
-    # Z__ref = ref[0, 5].item()
-
-    # Vx_ref = 0.0
-    # Vy_ref = 0.0
-    # Vz_ref = 0.0
-    # Wx_ref = 0.0
-    # Wy_ref = 0.0
-    # Wz_ref = 0.0
-
-    # -0.8948, -0.3471,  0.8949, -0.3400,  0.0687,  0.3558
-
-    # X_ref = -0.8800
-    # Y_ref = -0.3645
-    # Z_ref = 0.8800
-    # X__ref = -0.3400
-    # Y__ref = -0.1850
-    # Z__ref = 0.3616
-
-
-
-    X_ref = -0.2968
-    Y_ref = -0.0151
-    Z_ref = 0.4611
-    X__ref = -3.0582
-    Y__ref = 0.9217
-    Z__ref = 2.6561
-
-    Vx_ref = 0.0
-    Vy_ref = 0.0
-    Vz_ref = 0.0
-    Wx_ref = 0.0
-    Wy_ref = 0.0
-    Wz_ref = 0.0
-
-    nmpc.quad_stage_cost.add_states(
-        names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
-                'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
-
-        ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
-                Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
-        weights=[50, 50, 50, 50, 50, 50,
-                    5, 5, 5, 5, 5, 5]
-    )
-
-    nmpc.quad_stage_cost.add_inputs(
-        names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
-        weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-    )
-
-    # Horizon
-    nmpc.horizon = 30
-
-    # Box constraints
-    nmpc.set_box_constraints(
-        x_lb=[-10, -10, -10, -10, -10, -10, 
-            -10, -10, -10, -10, -10, -10],
-        x_ub=[10, 10, 10, 10, 10, 10,
-            10, 10, 10, 10, 10, 10],
-        u_lb=[-0.01, -0.01, -0.01, -0.01, -0.01, -0.01],
-        u_ub=[0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
-        # z_lb=[0.0]*24,      # <-- enforces obstacle avoidance
-        # z_ub=[ca.inf]*24
-    )
-
-    # Initial conditions
-    x0 = ini[0].cpu().numpy().tolist()
-    z0 = [1.0]# [1.0]*24   # start feasible
-    u0 = [0]*6
-
-    model.set_initial_conditions(x0=x0)
-    nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
-
-    nmpc.setup(options={'print_level': 0})
-
-    return model, nmpc
-
-def get_frame(x, tgt, ax=None):
-    """
-    x     : current state (at least X,Y,Z)
-    tgt   : [Xt, Yt, Zt]
-    obst  : [Xo, Yo, Zo]
-    traj  : list or array of past positions [[x,y,z], ...]
-    ax    : matplotlib 3D axis
-    """
-
-
-    X, Y, Z = float(x[0,3]), float(x[0,4]), float(x[0,5])
-    Xt, Yt, Zt = tgt
-
-    # Create axis if needed
-    if ax is None:
-        fig = plt.figure(figsize=(7, 7))
-        ax = fig.add_subplot(111, projection='3d')
-    else:
-        fig = ax.get_figure()
-        ax.cla()
-
-
-
-    # =========================
-    # Plot current robot pose
-    # =========================
-    ax.scatter(X, Y, Z, c='k', s=80, label="Robot", zorder=5)
-
-    # =========================
-    # Plot target
-    # =========================
-    ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
-
-    # =========================
-    # Plot obstacle
-    # =========================
-
-    # =========================
-    # Plot origin
-    # =========================
-    ax.scatter(0, 0, 0, c='r', s=80, label="Origin")
-
-    # =========================
-    # Axis limits
-    # =========================
-    xs = [X, Xt, 0]
-    ys = [Y, Yt, 0]
-    zs = [Z, Zt, 0]
-    margin = 0.5
-
-    ax.set_xlim(min(xs) - margin, max(xs) + margin)
-    ax.set_ylim(min(ys) - margin, max(ys) + margin)
-    ax.set_zlim(min(zs) - margin, max(zs) + margin)
-
-    # =========================
-    # Formatting
-    # =========================
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.set_title("3D Robot Trajectory")
-    ax.legend(loc="upper left")
-
-    return fig, ax
 
 # Class for the Bimanual Direct Environment
 class RLManipulationObstaclesDirect(DirectRLEnv):
@@ -364,8 +119,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
 
         self.object_pose_w_lab = torch.tensor([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]).repeat(self.num_envs, 1).to(self.device)
+
+        self.end_target_pose_r = copy.deepcopy(self.target_pose_r)
+        self.end_target_pose_r_group = copy.deepcopy(self.target_pose_r_group)
+        self.end_target_pose_r_lie = copy.deepcopy(self.target_pose_r_lie)
         
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
+        self.end_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
 
         self.root_robot_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.root_state_w[:, 0:7]
@@ -489,28 +249,27 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --------------------------------
 
 
-        # --- Camera poses ---
-        self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
+        # # --- Camera poses ---
+        # self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+        #                                                                               t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
         
-        self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
+        # self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+        #                                                                               t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
         
 
-        new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
-                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
-        self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
+        # new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
+        #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
+        # self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
    
         
         
-        new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
-                                                            t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
-        self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
+        # new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
+        #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
+        # self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
 
 
         self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
 
-        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
 
 
@@ -575,9 +334,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
-        self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
-        self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
-        self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
+        # self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+        # self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
+        # self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -687,62 +446,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
         self.prim_g_action = torch.zeros_like(self.prim_g_action).to(self.device)
 
-
-        # print(self.robot_rot_ee_pose_r_lie[0])
-        # print(self.robot_rot_ee_pose_r_lie[0].cpu().numpy())
-
-
-        print(torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])))
-
-        target_euler = torch.tensor(euler_xyz_from_quat(self.target_pose_r[:, 3:])).unsqueeze(0).to(self.device)
-        robot_euler = torch.tensor(euler_xyz_from_quat(self.pose_group_r[:, 3:])).unsqueeze(0).to(self.device)
-        
-        print("Obj pose: ",   torch.cat((self.target_pose_r[:, :3], target_euler), dim = -1))
-        print("Robot pose: ", torch.cat((self.target_pose_r[:, :3], robot_euler), dim = -1))
-        
-
-        
-
-        vel_pos = torch.cat((self.target_pose_r[:, :3], robot_euler, self.u_opt), dim = -1)
-
-        u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
-        self.model.simulate(u=u_opt, steps=1)
-        x0 = self.model.solution['x:f']
-
-        # print(torch.tensor([[float(x0[3]), float(x0[4]), float(x0[5]), 
-        #                      float(x0[0]), float(x0[1]), float(x0[2])]]).to(self.device))
-
-        x0 = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-                            float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device)
-        self.u_opt = torch.tensor([[float(u_opt[0]), float(u_opt[1]), float(u_opt[2]), 
-                                    float(u_opt[3]), float(u_opt[4]), float(u_opt[5])]]).to(self.device)
-        
-        quat = quat_from_euler_xyz(roll = x0[:, 3], pitch = x0[:, 4], yaw = x0[:, 5])
-
-        x0 = torch.cat((x0[:, :3], quat), dim = -1)
-        print("quat: ", quat)
-
-
-
-        fig, ax = get_frame(
-            x0,
-            tgt=[-0.3400, 0.0687, 0.3558],
-            ax=None
-        )
-
-        self.count += 1
-
-        fig.savefig(f"{self.count:03d}.png")
-        plt.close(fig)
-
-        
-
-
-
-
-
+    
         # Set the command for the IKDifferentialController
-        self.controller.set_command(x0)
+        self.controller.set_command(action_pose_lab)
                 
         # Obtains the poses
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
@@ -820,13 +526,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
-                                                                         shelf_pose[:, :3],
-                                                                         self.cfg.shelf_poses[:, :3])), 
+                                                                         self.reset_robot_poses_group_r[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
                                                                           self.debug_target_pose_w[:,3:],
-                                                                          shelf_pose[:, 3:],
-                                                                          self.cfg.shelf_poses[:, 3:])), 
+                                                                          self.reset_robot_poses_group_r[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -911,6 +615,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
+        diff_end = self.diff_operator(self.end_target_pose_r_group, self.target_pose_r_group)
+        self.end_rot_ee_pose_r_lie_rel = self.log(diff_end)
 
         
 
@@ -993,13 +699,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        image = self._get_images()
+        # image = self._get_images()
         # image[image == float('inf')] = 255.0
         # image /= 255.0
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3]), dim = -1)
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel,
+                         self.end_rot_ee_pose_r_lie_rel,
+                         self.hand_pose.unsqueeze(-1), 
+                         self.contacts[:, :3]), 
+                         dim = -1)
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -1080,7 +790,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out*0, self.home_reached)
+        terminated = torch.logical_or(time_out, self.home_reached)
 
         return truncated, terminated
     
@@ -1206,6 +916,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_pose_r_group[env_ids] = self.convert_to_group(target_init_pose[:, :3], quat)[env_ids]
         self.target_pose_r_lie[env_ids] = self.log(self.target_pose_r_group)[env_ids]
 
+
+        self.end_target_pose_r[env_ids] = self.reset_robot_poses_r[env_ids]
+        self.end_target_pose_r_group[env_ids] = self.reset_robot_poses_group_r[env_ids]
+        self.end_target_pose_r_lie[env_ids] = self.log(self.end_target_pose_r_group)[env_ids]
+
         # --- Reset previous values ---
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
@@ -1247,21 +962,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
 
         
-        obj_pose_r = self.log(self.convert_to_group(new_obj_pose_w[0], new_obj_pose_w[1]))
-        
-        vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
-        vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, vel), dim = -1)
-
-        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
-
-        # NMPC model creation
-        self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r, ini = vel_pos, ref = obj_pose_r)
-
-        # print(self.cfg.shelf_poses[:, :3])
-        # print(self.cfg.ellipsoid_r)
-        # print(vel_pos)
-        # print(obj_pose_r)
-        # raise
 
         
 
