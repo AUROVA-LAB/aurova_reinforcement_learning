@@ -631,17 +631,17 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact) - self.hand_pose * torch.logical_not(self.interm_reached)
+        reward = diff_actions * torch.logical_or(torch.logical_not(self.target_reached), is_contact)
 
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 140)
+        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 80)
         reward = reward + apply_bonus_grasp * (self.cfg.bonus_tgt_reached)
 
         # Gripper
         reward = reward + self.target_reached * self.hand_pose * 3
-        reward = reward + self.grasp_reached * (contacts_w)
+        reward = reward + self.target_reached * (contacts_w)
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
