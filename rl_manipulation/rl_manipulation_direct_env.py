@@ -573,10 +573,12 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Obtain boolean values for collisions
         self.filter_collisions()
+
+        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, 
-                         self.end_robot_rot_ee_pose_r_lie_rel,
+        obs = torch.cat((pose,
                          self.hand_pose.unsqueeze(-1), 
                          self.contacts), 
                          dim = -1)
@@ -610,7 +612,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
-        is_contact = contacts_w > 4
+        is_contact = contacts_w > 3.5
 
         # Action difference between teacher and student
         diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
@@ -637,9 +639,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        # reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 90)
-        reward = reward + (2 * self.target_reached - 1) * self.hand_pose
-        reward = reward + apply_bonus_grasp * (self.cfg.bonus_tgt_reached)
+        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 90)
+        # reward = reward + (2 * self.target_reached - 1) * self.hand_pose
+        reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
 
         # Gripper
         # reward = reward - torch.logical_not(self.target_reached) * contacts_w

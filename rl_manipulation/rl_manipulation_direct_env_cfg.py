@@ -89,7 +89,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    observation_space = size*2 + 1 + 3             # Number of actions per environment (overridden)
+    observation_space = size + 1 + 3             # Number of actions per environment (overridden)
     action_space = size + 1        #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
@@ -318,7 +318,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     interm_distance_thres = 0.0375 # 0.08 # 0.03
-    distance_thres = 0.03 # 0.08 # 0.03
+    distance_thres = 0.0375 # 0.08 # 0.03
 
     height_thres = 0.5
 
