@@ -352,6 +352,8 @@ def get_frame(x, tgt, ax=None):
 
     return fig, ax
 
+
+
 # Class for the Bimanual Direct Environment
 class RLManipulationObstaclesDirect(DirectRLEnv):
     cfg: RLManipulationObstaclesDirectCfg
@@ -726,26 +728,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         print("Robot Pose: ", vel_pos)
         print("Command: ", x0)
         print("u_opt: ", self.u_opt)
+        print("Obj pose: ", obj_pose)
+        print("Obj pose: ", self.target_pose_r)
         print("-----")
+        raise
         
         
         
         quat = quat_from_euler_xyz(roll = x0[:, 3], pitch = x0[:, 4], yaw = x0[:, 5])
 
         x0 = torch.cat((x0[:, :3], quat), dim = -1)
-
-
-
-        fig, ax = get_frame(
-            x0,
-            tgt=[-0.3400, 0.0687, 0.3558],
-            ax=None
-        )
-
-        self.count += 1
-
-        fig.savefig(f"{self.count:03d}.png")
-        plt.close(fig)
 
         
 
@@ -907,6 +899,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Fix double cover
         neg_idx = target_quat_r[:, 0] < 0.0
         target_quat_r[neg_idx] *= -1
+
+        self.target_pose_r = torch.cat((target_pos_r, target_quat_r), dim = -1)
 
 
 
@@ -1232,7 +1226,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
         
         # Updates the poses 
-        self.update_new_poses() 
 
 
         box_pos_x = (self.cfg.box_range_x[1] - self.cfg.box_range_x[0]) * torch.rand((self.num_envs)).to(self.device) + self.cfg.box_range_x[0]
@@ -1258,23 +1251,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((new_obj_pose_w), dim = -1), env_ids = env_ids)
         self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
 
-        
-        obj_pose_r = self.log(self.convert_to_group(new_obj_pose_w[0], new_obj_pose_w[1]))
-        
-        vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:]
-        vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, vel), dim = -1)
+        self.update_new_poses() 
 
-        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
         # NMPC model creation
-        self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r, ini = vel_pos, ref = obj_pose_r)
+        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+        vel_pos = torch.cat((self.robot_rot_ee_pose_r_lie, torch.zeros_like(self.u_opt).yo(self.device)), dim = -1)
 
-        # print(self.cfg.shelf_poses[:, :3])
-        # print(self.cfg.ellipsoid_r)
-        # print(vel_pos)
-        # print(obj_pose_r)
-        # raise
-
+        self.model, self.nmpc = drop_NMPC_setup(self.cfg.shelf_poses[:, :3], self.cfg.ellipsoid_r, ini = vel_pos, ref = self.target_pose_r_lie)
         
 
 
