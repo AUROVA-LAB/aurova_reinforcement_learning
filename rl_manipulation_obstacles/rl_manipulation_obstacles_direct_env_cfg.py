@@ -390,7 +390,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-0.2830,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
+                         [-0.1030,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
     
     # Obtain Euler angles from the quaternion
@@ -431,8 +431,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [0,2]
-    box_range_y = [0,2]
+    box_range_x = [1,1]
+    box_range_y = [1,1]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
@@ -441,31 +441,39 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
     p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
 
-    shelf_poses = [p1, p2]
+    obst_list = []
+    sel = p1
 
     for i in range(2):
-        p_ = copy.deepcopy(shelf_poses[i])
-        
+        if i == 0:
+            obst_list.append(p1)
+            p_ = copy.deepcopy(p1)
+        else:
+            obst_list.append(p2)
+            p_ = copy.deepcopy(p2)
+
         for j in range(4):
 
             if j != 0:
                 p_[1] += 0.5
-                shelf_poses.append(copy.deepcopy(p_))
+                obst_list.append(copy.deepcopy(p_))
             
             p__ = copy.deepcopy(p_)
 
-            for k in range(2):
+            for k in range(3):
                 p__[2] += 0.5
-                shelf_poses.append(copy.deepcopy(p__))
+                obst_list.append(copy.deepcopy(p__))
 
 
-    ellipsoid_r = [0.275, 0.075, 0.28]
+    ellipsoid_r = [0.01 / 2, 
+                   0.01 / 2, 
+                   0.01 / 2]
     
                 
 
 
     # Object pose adjustments
-    object_translation = torch.tensor([np.array([0.0, 0.0, 0.0])])
+    object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
     rot_neg90_y = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
     rot_pos135_z = torch.tensor([(Rotation.from_rotvec((pi/2+pi/4) * np.array([0, 0, 1]))).as_quat()])        # Positive 135 degrees rotation in Y axis 
     rot_neg90_y[:, 0], rot_neg90_y[:, 1:] = rot_neg90_y.clone()[:, 3], rot_neg90_y.clone()[:, :3]
@@ -523,7 +531,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
 
-    cfg.shelf_poses = torch.tensor(cfg.shelf_poses).repeat(num_envs, 1).to(device)
+    cfg.obst_list = torch.tensor(cfg.obst_list).repeat(num_envs, 1).to(device)
 
     return cfg
 
