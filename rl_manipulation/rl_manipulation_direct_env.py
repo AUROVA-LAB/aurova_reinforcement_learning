@@ -608,11 +608,11 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Distance ---
         dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)    
         interm_dist = self.dist_function(self.pose_group_r, self.interm_target_pose_r_group, self.log, self.diff_operator)    
-        end_dist = self.dist_function(self.object_pose_r_group, self.end_target_pose_r_group, self.log, self.diff_operator)    
+        end_dist = self.dist_function(self.pose_group_r, self.end_target_pose_r_group, self.log, self.diff_operator)    
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
-        is_contact = contacts_w > 3.5
+        is_contact = contacts_w > 5
 
         # Action difference between teacher and student
         diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
@@ -903,4 +903,38 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()  
 
         self.teacher_input[env_ids] = self.interm_robot_rot_ee_pose_r_lie_rel[env_ids]
+
+
+
+
+
+        advance_reset = env_ids[torch.rand(env_ids.shape[0]) > 0.5]
+
+
+        self.target_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]        
+        self.interm_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]
+        self.teacher_input[advance_reset] = self.robot_rot_ee_pose_r_lie_rel[advance_reset]
+
+        
+        advance_reset_pose = self.target_pose_r
+        advance_reset_pose[:, 2] += 0.01 
+        # Set the command for the IKDifferentialController
+        self.controller.set_command(advance_reset_pose)
+                
+        # Obtains the poses
+        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
+        
+        # Obtains the joint positions to reset. Concatenates:
+        #   - the joint coordinates for the action computed by the IKDifferentialController and
+        #   - the joint coordinates for the hand.
+        joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+                               self.default_joint_pos[:, (6):]), 
+                               dim=-1)[advance_reset] 
+        
+        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[advance_reset]
+        
+        # Writes the state to the simulation
+        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, advance_reset)
+
+        self.update_new_poses()  
 
