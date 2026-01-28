@@ -407,6 +407,7 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
+        actions = torch.cat((actions, torch.zeros(actions.shape[0], 1).to(self.device)), dim = -1)
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
@@ -574,13 +575,11 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain boolean values for collisions
         self.filter_collisions()
 
-        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
-                self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.target_reached).unsqueeze(-1) + \
+                self.end_robot_rot_ee_pose_r_lie_rel * self.target_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((pose,
-                         self.hand_pose.unsqueeze(-1)), 
-                         dim = -1)
+        obs = pose
         
 
         # Builds the dictionary
@@ -623,8 +622,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
-        self.end_reached = torch.logical_and(self.grasp_reached, end_dist < self.cfg.interm_distance_thres)
+        # self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
+        self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
 
         # Bonus flag for reaching the object
         apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
@@ -638,14 +637,14 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 90)
+        # reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 90)
         # reward = reward + (2 * self.target_reached - 1) * self.hand_pose
-        reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
+        # reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
 
         # Gripper
         # reward = reward - torch.logical_not(self.target_reached) * contacts_w
         # reward = reward + self.target_reached * self.hand_pose
-        reward = reward + self.target_reached * (contacts_w)
+        # reward = reward + self.target_reached * (contacts_w)
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)
@@ -907,33 +906,33 @@ class RLManipulationDirect(DirectRLEnv):
 
 
 
-        advance_reset = env_ids[torch.rand(env_ids.shape[0]) > 0.5]
+        # advance_reset = env_ids[torch.rand(env_ids.shape[0]) > 0.5]
 
 
-        self.target_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]        
-        self.interm_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]
-        self.teacher_input[advance_reset] = self.robot_rot_ee_pose_r_lie_rel[advance_reset]
+        # self.target_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]        
+        # self.interm_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]
+        # self.teacher_input[advance_reset] = self.robot_rot_ee_pose_r_lie_rel[advance_reset]
 
         
-        advance_reset_pose = self.target_pose_r
-        advance_reset_pose[:, 2] += 0.01 
-        # Set the command for the IKDifferentialController
-        self.controller.set_command(advance_reset_pose)
+        # advance_reset_pose = self.target_pose_r
+        # advance_reset_pose[:, 2] += 0.01 
+        # # Set the command for the IKDifferentialController
+        # self.controller.set_command(advance_reset_pose)
                 
-        # Obtains the poses
-        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
+        # # Obtains the poses
+        # ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
         
-        # Obtains the joint positions to reset. Concatenates:
-        #   - the joint coordinates for the action computed by the IKDifferentialController and
-        #   - the joint coordinates for the hand.
-        joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
-                               self.default_joint_pos[:, (6):]), 
-                               dim=-1)[advance_reset] 
+        # # Obtains the joint positions to reset. Concatenates:
+        # #   - the joint coordinates for the action computed by the IKDifferentialController and
+        # #   - the joint coordinates for the hand.
+        # joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        #                        self.default_joint_pos[:, (6):]), 
+        #                        dim=-1)[advance_reset] 
         
-        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[advance_reset]
+        # joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[advance_reset]
         
-        # Writes the state to the simulation
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, advance_reset)
+        # # Writes the state to the simulation
+        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, advance_reset)
 
-        self.update_new_poses()  
+        # self.update_new_poses()  
 
