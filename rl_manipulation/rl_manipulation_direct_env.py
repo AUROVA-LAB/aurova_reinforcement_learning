@@ -645,7 +645,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Gripper
         # reward = reward - torch.logical_not(self.target_reached) * contacts_w
-        reward = reward + self.target_reached * self.hand_pose
+        # reward = reward + self.target_reached * self.hand_pose
         reward = reward + self.target_reached * (contacts_w)
 
         # Reward for end reaching
