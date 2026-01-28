@@ -637,7 +637,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        # reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached - self.hand_pose * 90)
+        reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached/2)
         # reward = reward + (2 * self.target_reached - 1) * self.hand_pose
         # reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
 
