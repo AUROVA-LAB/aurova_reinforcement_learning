@@ -505,7 +505,7 @@ class RLManipulationDirect(DirectRLEnv):
         
         
         self.interm_target_pose_r = torch.cat((grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot), dim = -1)
-        self.interm_target_pose_r[:, 2] += 0.3
+        self.interm_target_pose_r[:, 2] += 0.15
 
         self.interm_target_pose_r_group = self.convert_to_group(self.interm_target_pose_r[:, :3], self.interm_target_pose_r[:, 3:])
         self.interm_target_pose_r_lie = self.log(self.interm_target_pose_r_group)
