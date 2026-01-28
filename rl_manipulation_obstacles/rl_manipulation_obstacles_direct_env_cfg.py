@@ -415,7 +415,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Which robot apply the sampling poses
     apply_range = [False, False, False, False]
 
-    ee_translation = [0.0, 0.0, 0.18]
+    ee_translation = [0.0, 0.0, 0.25]
     ee_rotation = [1.0, 0.0, 0.0, 0.0]
 
 
@@ -431,8 +431,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [1,1]
-    box_range_y = [1,1]
+    box_range_x = [0,2]
+    box_range_y = [0,2]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
@@ -465,9 +465,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 obst_list.append(copy.deepcopy(p__))
 
 
-    ellipsoid_r = [0.01 / 2, 
-                   0.01 / 2, 
-                   0.01 / 2]
+    ellipsoid_r = [0.38 / 2.5, 
+                   0.2 / 2.5, 
+                   0.41 / 2.5]
     
                 
 

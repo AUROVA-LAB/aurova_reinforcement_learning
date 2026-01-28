@@ -1197,7 +1197,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
                     Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
             weights=[50, 50, 50, 50, 50, 50,
-                        5, 5, 5, 5, 5, 5]
+                        20, 20, 20, 20, 20, 20]
         )
 
         nmpc.quad_stage_cost.add_inputs(
