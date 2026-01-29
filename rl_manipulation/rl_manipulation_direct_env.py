@@ -135,7 +135,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
         self.target_pose_ranges2 = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs2)] for poses in cfg.target_pose]).to(self.device)
         
-        self.z_displ = torch.tensor([0.0, 0.0, -0.20]).to(self.device).repeat(self.num_envs, 1)
+        self.z_displ = torch.tensor([0.0, 0.0, -0.18]).to(self.device).repeat(self.num_envs, 1)
 
         # Previous distance
         self.prev_dist = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)
@@ -393,7 +393,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 65.0
+        move_hand = (self.hand_pose*140) < 85.0
 
         self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
@@ -407,7 +407,7 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
-        actions = torch.cat((actions, torch.zeros(actions.shape[0], 1).to(self.device)), dim = -1)
+        # actions = torch.cat((actions, torch.zeros(actions.shape[0], 1).to(self.device)), dim = -1)
 
         # Preprocessing actions
         actions = self._preprocess_actions(actions)
@@ -548,15 +548,19 @@ class RLManipulationDirect(DirectRLEnv):
         diff_end = self.diff_operator(self.end_target_pose_r_group, self.pose_group_r)
         self.end_robot_rot_ee_pose_r_lie_rel = self.log(diff_end)
 
-        self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
-                             self.robot_rot_ee_pose_r_lie_rel * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.target_reached).unsqueeze(-1)) + \
-                             self.end_robot_rot_ee_pose_r_lie_rel * self.target_reached.unsqueeze(-1)
+        # self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
+        #                      self.robot_rot_ee_pose_r_lie_rel * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.grasp_reached).unsqueeze(-1)) + \
+        #                      self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        
+        self.teacher_input = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                             self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
 
         
 
         # Hand observations
         self.hand_joints_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         self.hand_pose = torch.round(self.hand_joints_pos[:, 2] / self.cfg.m[0], decimals = 0) / 140.0
+
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -575,11 +579,12 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain boolean values for collisions
         self.filter_collisions()
 
-        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.target_reached).unsqueeze(-1) + \
-                self.end_robot_rot_ee_pose_r_lie_rel * self.target_reached.unsqueeze(-1)
+        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = pose
+        obs = torch.cat((pose, 
+                         self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
         # Builds the dictionary
@@ -610,7 +615,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # --- Contacts ---
         contacts_w = (self.contacts * self.cfg.contact_matrix).sum(-1)
-        is_contact = contacts_w > 5
+        is_contact = contacts_w > 1.2
 
         # Action difference between teacher and student
         diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
@@ -621,8 +626,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
-        self.target_reached = torch.logical_and(torch.logical_or(dist < self.cfg.distance_thres, self.target_reached), self.interm_reached)
-        # self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
+        self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
         self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
 
         # Bonus flag for reaching the object
@@ -639,12 +644,12 @@ class RLManipulationDirect(DirectRLEnv):
         # Phase reward plus bonuses
         reward = reward + apply_bonus * self.interm_reached * (self.cfg.bonus_tgt_reached/2)
         # reward = reward + (2 * self.target_reached - 1) * self.hand_pose
-        # reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
+        reward = reward + apply_bonus_grasp * self.cfg.bonus_tgt_reached
 
         # Gripper
         # reward = reward - torch.logical_not(self.target_reached) * contacts_w
-        # reward = reward + self.target_reached * self.hand_pose
-        # reward = reward + self.target_reached * (contacts_w)
+        # reward = reward + self.target_reached * (contacts_w - self.hand_pose)
+        reward = reward + self.target_reached * contacts_w
 
         # Reward for end reaching
         reward = reward + self.end_reached * (self.cfg.bonus_tgt_reached * 2)

@@ -55,7 +55,9 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     max_steps = 700             # Maximum steps in an episode
 
     # Pre-trained models that act as master for the RL agent
-    models = [["2025-05-06_18-49-55/model", "2025-12-12_10-04-45/model_122880000_steps", "2025-05-06_18-49-55/model"],
+    # PREV DQ model reach: 2025-12-12_10-04-45/model_122880000_steps
+
+    models = [["2025-05-06_18-49-55/model", "2026-01-28_17-18-34/model_256000000_steps", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-09-12_10-23-50/model"]]
@@ -89,8 +91,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    observation_space = size             # Number of actions per environment (overridden)
-    action_space = size       #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    observation_space = size + 1             # Number of actions per environment (overridden)
+    action_space = size + 1      #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -409,6 +411,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([2, 2, 2,])
+    cfg.contact_matrix = torch.tensor([0.5, 0.5, 0.5,])
 
     return cfg
