@@ -40,11 +40,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = MAT
-    mapping = 2
-    size = 9#sizes[int(mapping != 0)][representation]
+    representation = DQ
+    mapping = 1
+    size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 0
+    distance = 1
 
     # Scalings for each action
     scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
@@ -59,13 +59,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = 9             # Number of actions per environment (overridden)
-    observation_space = 9     #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    action_space = 6             # Number of actions per environment (overridden)
+    observation_space = 6     #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
