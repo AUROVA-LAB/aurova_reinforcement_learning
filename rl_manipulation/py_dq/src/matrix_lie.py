@@ -39,7 +39,7 @@ def homo_from_rt(R, t):
 
 
 
-def log_se3(T: torch.Tensor, so3 = False):
+def log_se3(T: torch.Tensor, so3 = True):
     """
     Logarithm of a Homogeneous Transformation Matrix.
     """
@@ -94,7 +94,7 @@ def log_se3(T: torch.Tensor, so3 = False):
         xi = torch.cat([phi, rho], dim=-1)
     return torch.round(xi, decimals =3)
 
-def exp_se3(xi: torch.Tensor, so3 = False):
+def exp_se3(xi: torch.Tensor, so3 = True):
     """
     Exponential map of a Homogeneous Transformation Matrix.
     """
