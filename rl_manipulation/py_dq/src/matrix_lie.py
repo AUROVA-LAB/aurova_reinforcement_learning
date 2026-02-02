@@ -39,7 +39,7 @@ def homo_from_rt(R, t):
 
 
 
-def log_se3(T: torch.Tensor):
+def log_se3(T: torch.Tensor, so3 = False):
     """
     Logarithm of a Homogeneous Transformation Matrix.
     """
@@ -88,10 +88,13 @@ def log_se3(T: torch.Tensor):
 
     rho = torch.bmm(J_inv, t.unsqueeze(-1)).squeeze(-1)
 
-    xi = torch.cat([phi, rho], dim=-1)
+    if so3:
+        xi = torch.cat([phi, t], dim=-1)
+    else:
+        xi = torch.cat([phi, rho], dim=-1)
     return torch.round(xi, decimals =3)
 
-def exp_se3(xi: torch.Tensor):
+def exp_se3(xi: torch.Tensor, so3 = False):
     """
     Exponential map of a Homogeneous Transformation Matrix.
     """
@@ -125,7 +128,10 @@ def exp_se3(xi: torch.Tensor):
 
     t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
 
-    return torch.round(homo_from_rt(R, t).view(B, -1), decimals =3)
+    if so3:
+        return torch.round(homo_from_rt(R, rho).view(B, -1), decimals =3)
+    else:
+        return torch.round(homo_from_rt(R, t).view(B, -1), decimals =3)
 
 
 
@@ -170,8 +176,6 @@ def exp_gram(R_: torch.Tensor, eps = 1e-08):
     # print(R.view(-1, 3,3))
     return R
 
-
-
 def log_gram_se3(T: torch.Tensor):
     B = T.shape[0]
 
@@ -195,3 +199,4 @@ def exp_gram_se3(T_: torch.Tensor):
 
     
     return torch.round(homo_from_rt(R, t).view(B, -1), decimals =5)
+
