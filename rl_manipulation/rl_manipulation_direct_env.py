@@ -409,13 +409,14 @@ class RLManipulationDirect(DirectRLEnv):
         '''
         # actions = torch.cat((actions, torch.zeros(actions.shape[0], 1).to(self.device)), dim = -1)
 
-        # Preprocessing actions
-        actions = self._preprocess_actions(actions)
-        self.student_action = actions[:, :-1].clone()
         
         # Obtain theacher action
         self.teacher_action = torch.tensor(self.teacher_model.predict(self.teacher_input.cpu().numpy(), deterministic = True)[0]).to(self.device)
         self.teacher_action = self._preprocess_actions(self.teacher_action, gripper = False)
+        
+        # Preprocessing actions
+        actions = self._preprocess_actions(actions)
+        self.student_action = actions[:, :-1].clone()
         
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
@@ -539,8 +540,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Transform to the Lie algebra leveraging symmetry
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff) * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
-                                           self.robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
         diff_interm = self.diff_operator(self.interm_target_pose_r_group, self.pose_group_r)
         self.interm_robot_rot_ee_pose_r_lie_rel = self.log(diff_interm)
@@ -548,12 +548,12 @@ class RLManipulationDirect(DirectRLEnv):
         diff_end = self.diff_operator(self.end_target_pose_r_group, self.pose_group_r)
         self.end_robot_rot_ee_pose_r_lie_rel = self.log(diff_end)
 
-        # self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
-        #                      self.robot_rot_ee_pose_r_lie_rel * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.grasp_reached).unsqueeze(-1)) + \
-        #                      self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
-        
-        self.teacher_input = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+        self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
+                             self.robot_rot_ee_pose_r_lie_rel * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.grasp_reached).unsqueeze(-1)) + \
                              self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        
+        # self.teacher_input = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+        #                      self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
 
         
 
