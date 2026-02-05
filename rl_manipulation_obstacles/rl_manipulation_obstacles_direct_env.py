@@ -334,9 +334,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
 
-        # self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
-        # self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
-        # self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
+        self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
+        self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
+        self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
@@ -526,11 +526,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
-                                                                         self.reset_robot_poses_group_r[:, :3])), 
+                                                                         self.end_target_pose_r[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
                                                                           self.debug_target_pose_w[:,3:],
-                                                                          self.reset_robot_poses_group_r[:, 3:])), 
+                                                                          self.end_target_pose_r[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -656,8 +656,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
                                                                     t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
+        new_camera_trans_2, new_camera_rot_2 = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
+                                                                    t12 = self.cfg.camera_trans_2,  q12 = self.cfg.camera_rot_2)
         
         self.scene.sensors[camera_key].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
+        self.scene.sensors["camera_ext"].set_world_poses(positions = new_camera_trans_2, orientations = new_camera_rot_2)
+        self.scene.sensors["camera_ext_2"].set_world_poses(positions = self.cfg.camera_ext_trans_2, orientations = self.cfg.rot_neg90_xy_2)
 
         
         
@@ -699,7 +703,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        # image = self._get_images()
+        image = self._get_images()
         # image[image == float('inf')] = 255.0
         # image /= 255.0
 

@@ -190,12 +190,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0), visible = True,
         ),
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
         colorize_instance_id_segmentation = True,
+        debug_vis = True
     )
 
     tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
@@ -204,12 +205,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0), visible = True,
         ),
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+        colorize_instance_id_segmentation = True,
+        debug_vis = True
     )
 
     tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
@@ -218,18 +220,22 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
         spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0), visible = True,
         ),
         width=img_width,
         height=img_height,
         # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+        colorize_instance_id_segmentation = True,
+        debug_vis = True
     )
 
 
 
     camera_trans = [[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]
     camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
+
+    camera_trans_2 = [[-0.1231539748184402, 0.09738024537036244 - 0.175, 0.015012247696052522]]
+    camera_rot_2 = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
 
     camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
     camera_ext_rot = [[1.0, 0.0, 0.0, 0.0]]
@@ -417,6 +423,8 @@ def update_cfg(cfg, num_envs, device):
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
     cfg.camera_trans = torch.tensor(cfg.camera_trans).repeat(num_envs, 1).to(device)
     cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
+    cfg.camera_trans_2 = torch.tensor(cfg.camera_trans_2).repeat(num_envs, 1).to(device)
+    cfg.camera_rot_2 = torch.tensor(cfg.camera_rot_2).repeat(num_envs, 1).to(device)
     cfg.camera_ext_trans = torch.tensor(cfg.camera_ext_trans).repeat(num_envs, 1).to(device)
     cfg.camera_ext_rot = torch.tensor(cfg.camera_ext_rot).repeat(num_envs, 1).to(device)
     cfg.camera_ext_trans_2 = torch.tensor(cfg.camera_ext_trans_2).repeat(num_envs, 1).to(device)
