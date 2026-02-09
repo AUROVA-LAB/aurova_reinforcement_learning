@@ -342,6 +342,18 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
 
+        self.my_traj = torch.load("/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/traj.pt")
+
+        
+        new_quat = quat_from_euler_xyz(self.my_traj[:, 3], self.my_traj[:, 4], self.my_traj[:, 5])
+        self.my_traj = torch.cat((self.my_traj[:, :3], new_quat), dim = -1).to(self.device)
+        # self.my_traj[:, 0] += 0.2
+
+        # robot_ee_r = combine_frame_transforms(t01 = self.my_traj[:, :3],            q01 = self.my_traj[:, 3:],
+        #                                       t12 = -self.cfg.ee_translation.repeat(300, 1),  q12 = self.cfg.ee_rotation.repeat(300, 1))
+        # self.my_traj = torch.cat(robot_ee_r, dim = -1)
+
+
 
     def on_press(self, key):
         try:
@@ -510,6 +522,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         action_pose_lab = self.convert_to_Lab(action_pose)
 
 
+        # ============================================ MPC ================================================
 
         grip_action = self.prim_g_action
         action_pose_lab[:, :3] += self.prim_action[:, :3]
@@ -539,10 +552,26 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         x0_lab = torch.cat(robot_ee_r, dim = -1)
 
+        # =================================================================================================
+
+
+        cmd = torch.cat((self.my_traj[:, :3], self.debug_robot_ee_pose_w[:, 3:].repeat(300, 1)), dim=-1)
+
+        # print("Debug: ", self.debug_robot_ee_pose_w)
+        # print(cmd[0])
+        # robot_ee_r = combine_frame_transforms(t01 = cmd[:, :3],            q01 = cmd[:, 3:],
+        #                                       t12 = -self.cfg.ee_translation.repeat(300, 1),  q12 = self.cfg.ee_rotation.repeat(300, 1))
+        
+        # x0_lab = torch.cat(robot_ee_r, dim = -1)
+        # print("Gripper: ", self.gripper_pose_r)
+        # print("NEW: ", x0_lab[self.count])
+        # print(self.cfg.ee_translation.repeat(300, 1))
+        
 
         # Set the command for the IKDifferentialController
-        self.controller.set_command(x0_lab)
-                
+        self.controller.set_command(cmd[self.count])
+        self.count +=1
+
         # Obtains the poses
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
 
@@ -720,6 +749,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = combine_frame_transforms(t01 = robot_rot_ee_pos_r,       q01 = robot_rot_ee_quat_r,
                                                                            t12 = self.cfg.ee_translation,  q12 = self.cfg.ee_rotation)
         
+        self.gripper_pose_r = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1) 
         self.gripper_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
         self.gripper_pose_r_lie = self.log(self.gripper_group_r)
 
@@ -790,7 +820,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        image = self._get_images()
+        # image = self._get_images()
         # image[image == float('inf')] = 255.0
         # image /= 255.0
 
@@ -1167,7 +1197,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # ======================================================
         # Setup model
         # ======================================================
-        dt = 0.01
+        dt = 0.005
         model.setup(dt=dt)
 
         # ======================================================
@@ -1214,8 +1244,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 -10, -10, -10, -10, -10, -10],
             x_ub=[10, 10, 10, 10, 10, 10,
                 10, 10, 10, 10, 10, 10],
-            u_lb=[-0.02, -0.02, -0.02, -0.02, -0.02, -0.02],
-            u_ub=[0.02, 0.02, 0.02, 0.02, 0.02, 0.02],
+            u_lb=[-0.01, -0.01, -0.01, -0.01, -0.01, -0.01],
+            u_ub=[0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
             z_lb=[0.0]*len(obst_list),      # <-- enforces obstacle avoidance
             z_ub=[ca.inf]*len(obst_list)
         )

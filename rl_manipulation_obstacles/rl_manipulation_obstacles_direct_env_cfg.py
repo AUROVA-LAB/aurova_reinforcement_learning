@@ -391,7 +391,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
                          [-0.1030,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
-                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
+                         [-0.2019,  0.1292,  0.6284, -0.4223, -0.2331, -0.8642,  0.1430]]
     
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(torch.tensor(ee_init_pose_quat)[:, 3:])
@@ -431,8 +431,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [0,2]
-    box_range_y = [0,2]
+    box_range_x = [1,1]
+    box_range_y = [1,1]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
 
