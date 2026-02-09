@@ -39,7 +39,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     import numpy as np
     import matplotlib.pyplot as plt
 
-    def plot_ellipsoid(ax, center, radii, color='orange', alpha=0.25, resolution=20):
+    def plot_ellipsoid(ax, center, radii, color='orange', alpha=1, resolution=20):
         u = np.linspace(0, 2 * np.pi, resolution)
         v = np.linspace(0, np.pi, resolution)
 
@@ -52,7 +52,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
             color=color,
             alpha=alpha,
             linewidth=0,
-            shade=True
+            shade=True,
+            zorder = 6
         )
 
     # =========================
@@ -80,6 +81,12 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
             traj[:, 0], traj[:, 1], traj[:, 2],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
+    # =========================
+    # Plot obstacles (ellipsoids)
+    # =========================
+    if obst_centers is not None and obst_radii is not None:
+        for center, radii in zip(obst_centers, obst_radii):
+            plot_ellipsoid(ax, center, radii)
 
     # =========================
     # Plot robot
@@ -91,12 +98,6 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     # =========================
     ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
 
-    # =========================
-    # Plot obstacles (ellipsoids)
-    # =========================
-    if obst_centers is not None and obst_radii is not None:
-        for center, radii in zip(obst_centers, obst_radii):
-            plot_ellipsoid(ax, center, radii)
 
     # =========================
     # Plot origin
@@ -240,9 +241,9 @@ n_obst = len(obst_list)
 
 
 idx_obst = [[0, 1, 2], [2, 0, 1]]
-ellipsoid_r = [0.4275 , 
-               0.18 , 
-               0.42  ]
+ellipsoid_r = [0.43, 
+               0.2, 
+               0.435 ]
 ellipsoid_r_torch = []
 
 # Obstacle parameters
@@ -260,11 +261,11 @@ for idx, o in enumerate(obst_list):
 
     change_idx = idx >= int(n_obst / 2)
 
-    rhs.append((X - o[0].item())**2 / ellipsoid_r[idx_obst[change_idx][0]]**2 + \
-               (Y - o[1].item())**2 / ellipsoid_r[idx_obst[change_idx][1]]**2 + \
-               (Z - o[2].item())**2 / ellipsoid_r[idx_obst[change_idx][2]]**2 - 1 - z[idx])
+    rhs.append((X - o[0].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][0]])**2 + \
+               (Y - o[1].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx)**2 + \
+               (Z - o[2].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx))**2 - 1 - z[idx])
     
-    ellipsoid_r_torch.append([ellipsoid_r[idx_obst[change_idx][0]], ellipsoid_r[idx_obst[change_idx][1]], ellipsoid_r[idx_obst[change_idx][2]]])
+    ellipsoid_r_torch.append([0.0 + ellipsoid_r[idx_obst[change_idx][0]], 1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
 
 ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
 model.set_algebraic_equations(ca.vertcat(*rhs))
@@ -288,7 +289,7 @@ nmpc = NMPC(model)
 # EULER: -0.2968, -0.0151,  0.4611, -3.0582,  0.9217,  2.6561
 # LIE: 0.8948  -0.3471  0.8949  -0.34   0.0687   0.3558
 
-ref_lab = torch.tensor([[-0.6800, -0.3700, 0.75400, -3.0582, 0.9217, 2.6561]])
+ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400, -3.0582, 0.9217, 2.6561]])
 
 # Target
 X_ref = ref_lab[0, 0].item()
@@ -311,7 +312,7 @@ nmpc.quad_stage_cost.add_states(
 
     ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
             Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
-    weights=[50, 50, 50, 50, 50, 50,
+    weights=[50, 60, 60, 50, 50, 50,
                 5, 5, 5, 5, 5, 5]
 )
 
@@ -354,12 +355,13 @@ nmpc.setup(options={'print_level': 0})
 # ======================================================
 # Simulation loop
 # ======================================================
-n_steps = 300
+n_steps = 200
 sol = model.solution
 
 t_dir = "."
 
 trajectory = []
+trajectory_save = []
 
 for k in range(n_steps):
     u_opt = nmpc.optimize(x0)
@@ -374,7 +376,10 @@ for k in range(n_steps):
 
     # print(u_opt)    
 
+    print("Step: ", k)
+
     trajectory.append([x0_tensor[0, 0].item(), x0_tensor[0, 1].item(), x0_tensor[0, 2].item()])
+    trajectory_save.append(x0_tensor[0].numpy().tolist())
 
     fig, ax = get_frame(
         x0_tensor[0],
@@ -385,7 +390,6 @@ for k in range(n_steps):
         obst_radii=ellipsoid_r_torch
     )
 
-    
 
 
     # fig.savefig(f"{k:03d}.png")
@@ -393,8 +397,8 @@ for k in range(n_steps):
     ax.view_init(elev=0, azim=0)
     fig.savefig(f"{k:03d}.png")
 
-    # ax.view_init(elev=0, azim=45)
-    # fig.savefig(f"side_{k:03d}.png")
+    ax.view_init(elev=0, azim=45)
+    fig.savefig(f"side_{k:03d}.png")
 
 
     ax.view_init(elev=90, azim=-0)
@@ -403,19 +407,9 @@ for k in range(n_steps):
     
     plt.close(fig)
 
-    # Visuals
     
-    # fig, axs = plt.subplots(1, 1, figsize=(10,10))
-    
-
-    # print(x0, [X_ref, Y_ref], )
-
-    # get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
-    # axs.get_xaxis().set_visible(True)
-    # axs.get_yaxis().set_visible(True)
-
-    # fig.tight_layout()
-    # fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
-    # plt.close(fig)
 
 print("Simulation finished")
+print(trajectory_save)
+torch.save(torch.tensor(trajectory_save), "./rl_manipulation_obstacles/traj.pt")
+

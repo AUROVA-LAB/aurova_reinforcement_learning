@@ -275,7 +275,7 @@ model.set_algebraic_equations(ca.vertcat(*rhs))
 # ======================================================
 # Setup model
 # ======================================================
-dt = 0.1
+dt = 0.01
 model.setup(dt=dt)
 
 # ======================================================
@@ -285,7 +285,7 @@ nmpc = NMPC(model)
 
 # EULER: -0.2968, -0.0151,  0.4611, -3.0582,  0.9217,  2.6561
 # LIE: 0.8948  -0.3471  0.8949  -0.34   0.0687   0.3558
-ref_lie = torch.tensor([[-0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.2700 + 0.1 - 0.25]])
+ref_lie = torch.tensor([[-0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.2700 + 0.1]])
 
 # Target
 X_ref = ref_lie[0, 0].item()
@@ -326,8 +326,8 @@ nmpc.set_box_constraints(
           -10, -10, -10, -10, -10, -10],
     x_ub=[10, 10, 10, 10, 10, 10,
           10, 10, 10, 10, 10, 10],
-    u_lb=[-0.04, -0.04, -0.04, -0.04, -0.04, -0.04],
-    u_ub=[0.04, 0.04, 0.04, 0.04, 0.04, 0.04],
+    u_lb=[-0.1, -0.1, -0.1, -0.1, -0.1, -0.1],
+    u_ub=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
     z_lb=[0.0]*len(obst_list),      # <-- enforces obstacle avoidance
     z_ub=[ca.inf]*len(obst_list)
 )
@@ -415,4 +415,6 @@ for k in range(n_steps):
     # fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
     # plt.close(fig)
 
+print(trajectory)
 print("Simulation finished")
+torch.save(torch.tensor(trajectory), "traj.pt")
