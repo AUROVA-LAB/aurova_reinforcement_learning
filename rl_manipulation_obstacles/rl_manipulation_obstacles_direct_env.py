@@ -554,8 +554,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # =================================================================================================
 
+        cmd = torch.cat((self.my_traj[:, :3], self.debug_robot_ee_pose_w[:, 3:].repeat(200, 1)), dim=-1)
+        
+        cmd = combine_frame_transforms(t01= cmd[:, :3], q01 = cmd[:, 3:],
+                                      t12 = -self.cfg.ee_translation.repeat(200, 1), q12 = self.cfg.ee_rotation.repeat(200, 1))
+        cmd = torch.cat(cmd, dim=-1)
+        print("TRAJ: ", self.my_traj[0])
+        print("AUX: ", cmd[0])
 
-        cmd = torch.cat((self.my_traj[:, :3], self.debug_robot_ee_pose_w[:, 3:].repeat(300, 1)), dim=-1)
+        
 
         # print("Debug: ", self.debug_robot_ee_pose_w)
         # print(cmd[0])
@@ -645,12 +652,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
                                                                          shelf_pose[:, :3],
-                                                                         self.cfg.obst_list[:, :3])), 
+                                                                         self.cfg.obst_list[:, :3],
+                                                                         self.gripper_pose_r[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
                                                                           self.debug_target_pose_w[:,3:],
                                                                           shelf_pose[:, 3:],
-                                                                          self.cfg.obst_list[:, 3:])), 
+                                                                          self.cfg.obst_list[:, 3:],
+                                                                          self.gripper_pose_r[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -687,6 +696,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --- Robot poses ---
         # Obtain the pose of the UR5e end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
+
+        print("ROBOT: ", self.debug_robot_ee_pose_w)
 
         # Obtain the pose of the end effector in UR5e root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
@@ -756,7 +767,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                            t12 = robot_rot_ee_pos_r,          q12 = robot_rot_ee_quat_r)
 
-        self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
+        # self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
+        print("GRIPPER: ", self.gripper_pose_r)
+        robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.gripper_pose_r[:, :3], q01 = self.gripper_pose_r[:, 3:],
+                                                                           t12 = -self.cfg.ee_translation,    q12 = self.cfg.ee_rotation)
+        print("New ROBOT: ", robot_rot_ee_pos_w)
+        print("------------------------------")
+
 
 
 
