@@ -261,11 +261,11 @@ for idx, o in enumerate(obst_list):
 
     change_idx = idx >= int(n_obst / 2)
 
-    rhs.append((X - o[0].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][0]])**2 + \
-               (Y - o[1].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx)**2 + \
-               (Z - o[2].item())**2 / (0.05+ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx))**2 - 1 - z[idx])
+    rhs.append((X - o[0].item())**2 / (-0.1 + 0.01+ellipsoid_r[idx_obst[change_idx][0]])**2 + \
+               (Y - o[1].item())**2 / (0.01+ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx)**2 + \
+               (Z - o[2].item())**2 / (0.01+ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx))**2 - 1 - z[idx])
     
-    ellipsoid_r_torch.append([0.0 + ellipsoid_r[idx_obst[change_idx][0]], 1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
+    ellipsoid_r_torch.append([-0.1 + ellipsoid_r[idx_obst[change_idx][0]], 1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
 
 ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
 model.set_algebraic_equations(ca.vertcat(*rhs))
@@ -339,7 +339,8 @@ nmpc.set_box_constraints(
 )
 
 # Initial conditions
-x0 = [-0.2018,  0.1293,  0.6283, -3.0582,  0.9217,  2.6561,  
+# -0.4067,  0.1397,  0.5128,  0.2076, -0.6794, -0.1910,  0.6774
+x0 = [-0.4067,  0.1397,  0.5128, -3.0582,  0.9217,  2.6561,  
        0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
 z0 = [1.0]*n_obst   # start feasible
 u0 = [0]*6
