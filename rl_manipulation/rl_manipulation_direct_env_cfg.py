@@ -50,7 +50,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
-                [[0.02,  0.004], [0.03,  0.006], [0.02, 0.004]]]
+                [[0.02,  0.004], [0.03,  0.006], [0.005, 0.005]]]
 
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5*2
