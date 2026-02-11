@@ -7,6 +7,18 @@ from isaaclab.utils.math import matrix_from_quat, quat_from_matrix
 def norm_mat(x: torch.Tensor):
     return x
 
+def norm_rot_mat(x: torch.Tensor):
+    """
+    Normalize a batch of rotation matrices to ensure they are valid.
+    x: (B, 3, 3) batch of rotation matrices
+    returns: (B, 3, 3) batch of normalized rotation matrices
+    """
+    # Use SVD to find the closest orthogonal matrix
+    U, _, Vh = torch.linalg.svd(x)
+    R = U @ Vh
+
+    return R
+
 def convert_homo_to_Lab(x: torch.Tensor):
     """
     Convert an Homogeneous Transformation Matrix x of the shape [*, 16] to the format of IsaacLab (translation+quaternion).

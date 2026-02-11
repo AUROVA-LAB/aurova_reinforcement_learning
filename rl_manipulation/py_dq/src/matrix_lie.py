@@ -174,7 +174,9 @@ def exp_gram(R_: torch.Tensor, eps = 1e-08):
     # Stack into rotation matrix
     R = torch.stack([b1, b2, b3], dim=2)  # (B, 3, 3)
     # print(R.view(-1, 3,3))
-    return R
+
+
+    return norm_mat(R)
 
 def log_gram_se3(T: torch.Tensor):
     B = T.shape[0]
