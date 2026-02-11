@@ -24,6 +24,7 @@ import torch
 from rl_manipulation_obstacles.py_dq.src.dq_lie import *
 from rl_manipulation_obstacles.py_dq.src.dq import *
 
+from rl_manipulation_obstacles.mpc_controller import *
 
 
 def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
@@ -138,65 +139,6 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
 
 
 # ======================================================
-# Create model
-# ======================================================
-model = Model(plot_backend='bokeh')
-
-# States
-x = model.set_dynamical_states(['X', 'Y',    'Z', 'X_', 'Y_', 'Z_', 
-                                'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'])
-X = x[0]
-Y = x[1]
-Z = x[2]
-X_ = x[3]
-Y_ = x[4]
-Z_ = x[5]
-
-Vx = x[6]
-Vy = x[7]
-Vz = x[8]
-Wx = x[9]
-Wy = x[10]
-Wz = x[11]
-
-# Measurements
-model.set_measurements(['yX', 'yY', 'yZ', 'yX_', 'yY_', 'yZ_',
-                        'yVx', 'yVy', 'yVz', 'yWx', 'yWy', 'yWz'])
-model.set_measurement_equations(x)
-
-# Inputs
-u = model.set_inputs(['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'])
-ax = u[0]
-ay = u[1]
-az = u[2]
-ax_ = u[3]
-ay_ = u[4]
-az_ = u[5]
-
-# ======================================================
-# Dynamics
-# ======================================================
-dx = ca.vertcat(
-    Vx,
-    Vy,
-    Vz,
-    Wx,
-    Wy,
-    Wz,
-    ax,
-    ay,
-    az,
-    ax_,
-    ay_,
-    az_,
-)
-model.set_dynamical_equations(dx)
-
-
-
-
-
-# ======================================================
 # Obstacle avoidance via algebraic constraint
 # ======================================================
 
@@ -227,136 +169,28 @@ for i in range(2):
             obst_list.append(copy.deepcopy(p__))
 
 
-z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
 
-obst_list = torch.tensor(obst_list)
+ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400+0.5, -3.0582, 0.9217, 2.6561]])
 
-rhs = []
+x0 = [-0.3958,  0.1400,  0.6118, -3.0582,  0.9217,  2.6561,  
+       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
 
-
-n_obst = len(obst_list)
-
-# obst_list_group = dq_from_tr(obst_list[:, :3], obst_list[:, 3:])
-# obst_list_lie = log_bruno(obst_list_group)
-
-
-idx_obst = [[0, 1, 2], [2, 0, 1]]
 ellipsoid_r = [0.43, 
                0.2, 
                0.435 ]
-ellipsoid_r_torch = []
 
-# Obstacle parameters
-for idx, o in enumerate(obst_list):
+obst_list = torch.tensor(obst_list)
 
-    # Algebraic state (constraint slack, optional)
-
-    # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
-    '''
-    sería algo así como:
-        rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
-
-    pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-    '''
-
-    change_idx = idx >= int(n_obst / 2)
-
-    rhs.append((X - o[0].item())**2 / (-0.1 + 0.01+ellipsoid_r[idx_obst[change_idx][0]])**2 + \
-               (Y - o[1].item())**2 / (0.01+ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx)**2 + \
-               (Z - o[2].item())**2 / (0.01+ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx))**2 - 1 - z[idx])
-    
-    ellipsoid_r_torch.append([-0.1 + ellipsoid_r[idx_obst[change_idx][0]], 1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
-
-ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
-model.set_algebraic_equations(ca.vertcat(*rhs))
-
-
-
-
-
-
-# ======================================================
-# Setup model
-# ======================================================
-dt = 0.01
-model.setup(dt=dt)
-
-# ======================================================
-# NMPC
-# ======================================================
-nmpc = NMPC(model)
-
-# EULER: -0.2968, -0.0151,  0.4611, -3.0582,  0.9217,  2.6561
-# LIE: 0.8948  -0.3471  0.8949  -0.34   0.0687   0.3558
-
-ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400, -3.0582, 0.9217, 2.6561]])
-
-# Target
-X_ref = ref_lab[0, 0].item()
-Y_ref = ref_lab[0, 1].item()
-Z_ref = ref_lab[0, 2].item()
-X__ref = ref_lab[0, 3].item()
-Y__ref = ref_lab[0, 4].item()
-Z__ref = ref_lab[0, 5].item()
-
-Vx_ref = 0.0
-Vy_ref = 0.0
-Vz_ref = 0.0
-Wx_ref = 0.0
-Wy_ref = 0.0
-Wz_ref = 0.0
-
-nmpc.quad_stage_cost.add_states(
-    names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
-            'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
-
-    ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
-            Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
-    weights=[50, 60, 60, 50, 50, 50,
-                5, 5, 5, 5, 5, 5]
-)
-
-
-
-nmpc.quad_stage_cost.add_inputs(
-    names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
-    weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-)
-
-# Horizon
-nmpc.horizon = 30
-
-# Box constraints
-nmpc.set_box_constraints(
-    x_lb=[-10, -10, -10, -10, -10, -10, 
-          -10, -10, -10, -10, -10, -10],
-    x_ub=[10, 10, 10, 10, 10, 10,
-          10, 10, 10, 10, 10, 10],
-    u_lb=[-2, -2, -2, -2, -2, -2],
-    u_ub=[2, 2, 2, 2, 2, 2],
-    z_lb=[0.0]*n_obst,      # <-- enforces obstacle avoidance
-    z_ub=[ca.inf]*n_obst
-)
-
-# Initial conditions
-# -0.4067,  0.1397,  0.5128,  0.2076, -0.6794, -0.1910,  0.6774
-x0 = [-0.4067,  0.1397,  0.5128, -3.0582,  0.9217,  2.6561,  
-       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
-z0 = [1.0]*n_obst   # start feasible
-u0 = [0]*6
-
-model.set_initial_conditions(x0=x0, z0=z0)
-nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
-
-nmpc.setup(options={'print_level': 0})
-
-
+model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list=obst_list, 
+                              ellipsoid_r=ellipsoid_r, 
+                              ini = torch.tensor(x0), 
+                              ref = ref_lab[0])
 
 
 # ======================================================
 # Simulation loop
 # ======================================================
-n_steps = 200
+n_steps = 500
 sol = model.solution
 
 t_dir = "."
@@ -398,8 +232,8 @@ for k in range(n_steps):
     ax.view_init(elev=0, azim=0)
     fig.savefig(f"{k:03d}.png")
 
-    ax.view_init(elev=0, azim=45)
-    fig.savefig(f"side_{k:03d}.png")
+    # ax.view_init(elev=0, azim=45)
+    # fig.savefig(f"side_{k:03d}.png")
 
 
     ax.view_init(elev=90, azim=-0)
