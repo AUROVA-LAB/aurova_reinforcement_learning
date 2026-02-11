@@ -139,7 +139,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
         spawn=sim_utils.CylinderCfg(
             radius = 0.05,
-            height = 0.11,
+            height = 0.31,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -395,7 +395,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-0.1030,  0.1225,  0.6802,  -0.2031, 0.6846, 0.1954,  -0.6722],
+                         [-0.1030,  0.1225,  0.7802,  -0.2031, 0.6846, 0.1954,  -0.6722],
                          [-0.2019,  0.1292,  0.6284, -0.4223, -0.2331, -0.8642,  0.1430]]
     
     # Obtain Euler angles from the quaternion
@@ -436,7 +436,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [1,1]
+    box_range_x = [0,0]
     box_range_y = [1,1]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
@@ -470,9 +470,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 obst_list.append(copy.deepcopy(p__))
 
 
-    ellipsoid_r = [0.38 / 2.5, 
-                   0.2 / 2.5, 
-                   0.41 / 2.5]
+    ellipsoid_r = [0.43, 
+                   0.2, 
+                   0.435 ]
     
                 
 
