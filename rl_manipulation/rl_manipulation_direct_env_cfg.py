@@ -44,7 +44,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
 
     # Scalings for each action
     scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
@@ -65,7 +65,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
