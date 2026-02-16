@@ -38,6 +38,10 @@ sys.path.append('../../../')
 from hilo_mpc import NMPC, Model
 import casadi as ca
 from .mpc_controller import drop_NMPC_setup
+import pickle
+from math import atan, pi
+from scipy.spatial.transform import Rotation
+
 
 
 
@@ -344,16 +348,19 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
 
-        self.my_traj = torch.load("/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/traj.pt")
+        # self.my_traj = torch.load("/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/traj.pt")
+        self.my_dict = None
 
-        
-        new_quat = quat_from_euler_xyz(self.my_traj[:, 3], self.my_traj[:, 4], self.my_traj[:, 5])
-        self.my_traj = torch.cat((self.my_traj[:, :3], new_quat), dim = -1).to(self.device)
-        # self.my_traj[:, 0] += 0.2
+        # with open("/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/traj.pkl", 'rb') as f:
+        #     self.m_dict = pickle.load(f)
 
-        # robot_ee_r = combine_frame_transforms(t01 = self.my_traj[:, :3],            q01 = self.my_traj[:, 3:],
-        #                                       t12 = -self.cfg.ee_translation.repeat(300, 1),  q12 = self.cfg.ee_rotation.repeat(300, 1))
-        # self.my_traj = torch.cat(robot_ee_r, dim = -1)
+        # lie = self.my_dict["lie"]
+        # self.my_traj = self.my_dict["traj"]
+        # if lie:
+        #     self.my_traj = self.convert_to_Lab(self.exp(self.my_traj)).to(self.device)
+        # else:
+        #     new_quat = quat_from_euler_xyz(self.my_traj[:, 3], self.my_traj[:, 4], self.my_traj[:, 5])
+        #     self.my_traj = torch.cat((self.my_traj[:, :3], new_quat), dim = -1).to(self.device)
 
 
 
@@ -546,16 +553,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         # print("X0: ", x0)
         # =================================================================================================
-
-        cmd = torch.cat((self.my_traj[:, :3], self.debug_robot_ee_pose_w[:, 3:].repeat(self.my_traj.shape[0], 1)), dim=-1)
         
-        cmd = combine_frame_transforms(t01= cmd[:, :3], q01 = cmd[:, 3:],
-                                       t12 = -self.cfg.ee_translation.repeat(self.my_traj.shape[0], 1), q12 = self.cfg.ee_rotation.repeat(self.my_traj.shape[0], 1))
+        # cmd = torch.cat((self.my_traj[:, :3], self.debug_robot_ee_pose_w[:, 3:].repeat(self.my_traj.shape[0], 1)), dim=-1)
+        
+        cmd = combine_frame_transforms(t01= self.gripper_pose_r[:, :3], q01 = self.gripper_pose_r[:, 3:],
+                                       t12 = -self.cfg.ee_translation, q12 = self.cfg.ee_rotation)
     
 
         
         # Set the command for the IKDifferentialController
-        self.controller.set_command(torch.cat(cmd, dim = -1)[self.count])
+        self.controller.set_command(torch.cat(cmd, dim = -1))
         self.count +=1
         
 
@@ -629,14 +636,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((self.debug_robot_ee_pose_w[:, :3], 
-                                                                         self.debug_target_pose_w[:, :3],
+        self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
+                                                                         self.gripper_pose_r[:, :3],
                                                                          shelf_pose[:, :3],
                                                                          self.cfg.obst_list[:, :3],
                                                                          self.gripper_pose_r[:, :3])), 
                                                                          
-                                                orientations = torch.cat((self.debug_robot_ee_pose_w[:, 3:], 
-                                                                          self.debug_target_pose_w[:,3:],
+                                                orientations = torch.cat((self.target_pose_r[:, 3:], 
+                                                                          self.gripper_pose_r[:,3:],
                                                                           shelf_pose[:, 3:],
                                                                           self.cfg.obst_list[:, 3:],
                                                                           self.gripper_pose_r[:, 3:])), 
@@ -748,12 +755,47 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                            t12 = robot_rot_ee_pos_r,          q12 = robot_rot_ee_quat_r)
 
         # self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
+        print("ROBOT Lie: ", self.robot_rot_ee_pose_r_lie)
         print("GRIPPER: ", self.gripper_pose_r)
-        robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.gripper_pose_r[:, :3], q01 = self.gripper_pose_r[:, 3:],
-                                                                           t12 = -self.cfg.ee_translation,    q12 = self.cfg.ee_rotation)
-        print("New ROBOT: ", robot_rot_ee_pos_w)
+        print("GRIPPER Lie: ", self.gripper_pose_r_lie)
+        print("TARGET Lie: ", self.target_pose_r_lie)
+        print("TARGET: ", self.target_pose_r)
+        # robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.gripper_pose_r[:, :3], q01 = self.gripper_pose_r[:, 3:],
+        #                                                                    t12 = -self.cfg.ee_translation,    q12 = self.cfg.ee_rotation)
         print("------------------------------")
 
+
+        x0 = self.gripper_pose_r.clone()
+        # r,p,y = euler_xyz_from_quat(x0[:, 3:7])
+        # x0[:, 3] = r.item()
+        # x0[:, 4] = p.item()
+        # x0[:, 5] = y.item()
+        # x0 = x0[:, :-1]
+
+        ref_lab = self.target_pose_r.clone()
+        # r,p,y = euler_xyz_from_quat(ref_lab[:, 3:7])
+        # ref_lab[:, 3] = r.item()
+        # ref_lab[:, 4] = p.item()
+        # ref_lab[:, 5] = y.item()
+        # ref_lab = ref_lab[:, :-1]
+
+        quat_ref = quat_from_euler_xyz(roll = ref_lab[:,3], pitch = ref_lab[:,4], yaw = ref_lab[:,5])
+        
+        alpha = atan((ref_lab[0 ,1].item() - x0[0, 1].item()) / (ref_lab[0 ,0].item() - x0[0, 0].item()))
+        rot_pos45_xy = torch.tensor([(Rotation.from_rotvec(pi/4 * np.array([1, 0, 0]))).as_quat()]).to(self.device)
+        rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec(alpha * np.array([0, 0, 1]))).as_quat()]).to(self.device)
+
+        corrected_ref = combine_frame_transforms(t01 = ref_lab[:, :3], q01 = ref_lab[:, 3:], 
+                                                t12 = torch.zeros(1,3).to(self.device), q12 = rot_pos45_xy)
+        self.target_pose_r = torch.cat(corrected_ref ,dim = -1)
+
+
+        corrected_ref = combine_frame_transforms(t01 = corrected_ref[0].double(), q01 = corrected_ref[1].double(), 
+                                                t12 = torch.zeros(1,3).double().to(self.device), q12 = rot_negAlpha_yz.double())
+        self.target_pose_r = torch.cat(corrected_ref ,dim = -1)
+
+
+        
 
 
 
