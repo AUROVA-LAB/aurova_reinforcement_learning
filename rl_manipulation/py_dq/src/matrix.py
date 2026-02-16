@@ -21,6 +21,16 @@ def homo_from_mat_trans_LAB(t: torch.Tensor, r: torch.tensor):
 
     return torch.cat((cat1, row4), dim = -1).view(-1, 16)
 
+def convert_homo_to_Lab(x: torch.Tensor):
+    """
+    Convert an Homogeneous Transformation Matrix x of the shape [*, 16] to the format of IsaacLab (translation+quaternion).
+    """
+    assert x.shape[-1] == 16
+
+    x = x.view(-1, 4, 4)
+    q = quat_from_matrix(matrix = x[:, :-1, :-1])
+
+    return torch.cat((x[:, :-1, -1], q), dim = -1)
 
 
 def homo_from_mat_trans(t: torch.Tensor, r: torch.tensor):
