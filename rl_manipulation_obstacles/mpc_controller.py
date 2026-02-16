@@ -19,11 +19,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
+import pickle
+
+
 
 
 
 def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
-                                                0,0,0,0,0,0], ref = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0]):
+                                                0,0,0,0,0,0], ref = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0], 
+                                                lie = False):
         
     # ======================================================
     # Create model
@@ -113,11 +117,14 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
         change_idx = idx >= int(n_obst / 2)
 
-        rhs.append((X - o[0].item())**2 / (-0.25 + 0.01+ellipsoid_r[idx_obst[change_idx][0]])**2 + \
-                (Y - o[1].item())**2    / (0.01+ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx)**2 + \
-                (Z - o[2].item())**2    / (0.01+ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx))**2 - 1 - z[idx])
+        rhs.append((X - o[0].item())**2 / ((-0.25/2 + 0.01 + ellipsoid_r[idx_obst[change_idx][0]]))**2 + \
+                   (Y - o[1].item())**2 / ((0.01 + ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx))**2 + \
+                   (Z - o[2].item())**2 / ((0.01 + ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx)))**2 - 1 - z[idx])
         
-        ellipsoid_r_torch.append([-0.25 + ellipsoid_r[idx_obst[change_idx][0]], 1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
+        ellipsoid_r_torch.append([-0.25/2 + ellipsoid_r[idx_obst[change_idx][0]], 
+                                  1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 
+                                  1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
+        
     ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
     model.set_algebraic_equations(ca.vertcat(*rhs))
 
@@ -150,14 +157,16 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     Wy_ref = 0.0
     Wz_ref = 0.0
 
+    weights = [[50, 70, 60, 50, 50, 50,     2, 2, 2, 2, 2, 2], 
+               [50, 50, 50, 50, 70, 60,     2, 2, 2, 2, 2, 2]]
+
     nmpc.quad_stage_cost.add_states(
         names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
                 'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
 
         ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
                 Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
-        weights=[50, 70, 60, 50, 50, 50,
-                    2, 2, 2, 2, 2, 2]
+        weights=weights[lie]
     )
 
     nmpc.quad_stage_cost.add_inputs(
@@ -192,3 +201,9 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
 
     return model, nmpc, ellipsoid_r_torch
+
+def save_traj(traj, lie):
+    dict_save = {"lie": lie,
+             "traj": torch.tensor(traj) }
+    with open('./rl_manipulation_obstacles/traj.pkl', 'wb') as f:
+        pickle.dump(dict_save, f)

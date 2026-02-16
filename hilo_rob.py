@@ -19,10 +19,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
+import pickle
+
 
 from rl_manipulation_obstacles.py_dq.src.dq_lie import *
 from rl_manipulation_obstacles.py_dq.src.dq import *
 
+from rl_manipulation_obstacles.mpc_controller import *
 
 
 def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
@@ -38,7 +41,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     import numpy as np
     import matplotlib.pyplot as plt
 
-    def plot_ellipsoid(ax, center, radii, color='orange', alpha=0.25, resolution=20):
+    def plot_ellipsoid(ax, center, radii, color='orange', alpha=1, resolution=20):
         u = np.linspace(0, 2 * np.pi, resolution)
         v = np.linspace(0, np.pi, resolution)
 
@@ -51,7 +54,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
             color=color,
             alpha=alpha,
             linewidth=0,
-            shade=True
+            shade=True,
+            zorder = 6
         )
 
     # =========================
@@ -79,6 +83,12 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
             traj[:, 0], traj[:, 1], traj[:, 2],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
+    # =========================
+    # Plot obstacles (ellipsoids)
+    # =========================
+    if obst_centers is not None and obst_radii is not None:
+        for center, radii in zip(obst_centers, obst_radii):
+            plot_ellipsoid(ax, center, radii)
 
     # =========================
     # Plot robot
@@ -90,12 +100,6 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     # =========================
     ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
 
-    # =========================
-    # Plot obstacles (ellipsoids)
-    # =========================
-    if obst_centers is not None and obst_radii is not None:
-        for center, radii in zip(obst_centers, obst_radii):
-            plot_ellipsoid(ax, center, radii)
 
     # =========================
     # Plot origin
@@ -136,65 +140,6 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
 
 
 # ======================================================
-# Create model
-# ======================================================
-model = Model(plot_backend='bokeh')
-
-# States
-x = model.set_dynamical_states(['X', 'Y',    'Z', 'X_', 'Y_', 'Z_', 
-                                'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'])
-X = x[0]
-Y = x[1]
-Z = x[2]
-X_ = x[3]
-Y_ = x[4]
-Z_ = x[5]
-
-Vx = x[6]
-Vy = x[7]
-Vz = x[8]
-Wx = x[9]
-Wy = x[10]
-Wz = x[11]
-
-# Measurements
-model.set_measurements(['yX', 'yY', 'yZ', 'yX_', 'yY_', 'yZ_',
-                        'yVx', 'yVy', 'yVz', 'yWx', 'yWy', 'yWz'])
-model.set_measurement_equations(x)
-
-# Inputs
-u = model.set_inputs(['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'])
-ax = u[0]
-ay = u[1]
-az = u[2]
-ax_ = u[3]
-ay_ = u[4]
-az_ = u[5]
-
-# ======================================================
-# Dynamics
-# ======================================================
-dx = ca.vertcat(
-    Vx,
-    Vy,
-    Vz,
-    Wx,
-    Wy,
-    Wz,
-    ax,
-    ay,
-    az,
-    ax_,
-    ay_,
-    az_,
-)
-model.set_dynamical_equations(dx)
-
-
-
-
-
-# ======================================================
 # Obstacle avoidance via algebraic constraint
 # ======================================================
 
@@ -203,7 +148,6 @@ p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
 p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
 
 obst_list = []
-sel = p1
 
 for i in range(2):
     if i == 0:
@@ -226,126 +170,23 @@ for i in range(2):
             obst_list.append(copy.deepcopy(p__))
 
 
-z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
+# Original pose: -0.6800, -0.3700,  0.7400,  0.2706, -0.6533, -0.2706,  0.6533
+ref_lab = torch.tensor([[-0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.3700]])
+tgt_pos = [-0.6800, -0.3700,  0.7400]
+
+x0 = [-0.9456, -0.2658,  0.9430, -0.1979,  0.0700,  0.3059,  
+       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
+
+ellipsoid_r = [0.43/2, 
+               0.2/2,  
+               0.435/2]
 
 obst_list = torch.tensor(obst_list)
 
-rhs = []
-
-
-n_obst = len(obst_list)
-
-obst_list_group = dq_from_tr(obst_list[:, :3], obst_list[:, 3:])
-obst_list_lie = log_bruno(obst_list_group)
-
-
-idx_obst = [[0, 1, 2], [2, 0, 1]]
-ellipsoid_r = [0.380/2 , 
-               0.2 /2, 
-               0.4 /2 ]
-ellipsoid_r_torch = []
-
-# Obstacle parameters
-for idx, o in enumerate(obst_list_lie):
-
-    # Algebraic state (constraint slack, optional)
-
-    # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
-    '''
-    sería algo así como:
-        rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
-
-    pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-    '''
-
-    change_idx = idx >= int(n_obst / 2)
-
-    rhs.append((X_ - o[0+3].item())**2 / ellipsoid_r[idx_obst[change_idx][0]]**2 + \
-               (Y_ - o[1+3].item())**2 / ellipsoid_r[idx_obst[change_idx][1]]**2 + \
-               (Z_ - o[2+3].item())**2 / ellipsoid_r[idx_obst[change_idx][2]]**2 - 1 - z[idx])
-    
-    ellipsoid_r_torch.append([ellipsoid_r[idx_obst[change_idx][0]], ellipsoid_r[idx_obst[change_idx][1]], ellipsoid_r[idx_obst[change_idx][2]]])
-
-ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
-model.set_algebraic_equations(ca.vertcat(*rhs))
-
-
-
-
-# ======================================================
-# Setup model
-# ======================================================
-dt = 0.01
-model.setup(dt=dt)
-
-# ======================================================
-# NMPC
-# ======================================================
-nmpc = NMPC(model)
-
-# EULER: -0.2968, -0.0151,  0.4611, -3.0582,  0.9217,  2.6561
-# LIE: 0.8948  -0.3471  0.8949  -0.34   0.0687   0.3558
-ref_lie = torch.tensor([[-0.8800, -0.3645,  0.8800, -0.3400, -0.1850,  0.2700 + 0.1]])
-
-# Target
-X_ref = ref_lie[0, 0].item()
-Y_ref = ref_lie[0, 1].item()
-Z_ref = ref_lie[0, 2].item()
-X__ref = ref_lie[0, 3].item()
-Y__ref = ref_lie[0, 4].item()
-Z__ref = ref_lie[0, 5].item()
-
-Vx_ref = 0.0
-Vy_ref = 0.0
-Vz_ref = 0.0
-Wx_ref = 0.0
-Wy_ref = 0.0
-Wz_ref = 0.0
-
-nmpc.quad_stage_cost.add_states(
-    names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
-            'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
-
-    ref=[X_ref, Y_ref, Z_ref, X__ref, Y__ref, Z__ref,
-            Vx_ref, Vy_ref, Vz_ref, Wx_ref, Wy_ref, Wz_ref],
-    weights=[50, 50, 50, 50, 50, 50,
-                5, 5, 5, 5, 5, 5]
-)
-
-nmpc.quad_stage_cost.add_inputs(
-    names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
-    weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-)
-
-# Horizon
-nmpc.horizon = 20
-
-# Box constraints
-nmpc.set_box_constraints(
-    x_lb=[-10, -10, -10, -10, -10, -10, 
-          -10, -10, -10, -10, -10, -10],
-    x_ub=[10, 10, 10, 10, 10, 10,
-          10, 10, 10, 10, 10, 10],
-    u_lb=[-0.1, -0.1, -0.1, -0.1, -0.1, -0.1],
-    u_ub=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-    z_lb=[0.0]*len(obst_list),      # <-- enforces obstacle avoidance
-    z_ub=[ca.inf]*len(obst_list)
-)
-
-# Initial conditions
-x0 = [-0.9457, -0.2658,  0.9429, -0.050,  0.0647,  0.3141,  
-       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
-z0 = [1.0]*len(obst_list)   # start feasible
-u0 = [0]*6
-
-model.set_initial_conditions(x0=x0, z0=z0)
-nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
-
-nmpc.setup(options={'print_level': 0})
-
-
-ref_lab = convert_dq_to_Lab(exp_bruno(ref_lie))
-
+model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list=obst_list, 
+                              ellipsoid_r=ellipsoid_r, 
+                              ini = torch.tensor(x0), 
+                              ref = ref_lab[0])
 
 
 # ======================================================
@@ -357,6 +198,7 @@ sol = model.solution
 t_dir = "."
 
 trajectory = []
+trajectory_save = []
 
 for k in range(n_steps):
     u_opt = nmpc.optimize(x0)
@@ -367,28 +209,30 @@ for k in range(n_steps):
                         float(x0[3]), float(x0[4]), float(x0[5])]])
     
     x0_group = exp_bruno(x0_tensor)
-    x0_lab = convert_dq_to_Lab(x0_group)
+    x0_lab   = convert_dq_to_Lab(x0_group)
 
-    print(u_opt)    
+    # print(u_opt)    
+
+    print("Step: ", k)
 
     trajectory.append([x0_lab[0, 0].item(), x0_lab[0, 1].item(), x0_lab[0, 2].item()])
+    trajectory_save.append(x0_tensor[0].numpy().tolist())
 
     fig, ax = get_frame(
-        [x0_lab[0,0].item(), x0_lab[0,1].item(), x0_lab[0,2].item()],
-        tgt=[ref_lab[0,0].item(), ref_lab[0,1].item(), ref_lab[0,2].item()],
+        x0_lab[0],
+        tgt=tgt_pos,
         traj=trajectory,
         ax=None,
         obst_centers=obst_list[:, :3],
-        obst_radii=ellipsoid_r_torch *2
+        obst_radii=ellipsoid_r_torch*2
     )
 
-    
 
 
     # fig.savefig(f"{k:03d}.png")
 
     ax.view_init(elev=0, azim=0)
-    fig.savefig(f"front_{k:03d}.png")
+    fig.savefig(f"{k:03d}.png")
 
     # ax.view_init(elev=0, azim=45)
     # fig.savefig(f"side_{k:03d}.png")
@@ -400,21 +244,10 @@ for k in range(n_steps):
     
     plt.close(fig)
 
-    # Visuals
-    
-    # fig, axs = plt.subplots(1, 1, figsize=(10,10))
     
 
-    # print(x0, [X_ref, Y_ref], )
-
-    # get_frame(x0, [X_ref, Y_ref], [1, 1], ax=axs)
-    # axs.get_xaxis().set_visible(True)
-    # axs.get_yaxis().set_visible(True)
-
-    # fig.tight_layout()
-    # fig.savefig(os.path.join(t_dir, '{:03d}.png'.format(k)))
-    # plt.close(fig)
-
-print(trajectory)
 print("Simulation finished")
-torch.save(torch.tensor(trajectory), "traj.pt")
+save_traj(trajectory_save, lie = True)
+
+# torch.save(torch.tensor(trajectory_save), "./rl_manipulation_obstacles/traj.pt")
+

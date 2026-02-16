@@ -19,12 +19,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
-
+import pickle
 
 from rl_manipulation_obstacles.py_dq.src.dq_lie import *
 from rl_manipulation_obstacles.py_dq.src.dq import *
 
 from rl_manipulation_obstacles.mpc_controller import *
+
+from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
+from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
+
+from scipy.spatial.transform import Rotation
+from math import atan, atan2, pi
+
+
 
 
 def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
@@ -169,11 +177,42 @@ for i in range(2):
             obst_list.append(copy.deepcopy(p__))
 
 
+x0 = [-0.3958,  0.1400,  0.6118, -3.0582,  0.9217,  2.6561,  
+       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
 
 ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400+0.5, -3.0582, 0.9217, 2.6561]])
 
-x0 = [-0.3958,  0.1400,  0.6118, -3.0582,  0.9217,  2.6561,  
-       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
+# quat_ref = quat_from_euler_xyz(roll = ref_lab[:,3], pitch = ref_lab[:,4], yaw = ref_lab[:,5])
+
+# alpha = atan((ref_lab[0,1].item() - x0[1]) / (ref_lab[0,0].item() - x0[0]))
+# rot_pos45_xy = torch.tensor([(Rotation.from_rotvec(pi/4 * np.array([0, 0, 1]))).as_quat()])
+# rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec(pi/4 * np.array([-1, 0, 0]))).as_quat()])
+
+
+# corrected_ref = combine_frame_transforms(t01 = ref_lab[0, :3], q01 = quat_ref, 
+#                                          t12 = torch.zeros(1,3), q12 = rot_pos45_xy)
+
+
+# corrected_ref = combine_frame_transforms(t01 = corrected_ref[0].double(), q01 = corrected_ref[1].double(), 
+#                                          t12 = torch.zeros(1,3).double(), q12 = rot_negAlpha_yz.double())
+# corrected_ref = torch.cat(corrected_ref ,dim = -1)
+
+
+# corrected_euler = euler_xyz_from_quat(corrected_ref[:, 3:7])
+# ref_lab[:, 3] = corrected_euler[0].item()
+# ref_lab[:, 4] = corrected_euler[1].item()
+# ref_lab[:, 5] = corrected_euler[2].item()
+# ref_lab = ref_lab[:, :-1]
+
+# print(ref_lab)
+# raise
+
+
+
+
+
+
+
 
 ellipsoid_r = [0.43, 
                0.2, 
@@ -245,6 +284,8 @@ for k in range(n_steps):
     
 
 print("Simulation finished")
-print(trajectory_save)
-torch.save(torch.tensor(trajectory_save), "./rl_manipulation_obstacles/traj.pt")
+save_traj(trajectory_save, lie = False)
+
+
+# torch.save(torch.tensor(trajectory_save), "./rl_manipulation_obstacles/traj.pt")
 
