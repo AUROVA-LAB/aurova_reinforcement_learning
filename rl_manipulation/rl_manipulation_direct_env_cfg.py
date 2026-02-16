@@ -58,11 +58,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # PREV DQ model reach: 2025-12-12_10-04-45/model_122880000_steps
     # PREV DQ model traj: 2026-01-28_17-18-34/model_256000000_steps
 
+    
+
     models = [["2025-05-06_18-49-55/model", "2026-01-30_10-07-52/model_204800000_steps", "2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model"],
               ["2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model", "2025-05-06_18-49-55/model"],
-              ["2025-05-06_18-49-55/model", "2025-09-12_10-23-50/model"]]
-   
+              ["2025-05-06_18-49-55/model", "2026-02-12_13-07-48/model_148480000_steps"]]
+
     # --- Mapping configuration ---
     DQ = 0
     EULER = 1
@@ -72,11 +74,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = DQ
+    representation = MAT
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
     path_to_pretrained = models[representation][mapping] # Path to the pre-trained approaching model
 
     # Scalings for each action
