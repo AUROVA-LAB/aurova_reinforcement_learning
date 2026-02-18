@@ -701,6 +701,22 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Get object world pose
         self.debug_target_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 0:7]
 
+
+        alpha = atan((self.debug_target_pose_w[0 ,1].item() - self.debug_robot_ee_pose_w[0, 1].item()) / (self.debug_target_pose_w[0 ,0].item() - self.debug_robot_ee_pose_w[0, 0].item()))
+        rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec((alpha) * np.array([0, 0, 1]))).as_quat()]).to(self.device)
+        w = rot_negAlpha_yz[:, 3].clone().unsqueeze(0)
+        xyz = rot_negAlpha_yz[:, :3].clone()
+        rot_negAlpha_yz = torch.cat((w,xyz), dim=-1)
+
+
+
+        corrected_ref = combine_frame_transforms(t01 = self.debug_target_pose_w[:, :3], q01 = self.debug_target_pose_w[:, 3:],
+                                                t12 = torch.zeros(1,3).to(self.device), q12 = rot_negAlpha_yz)
+        self.debug_target_pose_w = torch.cat(corrected_ref ,dim = -1).float()
+
+
+
+
         # Obtain the relative pose w.r.t. the robot root frame
         target_pos_r, target_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                 t02 = self.debug_target_pose_w[:, :3], q02 = self.debug_target_pose_w[:, 3:])
@@ -749,53 +765,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         self.gripper_pose_r = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1) 
         self.gripper_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
-        self.gripper_pose_r_lie = self.log(self.gripper_group_r)
-
-        robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
-                                                                           t12 = robot_rot_ee_pos_r,          q12 = robot_rot_ee_quat_r)
-
-        # self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
-        print("ROBOT Lie: ", self.robot_rot_ee_pose_r_lie)
-        print("GRIPPER: ", self.gripper_pose_r)
-        print("GRIPPER Lie: ", self.gripper_pose_r_lie)
-        print("TARGET Lie: ", self.target_pose_r_lie)
-        print("TARGET: ", self.target_pose_r)
-        # robot_rot_ee_pos_w, robot_rot_ee_quat_w = combine_frame_transforms(t01 = self.gripper_pose_r[:, :3], q01 = self.gripper_pose_r[:, 3:],
-        #                                                                    t12 = -self.cfg.ee_translation,    q12 = self.cfg.ee_rotation)
-        print("------------------------------")
-
-
-        x0 = self.gripper_pose_r.clone()
-        # r,p,y = euler_xyz_from_quat(x0[:, 3:7])
-        # x0[:, 3] = r.item()
-        # x0[:, 4] = p.item()
-        # x0[:, 5] = y.item()
-        # x0 = x0[:, :-1]
-
-        ref_lab = self.target_pose_r.clone()
-        # r,p,y = euler_xyz_from_quat(ref_lab[:, 3:7])
-        # ref_lab[:, 3] = r.item()
-        # ref_lab[:, 4] = p.item()
-        # ref_lab[:, 5] = y.item()
-        # ref_lab = ref_lab[:, :-1]
-
-        quat_ref = quat_from_euler_xyz(roll = ref_lab[:,3], pitch = ref_lab[:,4], yaw = ref_lab[:,5])
-        
-        alpha = atan((ref_lab[0 ,1].item() - x0[0, 1].item()) / (ref_lab[0 ,0].item() - x0[0, 0].item()))
-        rot_pos45_xy = torch.tensor([(Rotation.from_rotvec(pi/4 * np.array([1, 0, 0]))).as_quat()]).to(self.device)
-        rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec(alpha * np.array([0, 0, 1]))).as_quat()]).to(self.device)
-
-        corrected_ref = combine_frame_transforms(t01 = ref_lab[:, :3], q01 = ref_lab[:, 3:], 
-                                                t12 = torch.zeros(1,3).to(self.device), q12 = rot_pos45_xy)
-        self.target_pose_r = torch.cat(corrected_ref ,dim = -1)
-
-
-        corrected_ref = combine_frame_transforms(t01 = corrected_ref[0].double(), q01 = corrected_ref[1].double(), 
-                                                t12 = torch.zeros(1,3).double().to(self.device), q12 = rot_negAlpha_yz.double())
-        self.target_pose_r = torch.cat(corrected_ref ,dim = -1)
-
-
-        
+        self.gripper_pose_r_lie = self.log(self.gripper_group_r)     
 
 
 
