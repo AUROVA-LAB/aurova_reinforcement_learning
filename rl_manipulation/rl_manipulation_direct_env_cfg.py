@@ -322,8 +322,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    interm_distance_thres = 0.0375 # 0.08 # 0.03
-    distance_thres = 0.0375 # 0.08 # 0.03
+    interm_distance_thres = 0.23 # 0.0375 -> For DQ
+    distance_thres = 0.23 # 0.0375 -> For DQ
 
     height_thres = 0.5
 
