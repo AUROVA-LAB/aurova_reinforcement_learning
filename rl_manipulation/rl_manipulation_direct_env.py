@@ -398,7 +398,7 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 160.0
+        move_hand = (self.hand_pose*140) < 95.0
 
         self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
@@ -588,8 +588,7 @@ class RLManipulationDirect(DirectRLEnv):
                 self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel,
-                         self.end_robot_rot_ee_pose_r_lie_rel,
+        obs = torch.cat((pose,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
