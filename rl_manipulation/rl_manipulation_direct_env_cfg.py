@@ -51,8 +51,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 7.0      # Length of the episode in seconds
-    max_steps = 700             # Maximum steps in an episode
+    episode_length_s = 9.0      # Length of the episode in seconds
+    max_steps = 900             # Maximum steps in an episode
 
     # Pre-trained models that act as master for the RL agent
     # PREV DQ model reach: 2025-12-12_10-04-45/model_122880000_steps
@@ -296,6 +296,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.04, 0,pi,0]
+    target_pose_2 = [-0.4919,  0.1333,  0.4879, 3.3677e-06, -3.8268e-01, -9.2388e-01,  1.9968e-06]
+
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
                          [-0.35*0,   0.225*0],
@@ -305,10 +307,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     target_poses_incs2 = [[-0.25,  0.25],
                          [-0.25,  0.25],
-                         [-0.15*0,   0.1*0],
-                         [-2*pi/5*0,  2*pi/5*0],
-                         [-2*pi/5*0,  2*pi/5*0],
-                         [-pi/2,  pi/2]]
+                         [-0.15,   0.1],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5],
+                         [-2*pi/5,  2*pi/5]]
 
     apply_range_tgt = True
 
