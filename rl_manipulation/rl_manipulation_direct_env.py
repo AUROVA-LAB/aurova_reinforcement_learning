@@ -399,9 +399,9 @@ class RLManipulationDirect(DirectRLEnv):
         # --- Update gripper position ---
         actual_gripper_pos = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._hand_joints_idx]
         
-        move_hand = (self.hand_pose*140) < 85.0
+        move_hand = ((self.hand_pose*140) < 85.0).unsqueeze(-1)
 
-        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper
+        self.actions[:, 6:] = move_hand * grip_action * self.cfg.moving_joints_gripper
         self.actions[:, 8:11] += actual_gripper_pos[:, 2:5]
         self.actions[:, -3:] += actual_gripper_pos[:, -3:]
 
