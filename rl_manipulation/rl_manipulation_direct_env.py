@@ -401,7 +401,9 @@ class RLManipulationDirect(DirectRLEnv):
         
         move_hand = (self.hand_pose*140) < 85.0
 
-        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
+        self.actions[:, 6:] = move_hand.unsqueeze(-1) * grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper
+        self.actions[:, 8:11] += actual_gripper_pos[:, 2:5]
+        self.actions[:, -3:] += actual_gripper_pos[:, -3:]
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
