@@ -130,7 +130,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain the ranges in which sample reset poses
         self.ee_pose_ranges = torch.tensor([[ [(i + cfg.apply_range[idx]*inc[0]), (i + cfg.apply_range[idx]*inc[1])] for i, inc in zip(poses, cfg.ee_pose_incs)] for idx, poses in enumerate(cfg.ee_init_pose)]).to(self.device)
         self.target_pose_ranges = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs)] for poses in cfg.target_pose]).to(self.device)
-        self.target_pose_ranges2 = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs2)] for poses in cfg.target_pose]).to(self.device)
+        self.target_pose_ranges2 = torch.tensor([[ [(i + cfg.apply_range_tgt*inc[0]), (i + cfg.apply_range_tgt*inc[1])] for i, inc in zip(poses, cfg.target_poses_incs2)] for poses in cfg.target_pose_2]).to(self.device)
         
         self.z_displ = torch.tensor([0.0, 0.0, -0.21]).to(self.device).repeat(self.num_envs, 1)
 
@@ -204,8 +204,8 @@ class RLManipulationDirect(DirectRLEnv):
         # teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         # For v5.0.0
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
 
 
 
@@ -215,6 +215,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.student_action = self.actions.clone()
         self.teacher_action = self.actions.clone()
+
+        self.g_action = torch.zeros((self.num_envs)).to(self.device)
 
 
         # # Crear listener
@@ -371,6 +373,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Separate the robot action from the gripper action        
         grip_action = actions
+        self.g_action = grip_action.squeeze(-1)
         actions = self.teacher_action # actions[:, :-1]
 
         # Lie increment -> plus operator
@@ -401,7 +404,7 @@ class RLManipulationDirect(DirectRLEnv):
         
         move_hand = ((self.hand_pose*140) < 85.0).unsqueeze(-1)
 
-        self.actions[:, 6:] = move_hand * grip_action * self.cfg.moving_joints_gripper
+        self.actions[:, 6:] = 100*move_hand * grip_action * self.cfg.moving_joints_gripper
         self.actions[:, 8:11] += actual_gripper_pos[:, 2:5]
         self.actions[:, -3:] += actual_gripper_pos[:, -3:]
 
@@ -455,11 +458,11 @@ class RLManipulationDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
-                                                                         self.debug_target_pose_w2[:, :3],
+                                                                         self.end_target_pose_r[:, :3],
                                                                          self.interm_target_pose_r[:, :3])), 
                                                 orientations = torch.cat((ee_pose_w_1[:, 3:], 
                                                                           self.debug_target_pose_w[:, 3:],
-                                                                          self.debug_target_pose_w2[:, 3:],
+                                                                          self.end_target_pose_r[:, 3:],
                                                                           self.interm_target_pose_r[:, 3:]),), 
                                                 marker_indices=marker_indices)
 
@@ -636,26 +639,22 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
-        self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
+        self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.5), self.target_reached), self.interm_reached)
         self.grasp_reached = torch.logical_or(self.target_reached, self.grasp_reached)
         self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
-        # Bonus flag for reaching the object
-        apply_bonus = torch.logical_and(torch.logical_not(aux_reached), self.target_reached)
-        apply_bonus_grasp = torch.logical_and(torch.logical_not(aux_grasp_reached), self.grasp_reached)
-
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = (torch.logical_not(self.target_reached) * (self.hand_pose < 0.15)).float()
-        reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.hand_pose > 0.15)).float()
-        reward -= (self.end_reached * (self.hand_pose > 0.15)).float()
+        reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
+        reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
+        reward -= (self.end_reached * (self.g_action > 0.0)).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
         # Update previous distances
         self.prev_dist = dist
-        
+
         return reward
     
 
@@ -678,7 +677,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.end_reached)
+        terminated = torch.logical_or(time_out, self.end2_reached)
 
         return truncated, terminated
     
