@@ -640,7 +640,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.35), self.grasp_reached)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.2), self.grasp_reached)
         self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
