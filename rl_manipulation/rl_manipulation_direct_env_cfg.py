@@ -305,12 +305,12 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.25,  0.25],
-                         [-0.25,  0.25],
-                         [-0.15,   0.1],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5],
-                         [-2*pi/5,  2*pi/5]]
+    target_poses_incs2 = [[-0.2,  0.2],
+                          [-0.2,  0.2],
+                          [-0.15,   0.1],
+                          [-2*pi/5*0,  2*pi/5*0],
+                          [-2*pi/5*0,  2*pi/5*0],
+                          [-2*pi/5,    2*pi/5]]
 
     apply_range_tgt = True
 
@@ -364,6 +364,7 @@ def update_cfg(cfg, num_envs, device):
     # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+    cfg.target_pose_2 = torch.tensor(cfg.target_pose_2).repeat(num_envs, 1).to(device)
     cfg.open = torch.tensor(cfg.open).repeat(num_envs, 1).to(device)
     cfg.close = torch.tensor(cfg.close).repeat(num_envs, 1).to(device)
 
