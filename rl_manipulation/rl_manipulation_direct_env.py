@@ -649,7 +649,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
-        reward += contacts_w * self.grasp_reached
+        reward += contacts_w * self.target_reached
         # reward -= (self.end_reached * (self.g_action > 0.0)).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
