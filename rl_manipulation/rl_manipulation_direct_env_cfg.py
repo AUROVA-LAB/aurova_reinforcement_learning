@@ -100,7 +100,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -296,7 +296,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.04, 0,pi,0]
-    target_pose_2 = [-0.4919,  0.1333,  0.4879, 3.3677e-06, -3.8268e-01, -9.2388e-01,  1.9968e-06]
+    target_pose_2 = [-0.4308,  0.1459,  0.4802,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
@@ -307,10 +307,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     target_poses_incs2 = [[-0.2,  0.2],
                           [-0.2,  0.2],
-                          [-0.15,   0.1],
-                          [-2*pi/5*0,  2*pi/5*0],
-                          [-2*pi/5*0,  2*pi/5*0],
-                          [-2*pi/5,    2*pi/5]]
+                          [-0.1,  0.1],
+                          [-2*pi/5,  2*pi/5],
+                          [-2*pi/5,  2*pi/5],
+                          [-2*pi/5,  2*pi/5]]
 
     apply_range_tgt = True
 
@@ -417,6 +417,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([0.5, 0.5, 0.5,])
+    cfg.contact_matrix = torch.tensor([0.8, 0.8, 0.8,])
 
     return cfg
