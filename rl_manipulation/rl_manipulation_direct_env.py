@@ -406,7 +406,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.actions[:, 6:] = 100*move_hand * grip_action * self.cfg.moving_joints_gripper
         self.actions[:, 8:11] += actual_gripper_pos[:, 2:5]
-        self.actions[:, -3:] += actual_gripper_pos[:, -3:]
+        # self.actions[:, -3:] += actual_gripper_pos[:, -3:]
 
 
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
@@ -644,7 +644,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
         self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
-        self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.interm_distance_thres)
+        self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
 
@@ -653,7 +653,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         reward += contacts_w * self.target_reached
-        reward += (self.end_reached * (self.g_action < 0.0)).float()
+        reward += 5*((2*(self.g_action < 0.0) - 1)*self.end_reached).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
         reward[reward == 0.0] = -1.0
