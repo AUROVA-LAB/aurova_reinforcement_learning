@@ -195,7 +195,7 @@ class RLManipulationDirect(DirectRLEnv):
 
 
 
-        self.end_target_pose_r = torch.tensor([[-0.4919,  0.1333,  0.4879, 3.3677e-06, -3.8268e-01, -9.2388e-01,  1.9968e-06]], device=self.device).repeat(self.num_envs, 1)
+        self.end_target_pose_r = torch.tensor([[-0.4308,  0.1459,  0.4802,  0.1308, -0.4781, -0.8669, -0.0536]], device=self.device).repeat(self.num_envs, 1)
         self.end_target_pose_r_group = self.convert_to_group(self.end_target_pose_r[:, :3], self.end_target_pose_r[:, 3:])
         self.end_target_pose_r_lie = self.log(self.end_target_pose_r_group)
 
@@ -377,11 +377,11 @@ class RLManipulationDirect(DirectRLEnv):
         actions = self.teacher_action # actions[:, :-1]
 
         # Lie increment -> plus operator
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
   
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
-        # action_pose = self.exp(actions + self.robot_rot_ee_pose_r_lie)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
+        action_pose = self.exp(actions + self.robot_rot_ee_pose_r_lie)
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
@@ -545,6 +545,9 @@ class RLManipulationDirect(DirectRLEnv):
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = robot_root_pose_w[:, :3], q01 = robot_root_pose_w[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
 
+
+        self.debug_robot_ee_pose_w  = torch.cat((robot_rot_ee_pos_r, robot_rot_ee_quat_r), dim = -1)
+        
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
@@ -640,8 +643,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.2), self.grasp_reached)
-        self.end_reached = torch.logical_and(self.target_reached, end_dist < self.cfg.interm_distance_thres)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
+        self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
 
@@ -650,8 +653,10 @@ class RLManipulationDirect(DirectRLEnv):
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         reward += contacts_w * self.target_reached
-        # reward -= (self.end_reached * (self.g_action > 0.0)).float()
+        reward += (self.end_reached * (self.g_action < 0.0)).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
+
+        reward[reward == 0.0] = -1.0
 
         # Update previous distances
         self.prev_dist = dist
