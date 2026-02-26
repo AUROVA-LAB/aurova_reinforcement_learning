@@ -147,7 +147,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     moving_joints_gripper = [0, 0, 
                              m[0], m[0], m[0], 
                              0, 0, 0, 
-                             -m[0], -m[0], -m[0]]
+                             -m[0]*0, -m[0]*0, -m[0]*0]
 
 
 
@@ -308,8 +308,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_poses_incs2 = [[-0.2,  0.2],
                           [-0.2,  0.2],
                           [-0.1,  0.1],
-                          [-2*pi/5,  2*pi/5],
-                          [-2*pi/5,  2*pi/5],
+                          [-2*pi/5*0,  2*pi/5*0],
+                          [-2*pi/5*0,  2*pi/5*0],
                           [-2*pi/5,  2*pi/5]]
 
     apply_range_tgt = True
@@ -325,7 +325,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # Position threshold for ending the episode
     interm_distance_thres =  0.0375 #  -> For DQ
-    distance_thres =  0.0375 #  -> For DQ
+    distance_thres =  0.1575 #  -> For DQ
 
     height_thres = 0.5
 
