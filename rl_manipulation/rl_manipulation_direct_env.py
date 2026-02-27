@@ -597,9 +597,8 @@ class RLManipulationDirect(DirectRLEnv):
         #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie,
-                         self.target_pose_r_lie,
-                         self.end_target_pose_r_lie,
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel,
+                         self.end_robot_rot_ee_pose_r_lie_rel,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
@@ -636,10 +635,6 @@ class RLManipulationDirect(DirectRLEnv):
         # Action difference between teacher and student
         # diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3        
 
-        # Previously reached
-        aux_reached = self.target_reached.clone()
-        aux_grasp_reached = self.grasp_reached.clone()
-
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
@@ -652,11 +647,11 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
-        reward += contacts_w * self.target_reached
-        reward += 5*((2*(self.g_action < 0.0) - 1)*self.end_reached).float()
+        # reward += contacts_w * self.target_reached
+        # reward += 5*((2*(self.g_action < 0.0) - 1)*self.end_reached).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
-        reward[reward == 0.0] = -1.0
+        reward[reward == 0.0] = -0.1
 
         # Update previous distances
         self.prev_dist = dist
