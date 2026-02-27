@@ -204,8 +204,8 @@ class RLManipulationDirect(DirectRLEnv):
         # teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         # For v5.0.0
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
 
 
 
@@ -554,8 +554,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Transform to the Lie algebra leveraging symmetry
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff) * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
-                                           self.robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
         diff_interm = self.diff_operator(self.interm_target_pose_r_group, self.pose_group_r)
         self.interm_robot_rot_ee_pose_r_lie_rel = self.log(diff_interm)
@@ -564,7 +563,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.end_robot_rot_ee_pose_r_lie_rel = self.log(diff_end)
 
         self.teacher_input = self.interm_robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.interm_reached).unsqueeze(-1) + \
-                             self.log(diff) * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.grasp_reached).unsqueeze(-1)) + \
+                             self.robot_rot_ee_pose_r_lie_rel * torch.logical_and(self.interm_reached.unsqueeze(-1), torch.logical_not(self.grasp_reached).unsqueeze(-1)) + \
                              self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # self.teacher_input = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
@@ -596,9 +595,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         # pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
         #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+
+        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        obj_tgt = self.log(diff) * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                                           self.robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel,
+        obs = torch.cat((obj_tgt,
                          self.end_robot_rot_ee_pose_r_lie_rel,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
