@@ -204,8 +204,8 @@ class RLManipulationDirect(DirectRLEnv):
         # teacher_path = "/workspace/isaaclab/source/extensions/isaaclab_tasks/omni/isaac/lab_tasks/manager_based/classic/aurova_reinforcement_learning/rl_manipulation/train/logs"
 
         # For v5.0.0
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
-        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
+        # teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
 
 
 
@@ -640,8 +640,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.35), self.grasp_reached)
-        self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.35), end_dist < self.cfg.distance_thres)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
+        self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
 
@@ -649,10 +649,11 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
-        # reward += bonus_grasp * self.cfg.bonus_tgt_reached / 2
-        reward += is_contact*contacts_w * self.target_reached
-        reward += ((self.g_action < 0.0)*self.end_reached).float()
+        reward += contacts_w * self.target_reached
+        reward += (self.end_reached * (self.g_action < 0.0)).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
+
+        reward[reward == 0.0] = -1.0
 
         # Update previous distances
         self.prev_dist = dist
