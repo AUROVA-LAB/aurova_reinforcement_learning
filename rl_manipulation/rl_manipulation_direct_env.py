@@ -593,12 +593,14 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain boolean values for collisions
         self.filter_collisions()
 
-        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
-                self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        # pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+        #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((pose,
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie,
+                         self.target_pose_r_lie,
+                         self.end_target_pose_r_lie,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
@@ -645,7 +647,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = -(torch.logical_not(self.target_reached) * (self.g_action > 0.0)).float()  + 0.2      
+        reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         # reward += bonus_grasp * self.cfg.bonus_tgt_reached / 2
         reward += is_contact*contacts_w * self.target_reached
