@@ -645,14 +645,12 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Distance reward ----
         # Reward for the approaching
-        reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
+        reward = -(torch.logical_not(self.target_reached) * (self.g_action > 0.0)).float()  + 0.2      
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         # reward += bonus_grasp * self.cfg.bonus_tgt_reached / 2
         reward += is_contact*contacts_w * self.target_reached
         reward += ((self.g_action < 0.0)*self.end_reached).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
-
-        reward[reward == 0.0] = -0.5
 
         # Update previous distances
         self.prev_dist = dist
