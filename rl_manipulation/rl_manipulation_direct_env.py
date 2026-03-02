@@ -593,13 +593,12 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtain boolean values for collisions
         self.filter_collisions()
 
-        # pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
-        #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+        pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
+                self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
         
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel,
-                         self.end_robot_rot_ee_pose_r_lie_rel,
+        obs = torch.cat((pose,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
