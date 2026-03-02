@@ -417,6 +417,6 @@ def update_collisions(cfg, num_envs):
                                 }
     
     # Updated contact matrix
-    cfg.contact_matrix = torch.tensor([0.8, 0.8, 0.8,])
+    cfg.contact_matrix = torch.tensor([0.5, 0.5, 0.5,])
 
     return cfg
