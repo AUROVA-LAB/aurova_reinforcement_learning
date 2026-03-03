@@ -74,11 +74,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = MAT
+    representation = DQ
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 0
+    distance = 1
     path_to_pretrained = models[representation][mapping] # Path to the pre-trained approaching model
 
     # Scalings for each action
