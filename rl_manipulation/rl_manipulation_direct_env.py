@@ -639,8 +639,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
-        self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.15), self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
+        self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.1), self.target_reached), self.interm_reached)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.35), self.grasp_reached)
         self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
 
@@ -651,7 +651,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         reward += contacts_w * self.target_reached
         reward += (self.end_reached * (self.g_action < 0.0)).float()
-        reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
+        reward += (self.end_reached * self.cfg.bonus_tgt_reached).float()
 
         reward[reward == 0.0] = -1.0
 
@@ -680,7 +680,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.end2_reached)
+        terminated = torch.logical_or(time_out, self.end_reached)
 
         return truncated, terminated
     
