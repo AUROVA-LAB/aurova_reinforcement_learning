@@ -657,7 +657,7 @@ class RLManipulationDirect(DirectRLEnv):
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
         reward += contacts_w * self.target_reached
         reward += (self.end_reached * (self.g_action < 0.0)).float()
-        reward += (self.end_reached * self.cfg.bonus_tgt_reached).float()
+        reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
         reward[reward == 0.0] = -1.0
 
@@ -689,7 +689,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.end_reached)
+        terminated = torch.logical_or(time_out, self.end2_reached)
 
         return truncated, terminated
     
