@@ -637,12 +637,18 @@ class RLManipulationDirect(DirectRLEnv):
         # Action difference between teacher and student
         # diff_actions = (2*(self.teacher_action == self.student_action) - 1).sum(-1) / 3  
 
+        aux_tgt = self.target_reached.clone()
+        aux_grasp = self.grasp_reached.clone()
+
         # Target reached flag
         self.interm_reached = torch.logical_or(interm_dist < self.cfg.interm_distance_thres, self.interm_reached)
         self.target_reached = torch.logical_and(torch.logical_or(torch.logical_and(dist < self.cfg.distance_thres, self.hand_pose < 0.1), self.target_reached), self.interm_reached)
-        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, self.hand_pose > 0.35), self.grasp_reached)
+        self.grasp_reached = torch.logical_or(torch.logical_and(self.target_reached, is_contact), self.grasp_reached)
         self.end_reached = torch.logical_and(torch.logical_and(self.target_reached, self.hand_pose > 0.3), end_dist < self.cfg.interm_distance_thres)
         self.end2_reached = torch.logical_and(self.end_reached, self.hand_pose < 0.15)
+
+        bonus_tgt = torch.logical_and(self.target_reached, torch.logical_not(aux_tgt))
+        bonus_grasp = torch.logical_and(self.grasp_reached, torch.logical_not(aux_grasp))
 
 
         # ---- Distance reward ----
@@ -654,6 +660,9 @@ class RLManipulationDirect(DirectRLEnv):
         reward += (self.end_reached * self.cfg.bonus_tgt_reached).float()
 
         reward[reward == 0.0] = -1.0
+
+        reward += bonus_tgt   * 5.0
+        reward += bonus_grasp * 5.0
 
         # Update previous distances
         self.prev_dist = dist
