@@ -596,15 +596,15 @@ class RLManipulationDirect(DirectRLEnv):
         # pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
         #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
 
-        lab_rob = self.exp(self.robot_rot_ee_pose_r_lie)
+        lab_rob = self.convert_to_Lab(self.exp(self.robot_rot_ee_pose_r_lie))
         so3_rob = homo_from_mat_trans_LAB(lab_rob[:, :3], lab_rob[:, 3:])
         log_rob = log_se3(so3_rob)
 
-        lab_tgt = self.exp(self.target_pose_r_lie)
+        lab_tgt = self.convert_to_Lab(self.exp(self.target_pose_r_lie))
         so3_tgt = homo_from_mat_trans_LAB(lab_tgt[:, :3], lab_tgt[:, 3:])
         log_tgt = log_se3(so3_tgt)
 
-        lab_end = self.exp(self.end_target_pose_r_lie)
+        lab_end = self.convert_to_Lab(self.exp(self.end_target_pose_r_lie))
         so3_end = homo_from_mat_trans_LAB(lab_end[:, :3], lab_end[:, 3:])
         log_end = log_se3(so3_end)
         
