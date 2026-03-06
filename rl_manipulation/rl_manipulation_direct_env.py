@@ -595,12 +595,24 @@ class RLManipulationDirect(DirectRLEnv):
 
         # pose = self.robot_rot_ee_pose_r_lie_rel * torch.logical_not(self.grasp_reached).unsqueeze(-1) + \
         #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
+
+        lab_rob = self.exp(self.robot_rot_ee_pose_r_lie)
+        so3_rob = homo_from_mat_trans_LAB(lab_rob[:, :3], lab_rob[:, 3:])
+        log_rob = log_se3(so3_rob)
+
+        lab_tgt = self.exp(self.target_pose_r_lie)
+        so3_tgt = homo_from_mat_trans_LAB(lab_tgt[:, :3], lab_tgt[:, 3:])
+        log_tgt = log_se3(so3_tgt)
+
+        lab_end = self.exp(self.end_target_pose_r_lie)
+        so3_end = homo_from_mat_trans_LAB(lab_end[:, :3], lab_end[:, 3:])
+        log_end = log_se3(so3_end)
         
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie,
-                         self.target_pose_r_lie,
-                         self.end_target_pose_r_lie,
+        obs = torch.cat((log_rob,
+                         log_tgt,
+                         log_end,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
@@ -655,14 +667,14 @@ class RLManipulationDirect(DirectRLEnv):
         # Reward for the approaching
         reward = (torch.logical_not(self.target_reached) * (self.g_action < 0.0)).float()        
         reward += (torch.logical_and(self.target_reached, torch.logical_not(self.end_reached)) * (self.g_action > 0.0)).float()
-        reward += is_contact * contacts_w * self.target_reached
+        reward += contacts_w * self.target_reached
         reward += (self.end_reached * (self.g_action < 0.0)).float()
         reward += (self.end2_reached * self.cfg.bonus_tgt_reached).float()
 
         reward[reward == 0.0] = -1.0
 
-        reward += bonus_tgt   * 5.0
-        reward += bonus_grasp * 5.0
+        # reward += bonus_tgt   * 5.0
+        # reward += bonus_grasp * 5.0
 
         # Update previous distances
         self.prev_dist = dist
