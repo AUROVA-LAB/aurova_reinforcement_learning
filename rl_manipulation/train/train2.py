@@ -297,14 +297,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         action = torch.tensor([[0,0,0,0,0,0, 0]]).repeat(env_cfg.scene.num_envs, 1)
         end_sim = False
 
-        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/"
+        teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
 
         # Pretrained model
-        model = PPO.load(os.path.join(teacher_path, "2026-03-02_15-05-23/model_7680000_steps.zip"))
+        # model = PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach
+        model = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach
         model.policy.eval()
 
         HOST = '0.0.0.0'
-        PORT = 5006
+        PORT = 5000
 
         
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -312,6 +313,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             s.listen()
 
             print("Receiver listening on port", PORT)
+            prev_tensor = torch.rand(1,6)
 
             conn, addr = s.accept()
             with conn:
@@ -321,14 +323,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     tensor = receive_tensor(conn)
 
                     print("Received tensor:")
+                    # print(tensor)
+
+
                     print(tensor)
+                    if tensor == None:
+                        tensor = prev_tensor.clone()
+                        print("PTREV: ", type(prev_tensor))
+                        
+                    tensor = torch.tensor(model.predict(tensor)[0])
+                    print("Tensor model: ", tensor)
+                    send_tensor(conn, tensor)
 
-                    tensor = model.predict(tensor)
+                    print("Tensor sent back")
 
-                    if tensor:
-                        send_tensor(conn, tensor)
+                    if tensor != None:
+                        prev_tensor = tensor.clone()
 
-                        print("Tensor sent back")
+
+
 
 
 
