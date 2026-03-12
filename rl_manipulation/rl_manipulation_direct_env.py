@@ -610,9 +610,9 @@ class RLManipulationDirect(DirectRLEnv):
         
         
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        obs = torch.cat((log_rob,
-                         log_tgt,
-                         log_end,
+        obs = torch.cat((self.robot_rot_ee_pose_r_lie,
+                         self.target_pose_r_lie,
+                         self.end_target_pose_r_lie,
                          self.hand_pose.unsqueeze(-1)), dim = -1)
         
 
