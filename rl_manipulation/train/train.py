@@ -124,9 +124,9 @@ from wandb.integration.sb3 import WandbCallback
 
 
 # directory for logging into
-path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train"
+path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train"
 log_dir = os.path.join(path_to_train, "logs", "sb3", args_cli.task, datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-run = wandb.init(project="rl_manipulation_obstacles", name=log_dir.split("/")[-1], sync_tensorboard=True)
+run = wandb.init(project="rl_manipulation", name=log_dir.split("/")[-1], sync_tensorboard=True)
 
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: dict):
