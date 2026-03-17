@@ -310,7 +310,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         model_traj.policy.eval()
 
         HOST = '0.0.0.0'
-        PORT = 5001
+        PORT = 5000
 
         
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
