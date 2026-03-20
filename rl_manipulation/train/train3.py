@@ -300,17 +300,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
 
         # Pretrained model
-        model = PPO.load(os.path.join(teacher_path, "2026-03-06_10-32-04/model.zip")) # --> DQ PP
-        # model = PPO.load(os.path.join(teacher_path, "2026-02-26_12-54-55/model.zip")) # --> SO3 PP 2026-03-02_16-21-00
+        # model = PPO.load(os.path.join(teacher_path, "2026-03-06_10-32-04/model.zip")) # --> DQ PP
+        model = PPO.load(os.path.join(teacher_path, "2026-02-26_12-54-55/model.zip")) # --> SO3 PP 2026-02-26_12-54-55 2026-03-02_16-21-00  2026-03-18_15-10-03
         model.policy.eval()
 
         # Pretrained model
-        model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
-        # model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
+        # model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
+        model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
         model_traj.policy.eval()
 
         HOST = '0.0.0.0'
-        PORT = 5000
+        PORT = 5014
 
         
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
