@@ -455,12 +455,17 @@ class RLManipulationDirect(DirectRLEnv):
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
+        tgt_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, :, :7].squeeze(-2)
+
+        print(euler_xyz_from_quat(tgt_pose_w))
+
+
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((ee_pose_w_1[:, :3], 
+        self.scene.extras["markers"].visualize(translations = torch.cat((tgt_pose_w[:, :3], 
                                                                          self.debug_target_pose_w[:, :3],
                                                                          self.end_target_pose_r[:, :3],
                                                                          self.interm_target_pose_r[:, :3])), 
-                                                orientations = torch.cat((ee_pose_w_1[:, 3:], 
+                                                orientations = torch.cat((tgt_pose_w[:, 3:], 
                                                                           self.debug_target_pose_w[:, 3:],
                                                                           self.end_target_pose_r[:, 3:],
                                                                           self.interm_target_pose_r[:, 3:]),), 
@@ -620,8 +625,8 @@ class RLManipulationDirect(DirectRLEnv):
         phase_flag = phase_flag.unsqueeze(-1)
 
 
-        
-        
+
+
         # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie,
         #                  self.target_pose_r_lie,
@@ -954,33 +959,33 @@ class RLManipulationDirect(DirectRLEnv):
 
 
 
-        advance_reset = env_ids[torch.rand(env_ids.shape[0]) > 0.5]
+        # advance_reset = env_ids[torch.rand(env_ids.shape[0]) > 0.5]
 
 
-        self.target_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]        
-        self.interm_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]
-        self.teacher_input[advance_reset] = self.robot_rot_ee_pose_r_lie_rel[advance_reset]
+        # self.target_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]        
+        # self.interm_reached[advance_reset] = torch.ones(self.num_envs).bool().to(self.device)[advance_reset]
+        # self.teacher_input[advance_reset] = self.robot_rot_ee_pose_r_lie_rel[advance_reset]
 
         
-        advance_reset_pose = self.target_pose_r
-        advance_reset_pose[:, 2] += 0.01 
-        # Set the command for the IKDifferentialController
-        self.controller.set_command(advance_reset_pose)
+        # advance_reset_pose = self.target_pose_r
+        # advance_reset_pose[:, 2] += 0.01 
+        # # Set the command for the IKDifferentialController
+        # self.controller.set_command(advance_reset_pose)
                 
-        # Obtains the poses
-        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
+        # # Obtains the poses
+        # ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
         
-        # Obtains the joint positions to reset. Concatenates:
-        #   - the joint coordinates for the action computed by the IKDifferentialController and
-        #   - the joint coordinates for the hand.
-        joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
-                               self.default_joint_pos[:, (6):]), 
-                               dim=-1)[advance_reset] 
+        # # Obtains the joint positions to reset. Concatenates:
+        # #   - the joint coordinates for the action computed by the IKDifferentialController and
+        # #   - the joint coordinates for the hand.
+        # joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        #                        self.default_joint_pos[:, (6):]), 
+        #                        dim=-1)[advance_reset] 
         
-        joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[advance_reset]
+        # joint_vel = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.default_joint_vel[advance_reset]
         
-        # Writes the state to the simulation
-        self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, advance_reset)
+        # # Writes the state to the simulation
+        # self.scene.articulations[self.cfg.keys[self.cfg.robot]].write_joint_state_to_sim(joint_pos, joint_vel, None, advance_reset)
 
-        self.update_new_poses()  
+        # self.update_new_poses()  
 
