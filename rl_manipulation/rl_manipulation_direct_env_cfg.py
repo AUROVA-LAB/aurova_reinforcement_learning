@@ -94,13 +94,13 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    observation_space = 6*3 + 1          # Number of actions per environment (overridden)
+    observation_space = 6*2          # Number of actions per environment (overridden)
     action_space = 1      #  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -295,7 +295,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # ---- Target poses ----
-    target_pose = [-0.4919+0.4, 0.1333+0.4, 0.04 + 0.24, -pi, pi + pi/2, 0.0]
+    target_pose = [-0.4919, 0.1333, 0.04, 0,pi,0]
     target_pose_2 = [-0.4308,  0.1459,  0.4802,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2,  0.2],
@@ -303,7 +303,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-0.35*0,   0.225*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-3*pi/5*0,  3*pi/5*0],
-                         [-pi/2*0,  pi/2*0]]
+                         [-pi/2,  pi/2]]
     
     target_poses_incs2 = [[-0.2,  0.2],
                           [-0.2,  0.2],
