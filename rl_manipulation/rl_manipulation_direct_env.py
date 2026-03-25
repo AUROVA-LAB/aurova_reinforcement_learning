@@ -600,24 +600,24 @@ class RLManipulationDirect(DirectRLEnv):
         #         self.end_robot_rot_ee_pose_r_lie_rel * self.grasp_reached.unsqueeze(-1)
 
         lab_rob = self.convert_to_Lab(self.exp(self.robot_rot_ee_pose_r_lie))
-        so3_rob = dq_from_tr(lab_rob[:, :3], lab_rob[:, 3:])
-        log_rob = log_bruno(so3_rob)# , so3 = False)
+        so3_rob = homo_from_mat_trans_LAB(lab_rob[:, :3], lab_rob[:, 3:])
+        log_rob = log_se3(so3_rob)# , so3 = False)
 
         lab_tgt = self.convert_to_Lab(self.exp(self.target_pose_r_lie))
-        so3_tgt = dq_from_tr(lab_tgt[:, :3], lab_tgt[:, 3:])
-        log_tgt = log_bruno(so3_tgt)# , so3 = False)
+        so3_tgt = homo_from_mat_trans_LAB(lab_tgt[:, :3], lab_tgt[:, 3:])
+        log_tgt = log_se3(so3_tgt)# , so3 = False)
 
         lab_end = self.convert_to_Lab(self.exp(self.end_target_pose_r_lie))
-        so3_end = dq_from_tr(lab_end[:, :3], lab_end[:, 3:])
-        log_end = log_bruno(so3_end)# , so3 = False)
+        so3_end = homo_from_mat_trans_LAB(lab_end[:, :3], lab_end[:, 3:])
+        log_end = log_se3(so3_end)# , so3 = False)
 
 
 
-        diff = dq_diff(so3_tgt, so3_rob)
-        robot_rel = log_bruno(diff)
+        diff = mat_diff(so3_tgt, so3_rob)
+        robot_rel = log_se3(diff, so3 = True)
 
-        diff_end = dq_diff(so3_end, so3_rob)
-        end_rel = log_bruno(diff_end)
+        diff_end = mat_diff(so3_end, so3_rob)
+        end_rel = log_se3(diff_end, so3 = True)
 
         phase_flag = self.interm_reached.float() + self.target_reached.float() + self.grasp_reached.float() + self.end_reached.float() + self.end2_reached.float() + 1
         phase_flag = phase_flag.unsqueeze(-1)
