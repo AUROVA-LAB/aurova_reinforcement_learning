@@ -614,10 +614,10 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         diff = mat_diff(so3_tgt, so3_rob)
-        robot_rel = log_se3(diff, so3 = True)
+        robot_rel = log_se3(diff, so3 = False)
 
         diff_end = mat_diff(so3_end, so3_rob)
-        end_rel = log_se3(diff_end, so3 = True)
+        end_rel = log_se3(diff_end, so3 = False)
 
         phase_flag = self.interm_reached.float() + self.target_reached.float() + self.grasp_reached.float() + self.end_reached.float() + self.end2_reached.float() + 1
         phase_flag = phase_flag.unsqueeze(-1)
