@@ -300,13 +300,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         teacher_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
 
         # Pretrained model
-        # model = PPO.load(os.path.join(teacher_path, "2026-03-25_10-19-12/model_76800000_steps.zip")) # --> DQ PP
-        model = PPO.load(os.path.join(teacher_path, "2026-03-25_15-00-18/model_15360000_steps.zip")) # --> SO3 PP 
+        model = PPO.load(os.path.join(teacher_path, "2026-03-25_16-05-05/model_56320000_steps.zip")) # --> DQ PP
+        # model = PPO.load(os.path.join(teacher_path, "2026-03-25_15-00-18/model_15360000_steps.zip")) # --> SO3 PP 
         model.policy.eval()
 
         # Pretrained model
-        # model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
-        model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
+        model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
+        # model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
         model_traj.policy.eval()
 
         HOST = '0.0.0.0'
