@@ -601,38 +601,31 @@ class RLManipulationDirect(DirectRLEnv):
 
         lab_rob = self.convert_to_Lab(self.exp(self.robot_rot_ee_pose_r_lie))
         so3_rob = homo_from_mat_trans_LAB(lab_rob[:, :3], lab_rob[:, 3:])
-        # log_rob = log_se3(so3_rob)# , so3 = False)
+        log_rob = log_se3(so3_rob, so3 = False)
 
         lab_tgt = self.convert_to_Lab(self.exp(self.target_pose_r_lie))
         so3_tgt = homo_from_mat_trans_LAB(lab_tgt[:, :3], lab_tgt[:, 3:])
-        # log_tgt = log_se3(so3_tgt)# , so3 = False)
+        log_tgt = log_se3(so3_tgt, so3 = False)
 
         lab_end = self.convert_to_Lab(self.exp(self.end_target_pose_r_lie))
         so3_end = homo_from_mat_trans_LAB(lab_end[:, :3], lab_end[:, 3:])
-        # log_end = log_se3(so3_end)# , so3 = False)
+        log_end = log_se3(so3_end, so3 = False)
 
 
 
-        diff = mat_diff(so3_tgt, so3_rob)
-        robot_rel = log_gram_se3(diff)# , so3 = False)
+        # diff = mat_diff(so3_tgt, so3_rob)
+        # robot_rel = log_gram_se3(diff)# , so3 = False)
 
-        diff_end = mat_diff(so3_end, so3_rob)
-        end_rel = log_gram_se3(diff_end)# , so3 = False)
+        # diff_end = mat_diff(so3_end, so3_rob)
+        # end_rel = log_gram_se3(diff_end)# , so3 = False)
 
-        phase_flag = self.interm_reached.float() + self.target_reached.float() + self.grasp_reached.float() + self.end_reached.float() + self.end2_reached.float() + 1
-        phase_flag = phase_flag.unsqueeze(-1)
+        # phase_flag = self.interm_reached.float() + self.target_reached.float() + self.grasp_reached.float() + self.end_reached.float() + self.end2_reached.float() + 1
+        # phase_flag = phase_flag.unsqueeze(-1)
 
-
-
-
-        # Builds the tensor with all the observations in a single row tensor (N, 6+6+1+3)        
-        # obs = torch.cat((self.robot_rot_ee_pose_r_lie,
-        #                  self.target_pose_r_lie,
-        #                  self.end_target_pose_r_lie,
-        #                  self.hand_pose.unsqueeze(-1)), dim = -1)
         
-        obs = torch.cat((robot_rel,
-                         end_rel), dim = -1)
+        obs = torch.cat((log_rob,
+                         log_tgt,
+                         log_end), dim = -1)
         
 
         # Builds the dictionary
