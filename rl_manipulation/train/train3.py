@@ -302,11 +302,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # Pretrained model
         # model = PPO.load(os.path.join(teacher_path, "2026-03-06_10-32-04/model.zip")) # --> DQ PP
         model = PPO.load(os.path.join(teacher_path, "2026-02-26_12-54-55/model.zip")) # --> SO3 PP 2026-02-26_12-54-55 2026-03-02_16-21-00  2026-03-18_15-10-03
+        # model = PPO.load(os.path.join(teacher_path, "2026-03-30_09-29-03/model.zip")) # --> SE3 PP
+        # model = PPO.load(os.path.join(teacher_path, "/model.zip")) # --> TQ PP
         model.policy.eval()
 
         # Pretrained model
         # model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
         model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
+        # model_traj = PPO.load(os.path.join(teacher_path, "2026-03-16_10-47-19/model.zip")) # --> SE3 reach teacher -> 
+        #                                                                      # TODO: poner el modelo SE3 correcto, no es el model pq colapsó 
+        # model_traj = PPO.load(os.path.join(teacher_path, "2026-03-27_12-37-52/model.zip")) # --> TQ reach teacher -> 
         model_traj.policy.eval()
 
         HOST = '0.0.0.0'
