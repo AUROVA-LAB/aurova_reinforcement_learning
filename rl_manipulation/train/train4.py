@@ -309,7 +309,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # Pretrained model
         model_traj= PPO.load(os.path.join(teacher_path, "2025-12-12_10-04-45/model.zip")) # --> DQ reach teacher
         # model_traj = PPO.load(os.path.join(teacher_path, "2026-02-12_13-07-48/model.zip")) # --> SO3 reach teacher
-        # model_traj = PPO.load(os.path.join(teacher_path, "2026-03-16_10-47-19/model.zip")) # --> SE3 reach teacher -> 
+        # model_traj = PPO.load(os.path.join(teacher_path, "2026-03-16_10-47-19/model_130560000_steps.zip")) # --> SE3 reach teacher -> 
         #                                                                      # TODO: poner el modelo SE3 correcto, no es el model pq colapsó 
         # model_traj = PPO.load(os.path.join(teacher_path, "2026-03-27_12-37-52/model.zip")) # --> TQ reach teacher -> 
         model_traj.policy.eval()
