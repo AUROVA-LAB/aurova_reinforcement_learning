@@ -53,24 +53,21 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                 [[0.02,  0.004], [0.03,  0.006], [0.02, 0.004]]]
 
     action_scaling = scalings[representation][mapping]
-    grip_scaling = 5*2
-
-    img_width, img_height = 80, 80
 
 
     # --- Action / observation space ---
     action_space = 6             # Number of actions per environment (overridden)
-    observation_space = 6     #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    observation_space = 6        # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = True       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
-    render_imgs = False          # Activate image rendering
-    render_steps = 6            # Render images every certain amount of steps
+    save_imgs = False          # Activate image saving from cameras
+    render_imgs = False        # Activate image rendering
+    render_steps = 6           # Render images every certain amount of steps
 
-    velocity_limit = 10         # Velocity limit for robots' end effector
+    velocity_limit = 10        # Velocity limit for robots' end effector
 
 
     # Robot options
@@ -82,41 +79,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     robot = UR5e_NOGRIP
 
     keys = ['UR5e', 'GEN3', 'UR5e_3f', 'UR5e_NOGRIP']     # Keys for the robots in simulation
-    ee_link = ['tool0',         # Names for the end effector of each robot
+    ee_link = ['tool0',                                   # Names for the end effector of each robot
                'tool_frame',
                'tool0',
                'wrist_3_link']
-    
-     # Robotiq 3f control
-    grip_theta_max = [1.2218, 1.5708]
-    m = [grip_theta_max[0]/140, grip_theta_max[1]/100]
-
-    def_pos = [0.0, 0.05, 0.0, -0.053]
-
-    open = [def_pos[1], 
-            def_pos[0], def_pos[0],
-            def_pos[2],
-            def_pos[1], def_pos[1],
-            def_pos[3],
-            def_pos[2], def_pos[2],
-            def_pos[3], def_pos[3]]
-    close = copy.deepcopy(open)
-    close[0] = 0.65
-    close[4] = 0.65
-    close[5] = 0.65
-
-    close[-1] = -0.65
-    close[-2] = -0.65
-    close[-5] = -0.65
-
-    moving_joints_gripper = [m[0], 
-                             m[0],
-                             m[0], 0*m[0],
-                             
-                             -m[0]*0,
-                             0.0, 0.0,
-                             -m[0]*0, -m[0]*0]
-
 
 
     # ---- Configurations ----
@@ -238,7 +204,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     ee_rotation = [1.0, 0.0, 0.0, 0.0]
 
 
-
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
@@ -249,7 +214,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
                          [-pi/2,  pi/2]]
 
     apply_range_tgt = True
-
 
 
     # ---- Reward variables ----
