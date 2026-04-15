@@ -385,8 +385,6 @@ class RLManipulationDirect(DirectRLEnv):
         Out:
             - None
         '''
-        # actions = torch.cat((actions, torch.zeros(actions.shape[0], 1).to(self.device)), dim = -1)
-
         
         # Obtain theacher action
         self.teacher_action = torch.tensor(self.teacher_model.predict(self.teacher_input.cpu().numpy(), deterministic = True)[0]).to(self.device)
