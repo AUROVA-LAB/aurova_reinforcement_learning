@@ -107,21 +107,6 @@ from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_lea
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
-# from pynput import keyboard
-
-# end_sim = False
-
-# def on_press(key):
-#     global end_sim
-#     try:
-#         if key.char == 'q':
-#             end_sim = True
-#     except AttributeError:
-#         pass
-
-# listener = keyboard.Listener(on_press=on_press)
-# listener.start()  # ✅ No bloquea
-
 
 # directory for logging into
 path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train"
@@ -153,7 +138,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
     print(f"Exact experiment name requested from command line: {run_info}")
-    # log_dir = os.path.join(log_root_path, run_info)
+
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
@@ -258,6 +243,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
         action = torch.tensor([[0,0,0,0,0,0, 0]]).repeat(env_cfg.scene.num_envs, 1)
         end_sim = False
+        
         # Simulate physics
         while not end_sim:
             with torch.inference_mode():

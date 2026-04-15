@@ -53,11 +53,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 9.0      # Length of the episode in seconds
     max_steps = 900             # Maximum steps in an episode
-
-    # Pre-trained models that act as master for the RL agent
-    # PREV DQ model reach: 2025-12-12_10-04-45/model_122880000_steps
-    # PREV DQ model traj: 2026-01-28_17-18-34/model_256000000_steps
-
     
 
     models = [["2025-05-06_18-49-55/model", "2025-12-12_10-04-45/model", "2025-05-06_18-49-55/model"],
@@ -90,12 +85,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5
 
-    img_width, img_height = 80, 80
-
 
     # --- Action / observation space ---
     observation_space = 9*2          # Number of actions per environment (overridden)
-    action_space = 1      #  + img_height*img_width*3       # Number of observations per environment (overridden)
+    action_space = 1                 # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
@@ -185,11 +178,6 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     marker_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
         prim_path="/Visuals/myMarkers",
         markers={
-            "ur5e_ee_pose": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
             "target_point": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
@@ -320,22 +308,16 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # ---- Reward variables ----
-    # reward scales
-    rew_scale_dist: float= 1.0
-
     # Position threshold for ending the episode
-    interm_distance_thres =  0.0375 #  -> For DQ
-    distance_thres =  0.0575 #  -> For DQ
-
-    height_thres = 0.5
+    interm_distance_thres =  0.0375 
+    distance_thres =  0.0575 
 
     # Bonus for reaching the target
     bonus_tgt_reached = 200
     
 
 
-# Function to update the variables in the configuration class
-#    using new information in the BimanualDirect class and new number of environments
+
 def update_cfg(cfg, num_envs, device):
     '''
     In:
@@ -346,35 +328,15 @@ def update_cfg(cfg, num_envs, device):
     Out:
         - cfg - RLManipulationDirectCfg: modified configuration class
     '''
-
-    cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
-    # Function to update the variables in the configuration class
-#    using new information in the BimanualDirect class and new number of environments
-def update_cfg(cfg, num_envs, device):
-    '''
-    In:
-        - cfg - RLManipulationDirectCfg: configuration class.
-        - num_envs - int: number of environments in the simulation.
-        - device - str: Cuda or cpu device
-    
-    Out:
-        - cfg - RLManipulationDirectCfg: modified configuration class
-    '''
-
-    # cfg.translation_scale = torch.tensor(cfg.translation_scale).to(device)
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
     cfg.target_pose_2 = torch.tensor(cfg.target_pose_2).repeat(num_envs, 1).to(device)
     cfg.open = torch.tensor(cfg.open).repeat(num_envs, 1).to(device)
     cfg.close = torch.tensor(cfg.close).repeat(num_envs, 1).to(device)
-
     cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
     cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
-
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
-
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
-
 
     return cfg
 
@@ -382,8 +344,6 @@ def update_cfg(cfg, num_envs, device):
 
 # Add the collision sensors to the configuration class according to the number of environments
 def update_collisions(cfg, num_envs):
-
-
     finger_middle_w_object: ContactSensorCfg = ContactSensorCfg(
         prim_path="/World/envs/env_.*/" + cfg.keys[cfg.robot] + "/robotiq_finger_middle_.*",
         update_period=0.001, 

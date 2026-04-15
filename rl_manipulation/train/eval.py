@@ -41,7 +41,7 @@ def main():
     env = gym.make(args_cli.task, cfg = env_cfg)
     
     # Filter models
-    path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs"
+    path_to_train = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/train/logs/sb3/Isaac-RL-Manipulation-Direct-reach-v0"
 
     dir = os.path.join(path_to_train, args_cli.model_dir)
 
