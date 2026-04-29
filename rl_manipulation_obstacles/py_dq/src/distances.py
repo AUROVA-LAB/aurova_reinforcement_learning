@@ -5,15 +5,21 @@ from .dq_lie import *
 
 # === DQ DISTANCES =================================================================================
 
-def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
+def dqLOAM_distance(dq_1: torch.Tensor, dq_2: torch.Tensor) -> torch.Tensor:
     '''
     Calculates the screw motion parameters between dual quaternion representations of the given poses pose_pred/real.
     The difference of two dual quaternions results the pure dual quaternion if the originals represent the same frame in space.
     => "Distance" between two dual quaternions: how different they are to the pure dual quaternion.
+
+    In:
+        - dq_1: [B, 8]: tensor with a set of dual quaternions
+        - dq_2: [B, 8]: tensor with another set of dual quaternions
+    Out:
+        - distance: [B]: tensor with the distance between both dual quaternions
     '''
 
     # Obtain the difference between two dual quaternion
-    res = dq_mul(dq_real, dq_conjugate(dq_pred))
+    res = dq_mul(dq_2, dq_conjugate(dq_1))
 
     # If the result was the pure dual quaternion, the real part of the dual part would be 1 and the rest 0s.
     #    The norm of that modified dual quaternion is 0. --> This is not geometrically correct because ...
@@ -34,14 +40,37 @@ def dqLOAM_distance(dq_pred: torch.Tensor, dq_real: torch.Tensor, log_fc = None,
 # === Lie DISTANCES =================================================================================
 
 def geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
+    """
+    Geodesic distance between two elements of the Lie group, given their logarithmic map.
+
+    In: 
+        - x1: [B, D]: tensor with a set of elements inside a Lie Group
+        - x2: [B, D]: tensor with another set of elements inside a Lie Group
+        - log_fc: function that computes the logarithmic map of the Lie Group
+        - diff_fc: function that computes the difference between elements of the Lie Group
+
+    Out:
+        - distance: [B]: geodesic distance between both sets
+    """
 
     log_diff = log_fc(diff_fc(x1, x2))
 
     return torch.norm(log_diff, dim = -1)
 
 
-def double_geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = None) -> torch.Tensor:
+def double_geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None) -> torch.Tensor:
+    """
+    Double geodesic distance between two elements of the Lie group, given their logarithmic map.
 
+    In: 
+        - x1: [B, D]: tensor with a set of elements inside a Lie Group
+        - x2: [B, D]: tensor with another set of elements inside a Lie Group
+        - log_fc: function that computes the logarithmic map of the Lie Group
+
+    Out:
+        - distance: [B]: geodesic distance between both sets
+    """
+    
     log_x1 = log_fc(x1)
     log_x2 = log_fc(x2)
 

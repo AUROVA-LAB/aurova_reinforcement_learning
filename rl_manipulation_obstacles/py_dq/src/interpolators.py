@@ -6,10 +6,26 @@ from .dq import *
 def ScLERP(p1: torch.Tensor, p2: torch.Tensor, exp, log, diff, mul, norm, step: int = 0.1):
     """
     Screw Linear Interpolation  between two poses p1 and p2 specifying the step, the group and mapping operations.
+
+    In: 
+        - p1: [B, 8]: tensor with a set of dual quaternions (w,x,y,z, w_,x_,y_,z_)
+        - p2: [B, 8]: tensor with another set of dual quaternions (w,x,y,z, w_,x_,y_,z_)
+        - exp: exponential map for the group (as a Python function)
+        - log: logarithmic map for the group (as a Python function)
+        - diff: difference function for the group (as a Python function)
+        - mul: multiplication operation for the group (as a Python function)
+        - norm: normalization operation for the group (as a Python function)
+        - step: interpolation step
+
+    Out:
+        - res: [B, N, 8]: tensor with the interpolated trajectory between p1 and p2 in dual quaternions, 
+            where N is the number of intermediate points (1/step)
     """
+    
     assert p1.shape[-1] == 8
     assert p2.shape[-1] == 8
     assert torch.any(torch.logical_and(dq_is_norm(p1), dq_is_norm(p1)))
+    assert step > 0.0 and step < 1.0
     
     device = p1.device
 
@@ -29,6 +45,7 @@ def ScLERP(p1: torch.Tensor, p2: torch.Tensor, exp, log, diff, mul, norm, step: 
     # The sclaed differences are put into the original reference frame
     dq_tau = mul(p1 = p1.repeat_interleave(tau.shape[0], dim = 0), p2 = dq_diff_tau)
 
+    # Normalizes the result
     return norm(dq = dq_tau).view(p1.shape[0], -1, 8)
 
 
