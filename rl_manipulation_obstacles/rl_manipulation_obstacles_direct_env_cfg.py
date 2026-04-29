@@ -22,12 +22,37 @@ from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
 
 
 
+# Function to change a Euler angles to a quaternion as a tensor
+def rot2tensor(rot: Rotation) -> torch.tensor:
+    '''
+    In:
+        - rot - scipy.Rotation(3): rotation expressed in Euler angles.
+
+    Out:
+        - rot_tensor_quat - torch.tensor - (4): rotation expressed a quaternion in a tensor.
+    '''
+
+    # Transform rotation to tensor
+    rot_tensor = torch.tensor(rot.as_quat())
+    rot_tensor_quat = torch.zeros((4))
+
+    # Scipy uses the notation (x,y,z,w) whilst IsaacLab uses (w,x,y,z), so that is changed
+    rot_tensor_quat[0], rot_tensor_quat[1:] = rot_tensor[-1].clone(), rot_tensor[:3].clone()
+    
+    return rot_tensor_quat
+
+
+rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
+
+
+
 # Configuration class for the environment
 @configclass
 class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
-    decimation = 3              # Number of control action updates @ sim dt per policy dt.
+    decimation = 1              # Number of control action updates @ sim dt per policy dt.
     episode_length_s = 3.0      # Length of the episode in seconds
     max_steps = 600             # Maximum steps in an episode
    
@@ -66,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = True       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
-    render_imgs = False          # Activate image rendering
+    save_imgs = True           # Activate image saving from cameras
+    render_imgs = True          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -133,21 +158,34 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     robot_cfg_4: Articulation = UR5e_NOGRIP_CFG.replace(prim_path="/World/envs/env_.*/" + keys[UR5e_NOGRIP])
 
     shelf_cfg: RigidObject = SHELF.replace(prim_path="/World/envs/env_.*/shelf")
-    # object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
+    # object_cfg: RigidObject = RigidObjectCfg(
+    #     prim_path="/World/envs/env_.*/object",
+
+    #     spawn=sim_utils.CylinderCfg(
+    #         radius = 0.05,
+    #         height = 0.31,
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
+    #         mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
+    #         collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+    #                                                         contact_offset=0.001),
+    #         visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+    #     ),
+    #     init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+    # )
     object_cfg: RigidObject = RigidObjectCfg(
         prim_path="/World/envs/env_.*/object",
 
-        spawn=sim_utils.CylinderCfg(
-            radius = 0.05,
-            height = 0.31,
+        spawn=sim_utils.CuboidCfg(
+            size = [0.075, 0.25, 0.075],
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.000025),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.00025),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
-                                                            contact_offset=0.001),
+                                                            contact_offset=0.015),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
     )
+    # object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
 
     
     # Markers
@@ -160,111 +198,6 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 visible = debug_markers
             ),
             "target_point": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-
-            "shelf_pose1": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose2": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose3": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose5": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose6": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose7": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"limit_": sim_utils.SphereCfg(
-                radius = 0.0275,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
-                visible = debug_markers
-            ),"shelf_pose9": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose10": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose11": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose12": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose13": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose14": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose15": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose16": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose17": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose18": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose19": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose20": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose21": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose22": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose23": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose24": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose25": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -285,30 +218,48 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     tiled_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
-        width=img_width,
-        height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True,
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 20.0),
+        ),
+
+        width=640,
+        height=480,
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
     tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
-        width=img_width,
-        height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 20.0),
+        ),
+
+        width=640,
+        height=480,
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
     tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
@@ -330,8 +281,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     camera_trans = [[0.1231539748184402, 0.09738024537036244, 0.015012247696052522]]
     camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
 
-    camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
-    camera_ext_rot = [[1.0, 0.0, 0.0, 0.0]]
+    # D_origin = 1.28 + 0.1
+    camera_ext_trans = [[-0.250333604818459999, 0.95019047623759998, 0.82149041133910001]] # [[-0.5333604818459999, 1.0019047623759998, 0.7149041133910001]]
+    camera_ext_rot = [[0.016458520000000004, 0.02048439000000002, 0.89798281, -0.43919778]]
+
+    # camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
+    # camera_ext_rot = [[1.0, 0.0, 0.0, 0.0]]
 
     rot_neg90_xy = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([-1, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
     rot_neg90_xy[:, 0], rot_neg90_xy[:, 1:] = rot_neg90_xy.clone()[:, 3], rot_neg90_xy.clone()[:, :3]
@@ -391,13 +346,20 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
 
+    # ---- Initial pose for the robot OBSTACLES----
+    # Initial pose of the robots in quaternions
+    # ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
+    #                      [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
+    #                      [-0.1030,  0.1225,  0.7802,  -0.2031, 0.6846, 0.1954,  -0.6722],
+    #                      [-0.2019,  0.1292,  0.6284, -0.4223, -0.2331, -0.8642,  0.1430]]
+    
     # ---- Initial pose for the robot ----
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-0.1030,  0.1225,  0.7802,  -0.2031, 0.6846, 0.1954,  -0.6722],
-                         [-0.2019,  0.1292,  0.6284, -0.4223, -0.2331, -0.8642,  0.1430]]
-    
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
+
     # Obtain Euler angles from the quaternion
     r, p, y = euler_xyz_from_quat(torch.tensor(ee_init_pose_quat)[:, 3:])
     
@@ -425,7 +387,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
 
-    # ---- Target poses ----
+    # ---- Target poses for obstacles ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
@@ -447,35 +409,69 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
 
     obst_list = []
+    ellipsoid_r = []
     sel = p1
 
-    for i in range(2):
-        if i == 0:
-            obst_list.append(p1)
-            p_ = copy.deepcopy(p1)
-        else:
-            obst_list.append(p2)
-            p_ = copy.deepcopy(p2)
+    # for i in range(2):
+    #     if i == 0:
+    #         obst_list.append(p1)
+    #         p_ = copy.deepcopy(p1)
+    #     else:
+    #         obst_list.append(p2)
+    #         p_ = copy.deepcopy(p2)
 
-        for j in range(4):
+    #     for j in range(4):
 
-            if j != 0:
-                p_[1] += 0.5
-                obst_list.append(copy.deepcopy(p_))
+    #         if j != 0:
+    #             p_[1] += 0.5
+    #             obst_list.append(copy.deepcopy(p_))
             
-            p__ = copy.deepcopy(p_)
+    #         p__ = copy.deepcopy(p_)
 
-            for k in range(3):
-                p__[2] += 0.5
-                obst_list.append(copy.deepcopy(p__))
+    #         for k in range(3):
+    #             p__[2] += 0.5
+    #             obst_list.append(copy.deepcopy(p__))
 
 
-    ellipsoid_r = [0.43, 
-                   0.2, 
-                   0.435 ]
+    # ellipsoid_r = [0.43, 
+    #                0.2, 
+    #                0.435 ]
     
+    # ---- MPC Configuration -----
+    n_steps_mpc = 200
+    path_traj_mpc = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/trajectories"
+
+    lie_mpc = True
+    dt = 0.1
+
+    get_frame_mpc = False
+
+
+
+    # ---- Target poses for Pick-and-Place ----
+    # ---- Target poses ----
+    target_pose = [-0.4919, 0.1333, 0.04, 0, 3, 0]
+    target_pose_2 = [-0.4308,  0.1459,  0.4802,  3.1350, -0.1133, 2.2588]
+
+    target_poses_incs = [[-0.2,  0.2],
+                         [-0.2,   0.2],
+                         [-0.35*0,   0.225*0],
+                         [-3*pi/5*0,  3*pi/5*0],
+                         [-3*pi/5*0,  3*pi/5*0],
+                         [-pi/2,  pi/2]]
+    
+    target_poses_incs2 = [[-0.2,  0.2],
+                          [-0.2,  0.2],
+                          [-0.1,  0.1],
+                          [-2*pi/5*0,  2*pi/5*0],
+                          [-2*pi/5*0,  2*pi/5*0],
+                          [-2*pi/5,  2*pi/5]]
+
+    apply_range_tgt = True
                 
 
+    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
+    rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
 
     # Object pose adjustments
     object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
@@ -505,6 +501,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     bonus_tgt_reached = 100
 
 
+
+
 # Function to update the variables in the configuration class
 #    using new information in the BimanualDirect class and new number of environments
 def update_cfg(cfg, num_envs, device):
@@ -519,8 +517,9 @@ def update_cfg(cfg, num_envs, device):
     '''
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
-    cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
-    cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
+    cfg.target_pose_2 = torch.tensor(cfg.target_pose_2).repeat(num_envs, 1).to(device)
+    # cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
+    # cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
     cfg.camera_trans = torch.tensor(cfg.camera_trans).repeat(num_envs, 1).to(device)
     cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
@@ -535,6 +534,9 @@ def update_cfg(cfg, num_envs, device):
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
+
+    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
 
     cfg.obst_list = torch.tensor(cfg.obst_list).repeat(num_envs, 1).to(device)
 
