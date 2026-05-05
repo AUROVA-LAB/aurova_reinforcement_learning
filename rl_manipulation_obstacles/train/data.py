@@ -113,6 +113,7 @@ class HDF5LfDDataset(Dataset):
             target_pose = f["states/target_pose"][t]
             gripper_pose = f["states/gripper_pose"][t]
             action = f["actions"][t]
+            gripper_action = f["gripper_actions"][t]
 
         # Convert to tensors
         cam = torch.tensor(cam).permute(2, 0, 1).float() / 255.0
@@ -121,11 +122,13 @@ class HDF5LfDDataset(Dataset):
         target_pose = torch.tensor(target_pose).float()
         gripper_pose = torch.tensor(gripper_pose).float()
         action = torch.tensor(action).float()
+        gripper_action = 2 * torch.tensor(gripper_action).float() - 1
 
         return {
             "cam": cam,
             "cam_ext": cam_ext,
             "target_pose": target_pose,
             "gripper_pose": gripper_pose,
-            "action": action
+            "action": action,
+            "gripper_action": gripper_action
         }
