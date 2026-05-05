@@ -737,8 +737,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3],         q01 = self.root_robot_pose[:, 3:],
                                                                             t02 = self.debug_robot_ee_pose_w[:, :3],   q02 = self.debug_robot_ee_pose_w[:, 3:])
 
-        # print("Actual Robot position: ", robot_rot_ee_pos_r)
-
         # Fix double cover
         neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
         robot_rot_ee_quat_r[neg_idx] *= -1
@@ -993,8 +991,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - terminated - torch.tensor(N, 1): tensor of boolean indicating if the episodes was terminated (finished).
         '''
 
-        print(self.trajectory_save.shape[0])
-        print("\n\n\n")
         # Computes time out indicators
         time_out = torch.tensor(self.count >= self.trajectory_save.shape[0]).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
 
@@ -1111,7 +1107,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # Builds the new initial pose for the target
             target_pose_r[env_ids] = torch.cat((target_init_pose[:, :3], quat), dim = -1)[env_ids].float()
             target_pose_r_group[env_ids] = self.convert_to_group(target_init_pose[:, :3], quat)[env_ids]
-            print("LOG TGT: ")
             target_pose_r_lie[env_ids] = self.log(target_pose_r_group)[env_ids]
 
             return target_pose_r, target_pose_r_group, target_pose_r_lie
@@ -1282,17 +1277,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 x0_group = self.exp(x0_tensor)
                 x0_lab   = self.convert_to_Lab(x0_group)
 
-                print("Step: ", k)
-
-                # print("MPC: ", torch.round(x0_lab, decimals = 3))
-                # print("TGT: ", torch.round(self.target_pose_r, decimals = 3))
-                # print("START: ", torch.round(self.gripper_pose_r, decimals = 3))
-                print("DIFF: ", torch.round(x0_tensor.to(self.device) - self.target_pose_r_lie, decimals = 4))
-
-
-                print("\n\n")
                 self.trajectory_save.append(x0_tensor[0].numpy().tolist())
-
 
                 if self.cfg.get_img_mpc:
                     fig, ax = get_frame(
@@ -1308,7 +1293,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     # fig.savefig(os.path.join(path, name))
 
                     name = f"{save_idx:03d}.png"
-                    # print(os.path.join(path, name))
                     ax.view_init(elev=0, azim=0)
                     fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
 
@@ -1347,9 +1331,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                         max_steps=self.trajectory_save.shape[0]
                                         )
 
+        print("--- Episode: ", self.episode_id)
         self.episode_id += 1
 
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
-        # print("Simulation finished")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
 
