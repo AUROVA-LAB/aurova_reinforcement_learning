@@ -176,8 +176,8 @@ UR5e_NOGRIP_CFG = ArticulationCfg(
                                 "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
             velocity_limit = 100.0,
             effort_limit = 87.0,
-            stiffness = 200.0,
-            damping = 100.0,
+            stiffness = 500.0,
+            damping = 800.0,
         ),
     },
 
