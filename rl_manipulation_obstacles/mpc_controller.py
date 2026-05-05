@@ -160,7 +160,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     Wz_ref = 0.0
 
     weights = [[50, 70, 60, 50, 50, 50,     2, 2, 2, 2, 2, 2], 
-               [30, 30, 30, 3, 3, 3,     3, 3, 3, 3, 3, 3]]
+               [3, 3, 3, 3, 3, 3,     3, 3, 3, 3, 3, 3]]
 
     nmpc.quad_stage_cost.add_states(
         names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
@@ -185,14 +185,14 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
             -10, -10, -10, -10, -10, -10],
         x_ub=[10, 10, 10, 10, 10, 10,
             10, 10, 10, 10, 10, 10],
-        u_lb=[-0.5, -0.5, -0.5, -0.05, -0.05, -0.05],
-        u_ub=[0.5, 0.5, 0.5, 0.05, 0.05, 0.05],
+        u_lb=[-0.75, -0.75, -0.75, -0.01, -0.01, -0.01],
+        u_ub=[0.75, 0.75, 0.75, 0.01, 0.01, 0.01],
         z_lb=None, # [0.0]*n_obst,      # <-- enforces obstacle avoidance
         z_ub=None, # [ca.inf]*n_obst
     )
 
     # Initial conditions
-    x0 = ini.cpu().numpy().tolist()
+    x0 = ini
     # z0 = [1.0]*len(obst_list)   # start feasible
     u0 = [0]*6
 
