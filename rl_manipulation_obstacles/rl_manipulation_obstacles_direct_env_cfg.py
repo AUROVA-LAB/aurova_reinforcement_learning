@@ -90,9 +90,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
-    render_imgs = True          # Activate image rendering
+    debug_markers = False       # Activate marker visualization
+    save_imgs = False           # Activate image saving from cameras
+    render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -202,6 +202,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            "interm_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
             
         }
     )
@@ -282,7 +287,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     camera_rot = [[-0.3825884841399441, -0.00019676447364075367, -0.00034948181171445825, -0.9239187685882916]]
 
     # D_origin = 1.28 + 0.1
-    camera_ext_trans = [[-0.250333604818459999, 0.95019047623759998, 0.82149041133910001]] # [[-0.5333604818459999, 1.0019047623759998, 0.7149041133910001]]
+    camera_ext_trans = [[-0.250333604818459999, 0.70019047623759998, 0.6752149041133910001]] # [[-0.5333604818459999, 1.0019047623759998, 0.7149041133910001]]
     camera_ext_rot = [[0.016458520000000004, 0.02048439000000002, 0.89798281, -0.43919778]]
 
     # camera_ext_trans = [[0.2778,  1.1144,  1.2721]]
@@ -444,14 +449,17 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     lie_mpc = True
     dt = 0.1
 
-    get_frame_mpc = False
+    get_img_mpc = False
+
+    plan_chg_thres = 0.01
 
 
 
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.4308,  0.1459,  0.4802,  3.1350, -0.1133, 2.2588]
+    target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  0, 3, 0]
+    # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
@@ -460,12 +468,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                          [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.2,  0.2],
-                          [-0.2,  0.2],
+    target_poses_incs2 = [[-0.1,  0.1],
                           [-0.1,  0.1],
-                          [-2*pi/5*0,  2*pi/5*0],
-                          [-2*pi/5*0,  2*pi/5*0],
-                          [-2*pi/5,  2*pi/5]]
+                          [-0.1,  0.1],
+                          [-1*pi/5*0,  1*pi/5*0],
+                          [-1*pi/5*0,  1*pi/5*0],
+                          [-1*pi/5*0,  1*pi/5*0]]
 
     apply_range_tgt = True
                 
@@ -592,5 +600,6 @@ def update_collisions(cfg, num_envs):
     
     # Updated contact matrix
     cfg.contact_matrix = torch.tensor([2.5, 2.5, 2.5, -10])
+    cfg.contact_thres = 6
 
     return cfg
