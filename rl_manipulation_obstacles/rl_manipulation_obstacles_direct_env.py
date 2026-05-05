@@ -32,7 +32,7 @@ from .train.data import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pynput import keyboard
+# from pynput import keyboard
 
 import sys
 sys.path.append('../../../')
@@ -372,8 +372,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.inc = 0.01
 
         # Crear listener
-        listener = keyboard.Listener(on_press=self.on_press)
-        listener.start()  # ✅ No bloquea
+        # listener = keyboard.Listener(on_press=self.on_press)
+        # listener.start()  # ✅ No bloquea
         # --------------------------------
 
 
