@@ -90,12 +90,6 @@ def log_bruno(dq: torch.Tensor):
     # Converts the parts
     primary = (q_angle(q = dq[:, :4]).unsqueeze(-1)*0.5)*q_axis(q = dq[:, :4])
 
-    print(primary)
-    print(dq)
-    print(q_angle(q = dq[:, :4]))
-    print(q_axis(q = dq[:, :4]))
-    print("\n\n")
-
     dual = dq_translation(dq = dq)*0.5
 
     # Returns the concatenation of both parts
