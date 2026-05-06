@@ -476,6 +476,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         # self.scene.rigid_objects["shelf"] = RigidObject(self.cfg.shelf_cfg)
         self.scene.rigid_objects["object"] = RigidObject(self.cfg.object_cfg)
+        self.scene.rigid_objects["obstacle"] = RigidObject(self.cfg.obstacle_cfg)
 
         # Add extras (markers, ...)
         self.scene.extras["markers"] = VisualizationMarkers(self.cfg.marker_cfg)
@@ -688,11 +689,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
                                                                          self.gripper_pose_r[:, :3],
-                                                                         self.interm_pose_r[:, :3])), 
+                                                                         self.interm_pose_r[:, :3],
+                                                                         self.end_target_pose_r[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.target_pose_r[:, 3:], 
                                                                           self.gripper_pose_r[:,3:],
-                                                                          self.interm_pose_r[:, 3:])), 
+                                                                          self.interm_pose_r[:, 3:],
+                                                                          self.end_target_pose_r[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -1250,12 +1253,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         for idx, ref in enumerate(references):
                 
-            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
+            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(
+                                                    self.cfg.obst_list, 
                                                     self.cfg.ellipsoid_r, 
                                                     ini = x0, 
                                                     ref = ref[0],
                                                     dt = self.cfg.dt, 
                                                     lie = self.cfg.lie_mpc,)
+            
 
             # ======================================================
             # Simulation loop
@@ -1263,8 +1268,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             
             sol = self.model.solution
 
-
-            # x0 = x0[0].cpu().numpy().tolist()
 
             for k in range(self.cfg.n_steps_mpc):
                 u_opt = self.nmpc.optimize(x0)
@@ -1285,7 +1288,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         tgt=ref[0].cpu().numpy().tolist(),
                         traj=self.trajectory_save,
                         ax=None,
-                        obst_centers=self.cfg.obst_list,
+                        obst_centers=self.cfg.obst_list.cpu(),
                         obst_radii=ellipsoid_r_torch*2,
                         rot = True,)
             

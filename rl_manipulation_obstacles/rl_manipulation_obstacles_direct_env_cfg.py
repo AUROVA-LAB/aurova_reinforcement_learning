@@ -90,7 +90,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
@@ -185,6 +185,22 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
     )
+
+    obstacle_pos = [-5.6190e-01,  1.3330e-01,  0.3]
+
+    obstacle_cfg: RigidObject = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/obstacle",
+
+        spawn=sim_utils.CuboidCfg(
+            size = [0.25, 0.25, 0.25],
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
+            mass_props=sim_utils.MassPropertiesCfg(mass=25),
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
+                                                            contact_offset=0.015),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+        ),
+        init_state=RigidObjectCfg.InitialStateCfg(pos = obstacle_pos),
+    )
     # object_cfg: RigidObject = MASTER_CHEF_CAN.replace(prim_path="/World/envs/env_.*/object")
 
     
@@ -207,6 +223,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+            "end_point": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            
             
         }
     )
@@ -403,45 +425,17 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     apply_range_tgt = True
 
-    box_range_x = [0,0]
-    box_range_y = [1,1]
-    object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
-    object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
-
-
-    # Shelf poses
-    p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
-    p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
+    
 
     obst_list = []
-    ellipsoid_r = []
-    sel = p1
+    obst_list.append(obstacle_pos)
 
-    # for i in range(2):
-    #     if i == 0:
-    #         obst_list.append(p1)
-    #         p_ = copy.deepcopy(p1)
-    #     else:
-    #         obst_list.append(p2)
-    #         p_ = copy.deepcopy(p2)
-
-    #     for j in range(4):
-
-    #         if j != 0:
-    #             p_[1] += 0.5
-    #             obst_list.append(copy.deepcopy(p_))
-            
-    #         p__ = copy.deepcopy(p_)
-
-    #         for k in range(3):
-    #             p__[2] += 0.5
-    #             obst_list.append(copy.deepcopy(p__))
+    ellipsoid_r = [0.125, 
+                   0.125, 
+                   0.125]
 
 
-    # ellipsoid_r = [0.43, 
-    #                0.2, 
-    #                0.435 ]
-    
+
     # ---- MPC Configuration -----
     n_steps_mpc = 200
     path_traj_mpc = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/trajectories"
@@ -449,7 +443,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     lie_mpc = True
     dt = 0.1
 
-    get_img_mpc = False
+    get_img_mpc = True
 
     plan_chg_thres = 0.01
 
@@ -457,20 +451,20 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
-    target_pose = [-0.4919, 0.1333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  0, 3, 0]
+    target_pose = [-0.40919, -0.29333, 0.04, 0, 3, 0]
+    target_pose_2 = [-0.55308,  0.29333,  0.04,  0, 3, 0]
     # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
-    target_poses_incs = [[-0.2,  0.2],
-                         [-0.2,   0.2],
+    target_poses_incs = [[-0.2*0,  0.2*0],
+                         [-0.2*0,   0.2*0],
                          [-0.35*0,   0.225*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.1,  0.1],
-                          [-0.1,  0.1],
-                          [-0.1,  0.1],
+    target_poses_incs2 = [[-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0]]
