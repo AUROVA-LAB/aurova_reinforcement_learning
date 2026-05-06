@@ -25,10 +25,14 @@ import pickle
 
 
 
-def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
-                                                0,0,0,0,0,0], ref = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0], 
-                                                dt = 0.01,
-                                                lie = False,):
+def drop_NMPC_setup(obst_list, 
+                    ellipsoid_r, 
+                    ini = [0,0,0,0,0,0,
+                           0,0,0,0,0,0], 
+                    ref = [1.0, 1.0, 1.0, 
+                           0.0, 0.0, 0.0], 
+                    dt = 0.01,
+                    lie = False,):
         
     # ======================================================
     # Create model
@@ -95,8 +99,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
     rhs = []
 
-
-    n_obst = obst_list.shape[-1]
+    n_obst = obst_list.shape[0]
 
     idx_obst = [[0, 1, 2], [2, 0, 1]]
 
@@ -120,13 +123,13 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
             change_idx = idx >= int(n_obst / 2)
 
-            rhs.append((X - o[0].item())**2 / ((-0.25/2 + 0.01 + ellipsoid_r[idx_obst[change_idx][0]]))**2 + \
-                    (Y - o[1].item())**2 / ((0.01 + ellipsoid_r[idx_obst[change_idx][1]] + 1.0*change_idx))**2 + \
-                    (Z - o[2].item())**2 / ((0.01 + ellipsoid_r[idx_obst[change_idx][2]] + 1.0*(not change_idx)))**2 - 1 - z[idx])
+            rhs.append((X - o[0].item())**2   / ((ellipsoid_r[0]))**2 + \
+                       (Y - o[1].item())**2   / ((ellipsoid_r[1]))**2 + \
+                       (Z - o[2].item())**2   / ((ellipsoid_r[2]))**2 - 1 - z[idx])
             
-            ellipsoid_r_torch.append([-0.25/2 + ellipsoid_r[idx_obst[change_idx][0]], 
-                                    1.0*change_idx + ellipsoid_r[idx_obst[change_idx][1]], 
-                                    1.0*(not change_idx) + ellipsoid_r[idx_obst[change_idx][2]]])
+            ellipsoid_r_torch.append([ellipsoid_r[0], 
+                                      ellipsoid_r[1], 
+                                      ellipsoid_r[2]])
         
         ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
         model.set_algebraic_equations(ca.vertcat(*rhs))
@@ -179,6 +182,10 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # Horizon
     nmpc.horizon = 15
 
+    print(obst_list)
+    print(n_obst)
+    print("\n\n\n")
+
     # Box constraints
     nmpc.set_box_constraints(
         x_lb=[-10, -10, -10, -10, -10, -10, 
@@ -187,16 +194,16 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
             10, 10, 10, 10, 10, 10],
         u_lb=[-0.75, -0.75, -0.75, -0.01, -0.01, -0.01],
         u_ub=[0.75, 0.75, 0.75, 0.01, 0.01, 0.01],
-        z_lb=None, # [0.0]*n_obst,      # <-- enforces obstacle avoidance
-        z_ub=None, # [ca.inf]*n_obst
+        z_lb=[0.0]*n_obst,      # <-- enforces obstacle avoidance
+        z_ub=[ca.inf]*n_obst
     )
 
     # Initial conditions
     x0 = ini
-    # z0 = [1.0]*len(obst_list)   # start feasible
+    z0 = [1.0]*n_obst  # start feasible
     u0 = [0]*6
 
-    model.set_initial_conditions(x0=x0, z0 = None)
+    model.set_initial_conditions(x0=x0, z0 = z0)
     nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
 
     nmpc.setup(options={'print_level': 0})
