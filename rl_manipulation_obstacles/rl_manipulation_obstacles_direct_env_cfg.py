@@ -80,7 +80,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5*2
 
-    img_width, img_height = 80, 80
+    img_width, img_height = 640, 480
 
 
     # --- Action / observation space ---
@@ -91,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = False           # Activate image saving from cameras
-    render_imgs = False          # Activate image rendering
+    save_imgs = True            # Activate image saving from cameras
+    render_imgs = True          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -237,8 +237,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             clipping_range=(0.1, 20.0),
         ),
 
-        width=640,
-        height=480,
+        width=img_width,
+        height=img_height,
 
         depth_clipping_behavior="max",
         colorize_instance_id_segmentation=True,
@@ -260,8 +260,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             clipping_range=(0.1, 20.0),
         ),
 
-        width=640,
-        height=480,
+        width=img_width,
+        height=img_height,
 
         depth_clipping_behavior="max",
         colorize_instance_id_segmentation=True,
@@ -452,6 +452,10 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     get_img_mpc = False
 
     plan_chg_thres = 0.01
+
+    test = False
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
+    
 
 
 
