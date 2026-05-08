@@ -98,19 +98,21 @@ class TransfPolicy(nn.Module):
         return actions
 
 
+
+
 # =========================================================
 # MODEL CNN
 # =========================================================
 
 class SimpleCNN(nn.Module):
-    def __init__(self, out_dim=128):
+    def __init__(self, in_channels=3, out_dim=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(3, 32, 3, stride=2), nn.ReLU(),
+            nn.Conv2d(in_channels, 32, 3, stride=2), nn.ReLU(),
             nn.Conv2d(32, 64, 3, stride=2), nn.ReLU(),
             nn.Conv2d(64, 128, 3, stride=2), nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128*14*14, out_dim)  # adapt if resolution changes
+            nn.Linear(596608, out_dim)  # adapt if resolution changes
         )
 
     def forward(self, x):
@@ -118,10 +120,11 @@ class SimpleCNN(nn.Module):
 
 
 class CnnPolicy(nn.Module):
-    def __init__(self, pose_dim, action_dim, hidden_dim=128):
+    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128):
         super().__init__()
 
-        self.cnn = SimpleCNN(out_dim=hidden_dim)
+        self.cnn = SimpleCNN(in_channels=in_channels, 
+                             out_dim=hidden_dim)
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
