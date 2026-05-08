@@ -8,6 +8,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
+def collate_fn(batch):
+
+    out = {}
+
+    for k in batch[0].keys():
+
+        arr = np.stack([b[k] for b in batch])
+
+        out[k] = torch.from_numpy(arr).float()
+
+    return out
+
+
+
 # --- Class for overriding and adding noise to the observations in the environment ---
 class AddNoiseObservation(gym.ObservationWrapper):
     def __init__(self, env, noise_std = 0.1):
