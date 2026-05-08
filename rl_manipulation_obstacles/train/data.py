@@ -84,51 +84,310 @@ class HDF5EpisodeWriter:
 
 
 
+import os
+import h5py
+import numpy as np
+import torch
 
+from torch.utils.data import Dataset
+from torchvision import transforms
+
+
+# =========================================================
+# BASE HDF5 DATASET
+# =========================================================
 
 class HDF5LfDDataset(Dataset):
+
     def __init__(self, dataset_dir):
-        self.files = [os.path.join(dataset_dir, f) for f in os.listdir(dataset_dir) if f.endswith(".h5")]
 
-        self.index = []  # (file_id, step)
+        self.files = sorted([
+            os.path.join(dataset_dir, f)
+            for f in os.listdir(dataset_dir)
+            if f.endswith(".h5")
+        ])
 
-        # Build global index
-        for file_id, path in enumerate(self.files):
-            with h5py.File(path, "r") as f:
-                length = f["actions"].shape[0]
-                for t in range(length):
-                    self.index.append((file_id, t))
+        # -------------------------------------------------
+        # Persistent HDF5 handles
+        # -------------------------------------------------
+
+        self.handles = [
+            h5py.File(path, "r+", libver="latest", swmr=True)
+            for path in self.files
+        ]
+
+        # -------------------------------------------------
+        # Global indexing
+        # -------------------------------------------------
+
+        self.index = []  # (file_id, timestep)
+
+        for file_id, f in enumerate(self.handles):
+
+            length = f["actions"].shape[0]
+
+            for t in range(length):
+                self.index.append((file_id, t))
+
+    # =====================================================
+    # CLEANUP
+    # =====================================================
+
+    def close(self):
+
+        for h in self.handles:
+            h.close()
+
+    def __del__(self):
+        self.close()
+
+    # =====================================================
+    # LENGTH
+    # =====================================================
 
     def __len__(self):
         return len(self.index)
 
+    # =====================================================
+    # GET ITEM
+    # =====================================================
+
     def __getitem__(self, idx):
+
         file_id, t = self.index[idx]
-        path = self.files[file_id]
+        f = self.handles[file_id]
 
-        with h5py.File(path, "r") as f:
-            cam = f["images/cam"][t]
-            cam_ext = f["images/cam_ext"][t]
+        cam = f["/images/cam"][t]
+        cam_ext = f["/images/cam_ext"][t]
 
-            target_pose = f["states/target_pose"][t]
-            gripper_pose = f["states/gripper_pose"][t]
-            action = f["actions"][t]
-            gripper_action = f["gripper_actions"][t]
+        target_pose = f["/states/target_pose"][t]
+        gripper_pose = f["/states/gripper_pose"][t]
 
-        # Convert to tensors
-        cam = torch.tensor(cam).permute(2, 0, 1).float() / 255.0
-        cam_ext = torch.tensor(cam_ext).permute(2, 0, 1).float() / 255.0
+        action = f["actions"][t]
+        gripper_action = f["gripper_action"][t]
 
-        target_pose = torch.tensor(target_pose).float()
-        gripper_pose = torch.tensor(gripper_pose).float()
-        action = torch.tensor(action).float()
-        gripper_action = 2 * torch.tensor(gripper_action).float() - 1
+        return {
+            "cam": cam[:-1],
+            "cam_D": cam[-1][None],
+            "cam_ext": cam_ext[:-1],
+            "cam_ext_D": cam_ext[-1][None],
+            "target_pose": target_pose,
+            "gripper_pose": gripper_pose,
+            "action": np.concatenate([action, gripper_action], axis=-1),
+        }
+
+    # =====================================================
+    # MODIFY ELEMENTS
+    # =====================================================
+
+    def set_item(
+        self,
+        idx,
+        cam=None,
+        cam_ext=None,
+        target_pose=None,
+        gripper_pose=None,
+        action=None,
+        gripper_action=None
+    ):
+
+        file_id, t = self.index[idx]
+
+        f = self.handles[file_id]
+
+        # -------------------------------------------------
+        # CAM
+        # -------------------------------------------------
+
+        if cam is not None:
+
+            if torch.is_tensor(cam):
+                cam = cam.cpu().numpy()
+
+            # HWC -> CWH
+            if cam.ndim == 3 and cam.shape[-1] == 3:
+                cam = np.transpose(cam, (2, 0, 1))
+
+            # float -> uint8
+            if cam.dtype != np.uint8:
+                cam = (cam * 255).astype(np.uint8)
+
+            f["cam"][t] = cam
+
+        # -------------------------------------------------
+        # CAM EXT
+        # -------------------------------------------------
+
+        if cam_ext is not None:
+
+            if torch.is_tensor(cam_ext):
+                cam_ext = cam_ext.cpu().numpy()
+
+            # HWC -> CWH
+            if cam_ext.ndim == 3 and cam_ext.shape[-1] == 3:
+                cam_ext = np.transpose(cam_ext, (2, 0, 1))
+
+            if cam_ext.dtype != np.uint8:
+                cam_ext = (cam_ext * 255).astype(np.uint8)
+
+            f["cam_ext"][t] = cam_ext
+
+        # -------------------------------------------------
+        # TARGET POSE
+        # -------------------------------------------------
+
+        if target_pose is not None:
+
+            if torch.is_tensor(target_pose):
+                target_pose = target_pose.cpu().numpy()
+
+            f["target_pose"][t] = target_pose
+
+        # -------------------------------------------------
+        # GRIPPER POSE
+        # -------------------------------------------------
+
+        if gripper_pose is not None:
+
+            if torch.is_tensor(gripper_pose):
+                gripper_pose = gripper_pose.cpu().numpy()
+
+            f["gripper_pose"][t] = gripper_pose
+
+        # -------------------------------------------------
+        # ACTION
+        # -------------------------------------------------
+
+        if action is not None:
+
+            if torch.is_tensor(action):
+                action = action.cpu().numpy()
+
+            f["actions"][t] = action
+
+        # -------------------------------------------------
+        # GRIPPER ACTION
+        # -------------------------------------------------
+
+        if gripper_action is not None:
+
+            if torch.is_tensor(gripper_action):
+                gripper_action = gripper_action.cpu().numpy()
+
+            f["gripper_action"][t] = gripper_action
+
+        f.flush()
+
+
+
+
+# =========================================================
+# PROCESSED DATASET
+# =========================================================
+
+class ProcessedDataset(Dataset):
+
+    def __init__(
+        self,
+        base_dataset,
+        image_size=(128, 128),
+        use_relative_pose=False,
+        use_delta_actions=False,
+        normalize_images=False
+    ):
+
+        self.dataset = base_dataset
+
+        self.use_relative_pose = use_relative_pose
+        self.use_delta_actions = use_delta_actions
+
+        # -------------------------------------------------
+        # IMAGE TRANSFORMS
+        # -------------------------------------------------
+
+        transform_list = [
+            transforms.Resize(image_size)
+        ]
+
+        if normalize_images:
+
+            transform_list.append(
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]
+                )
+            )
+
+        self.transform = transforms.Compose(transform_list)
+
+    # =====================================================
+    # LENGTH
+    # =====================================================
+
+    def __len__(self):
+        return len(self.dataset)
+
+    # =====================================================
+    # GET ITEM
+    # =====================================================
+
+    def __getitem__(self, idx):
+
+        sample = self.dataset[idx]
+
+        cam = sample["cam"]
+        cam_ext = sample["cam_ext"]
+
+        target_pose = sample["target_pose"]
+        gripper_pose = sample["gripper_pose"]
+
+        action = sample["action"]
+        gripper_action = sample["gripper_action"]
+
+        # -------------------------------------------------
+        # IMAGE PROCESSING
+        # -------------------------------------------------
+
+        cam = self.transform(cam)
+        cam_ext = self.transform(cam_ext)
+
+        # -------------------------------------------------
+        # RELATIVE POSE
+        # -------------------------------------------------
+
+        if self.use_relative_pose:
+
+            pose = target_pose - gripper_pose
+
+        else:
+
+            pose = torch.cat([
+                target_pose,
+                gripper_pose
+            ], dim=-1)
+
+        # -------------------------------------------------
+        # DELTA ACTIONS
+        # -------------------------------------------------
+
+        if self.use_delta_actions:
+
+            if idx < len(self.dataset) - 1:
+
+                next_sample = self.dataset[idx + 1]
+
+                next_action = next_sample["action"]
+
+                action = next_action - action
+
+            else:
+
+                action = torch.zeros_like(action)
 
         return {
             "cam": cam,
             "cam_ext": cam_ext,
-            "target_pose": target_pose,
-            "gripper_pose": gripper_pose,
+            "pose": pose,
             "action": action,
             "gripper_action": gripper_action
         }
