@@ -84,8 +84,8 @@ def log_bruno(dq: torch.Tensor):
     assert dq.shape[-1] == 8
 
     # Fix dual cover
-    # neg_idx = dq[:, 0] < 0.0
-    # dq[neg_idx] *= -1
+    neg_idx = dq[:, 0] < 0.0
+    dq[neg_idx] *= -1
 
     # Converts the parts
     primary = (q_angle(q = dq[:, :4]).unsqueeze(-1)*0.5)*q_axis(q = dq[:, :4])
