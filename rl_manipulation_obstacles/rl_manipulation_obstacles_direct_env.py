@@ -579,39 +579,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''
 
         grip_action = actions[:, -1]
-        actions = actions[:, :-1]
+        # actions = actions[:, :-1]
 
-        # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
+        # # Perform increment in the algebra and exponential map -> (plus operator)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
 
-        # Convert to IsaacLab representation (translation, quaternion)
-        action_pose_lab = self.convert_to_Lab(action_pose)
-
-
-        # ============================================ MPC ================================================
-
-        # grip_action = self.prim_g_action
-        # action_pose_lab[:, :3] += self.prim_action[:, :3]
-        # self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
-        # self.prim_g_action = torch.zeros_like(self.prim_g_action).to(self.device)
-
-        # vel_pos = torch.cat((self.x0, self.u_opt), dim = -1)
-        # # vel_pos = torch.cat((robot_pose[:, :3], robot_euler, self.u_opt), dim = -1)
+        # # Convert to IsaacLab representation (translation, quaternion)
+        # action_pose_lab = self.convert_to_Lab(action_pose)
 
 
-        # u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
-        # self.model.simulate(u=u_opt, steps=1)
-        # x0 = self.model.solution['x:f']
-
-        # self.x0 = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-        #                     float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device)
-        # self.u_opt = torch.tensor([[float(u_opt[0]), float(u_opt[1]), float(u_opt[2]), 
-        #                             float(u_opt[3]), float(u_opt[4]), float(u_opt[5])]]).to(self.device)
-        
-        # print("X0: ", x0)
-        # =================================================================================================
         
         if not self.cfg.test:
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
@@ -636,10 +614,28 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
         
         else:
-            pass
+
+            cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
+                                  self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
+                                  self.gripper_pose_r_lie)
+            
+            # actions = self._preprocess_actions(cmd)
+
+            grip_action = actions[:, -1].clone()
+            cmd_lie = actions[:, :-1].clone()
+
+
+            cmd = self.convert_to_Lab(self.exp(cmd_lie))
+            
+            cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
+                                           t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
+            
+            
+
+
+        self.controller.set_command(torch.cat(cmd, dim = -1))
 
         # Set the command for the IKDifferentialController
-        self.controller.set_command(torch.cat(cmd, dim = -1))
         
         # Obtains the poses
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
@@ -670,7 +666,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''
 
         # Preprocessing actions
-        actions = self._preprocess_actions(actions)
+        # actions = self._preprocess_actions(actions)
 
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
@@ -866,15 +862,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.camera_w = torch.cat((cam, cam_D), dim = 0)
         self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
 
-        print(self.camera_w.shape)
-
-
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
             if self.count % 5 == 0:
             # Function to save images (in utils)
-                save_images_grid(images = [self.camera_w[-1]],
+                save_images_grid(images = [self.camera_ext[-1]],
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
@@ -889,10 +882,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         target_pose = self.target_pose_r_lie[0].cpu().numpy()
         gripper_pose = self.gripper_pose_r_lie[0].cpu().numpy()
-        action = self.trajectory_save[0].cpu().numpy()
+        action = self.trajectory_save[self.count].cpu().numpy()
+
+        diff = (self.gripper_pose_r_lie - self.prev_pose)[0].cpu().numpy()
 
         # ---- Save step ----
-        self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, self.gripper_action)
+        self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, diff, self.gripper_action)
+
+        self.prev_pose = self.gripper_pose_r_lie
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -914,7 +911,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # image /= 255.0
 
 
-        if self.cfg.test and self.count % 5 == 0:
+        if not self.cfg.test and self.count % 5 == 0:
             self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
@@ -983,9 +980,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - truncated - torch.tensor(N, 1): tensor of boolean indicating if the episodes was truncated (finished badly).
             - terminated - torch.tensor(N, 1): tensor of boolean indicating if the episodes was terminated (finished).
         '''
-
+    
         # Computes time out indicators
-        time_out = torch.tensor(self.count >= self.trajectory_save.shape[0]).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
+        if not self.cfg.test:
+            time_out = torch.tensor(self.count >= self.trajectory_save.shape[0]).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
+        else:
+            time_out = self.episode_length_buf >= self.max_episode_length - 1
 
         # Checks out of bounds in velocity
         out_of_bounds = torch.norm(self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 7:], dim = -1) > self.cfg.velocity_limit 
@@ -1314,6 +1314,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
             self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
+            self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
 
             self.increment_condition = False
             self.gripper_action = False
@@ -1332,7 +1333,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         else:
             # Create model
-            model = CnnPolicy(
+            self.test_model = CnnPolicy(
                 pose_dim=6,
                 action_dim=7,
                 in_channels=1,
@@ -1343,14 +1344,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
 
             # If you saved only state_dict
-            model.load_state_dict(checkpoint)
+            self.test_model.load_state_dict(checkpoint)
 
             # OR if checkpoint is wrapped
-            # model.load_state_dict(checkpoint["model_state_dict"])
+            # self.test_model.load_state_dict(checkpoint["self.model_state_dict"])
 
             # Move to GPU if available
-            model.to(self.device)
+            self.test_model.to(self.device)
 
             # Inference mode
-            model.eval()
+            self.test_model.eval()
 
