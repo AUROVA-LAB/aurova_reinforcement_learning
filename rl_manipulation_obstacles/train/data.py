@@ -42,17 +42,23 @@ class HDF5EpisodeWriter:
             "actions", (T, action_dim), dtype="float32"
         )
 
+        self.diff_ds = self.file.create_dataset(
+            "diff", (T, action_dim), dtype="float32"
+        )
+
         self.gripper_action_ds = self.file.create_dataset(
             "gripper_action", (T, 1), dtype="bool"
         )
 
         self.initialized = True
 
-    def add_step(self, cam, cam_ext, target_pose, gripper_pose, action, gripper_action):
+    def add_step(self, cam, cam_ext, target_pose, gripper_pose, action, diff, gripper_action):
         """
         cam, cam_ext: (H, W, 3) uint8
         poses: (D,)
         action: (A,)
+        diff: (A,)
+        gripper_action: bool
         """
 
         if not self.initialized:
@@ -71,6 +77,7 @@ class HDF5EpisodeWriter:
         self.target_pose_ds[idx] = target_pose
         self.gripper_pose_ds[idx] = gripper_pose
         self.action_ds[idx] = action
+        self.diff_ds[idx] = diff
         self.gripper_action_ds[idx] = gripper_action
 
         self.step += 1
@@ -165,12 +172,12 @@ class HDF5LfDDataset(Dataset):
 
         action = f["actions"][t]
         gripper_action = f["gripper_action"][t]
-
+        
         return {
             "cam": cam[:-1],
-            "cam_D": cam[-1][None],
+            "cam_D": cam[-1][None] / 255.0,
             "cam_ext": cam_ext[:-1],
-            "cam_ext_D": cam_ext[-1][None],
+            "cam_ext_D": cam_ext[-1][None] / 255.0,
             "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": np.concatenate([action, gripper_action], axis=-1),
