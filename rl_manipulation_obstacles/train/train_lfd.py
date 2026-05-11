@@ -2,7 +2,6 @@ import os
 import torch
 import torch.nn as nn
 import numpy as np
-import h5py
 from torch.utils.data import DataLoader, random_split
 
 from data import *
@@ -24,7 +23,7 @@ def train():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    dataset = HDF5LfDDataset(os.path.join(os.getcwd(), "../dataset_aux"))
+    dataset = HDF5LfDDataset(os.path.join(os.getcwd(), "../dataset"))
 
     # Split dataset
     train_size = int(0.8 * len(dataset))
@@ -33,9 +32,9 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -54,6 +53,8 @@ def train():
 
     best_val = float("inf")
 
+    print("\n ------ Start training \n")
+
     for epoch in range(50):
 
         # ================= TRAIN =================
@@ -61,6 +62,7 @@ def train():
         train_loss = 0
 
         for b in train_loader:
+            print("Train")
             
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
@@ -86,6 +88,7 @@ def train():
 
         with torch.no_grad():
             for b in val_loader:
+                
             
                 b = {
                     k: v.to(device, non_blocking=True)
@@ -93,9 +96,9 @@ def train():
                 }
 
                 pred = model(
-                    b["cam_D"],
-                    b["cam_ext_D"],
-                    b["gripper_pose"],
+                    b["cam_D"].to(device, non_blocking = True),
+                    b["cam_ext_D"].to(device, non_blocking = True),
+                    b["gripper_pose"].to(device, non_blocking = True),
                 )
 
                 val_loss = criterion(pred, b["action"]).item()
