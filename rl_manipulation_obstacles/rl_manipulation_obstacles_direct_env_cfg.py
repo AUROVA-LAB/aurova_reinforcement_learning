@@ -91,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = True            # Activate image saving from cameras
-    render_imgs = True          # Activate image rendering
+    save_imgs = False            # Activate image saving from cameras
+    render_imgs = False          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -467,14 +467,14 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
-                         [-0.35*0,   0.225*0],
-                         [-3*pi/5*0,  3*pi/5*0],
-                         [-3*pi/5*0,  3*pi/5*0],
+                         [-0.1*0,   0.1*0],
+                         [-2*pi/5*0,  2*pi/5*0],
+                         [-2*pi/5*0,  2*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.1,  0.1],
-                          [-0.1,  0.1],
-                          [-0.1,  0.1],
+    target_poses_incs2 = [[-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0]]
