@@ -164,7 +164,7 @@ def drop_NMPC_setup(obst_list,
 
     weights = [[50, 70, 60, 50, 50, 50,     2, 2, 2, 2, 2, 2], 
                [3, 3, 3, 3, 3, 3,     3, 3, 3, 3, 3, 3]]
-
+    
     nmpc.quad_stage_cost.add_states(
         names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
                 'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
@@ -182,9 +182,9 @@ def drop_NMPC_setup(obst_list,
     # Horizon
     nmpc.horizon = 15
 
-    print(obst_list)
-    print(n_obst)
-    print("\n\n\n")
+    # print(obst_list)
+    # print(n_obst)
+    # print("\n\n\n")
 
     # Box constraints
     nmpc.set_box_constraints(

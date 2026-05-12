@@ -2,22 +2,28 @@ import os
 import torch
 import torch.nn as nn
 import numpy as np
-import h5py
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import DataLoader, random_split
 
 from data import *
 from networks_lfd import *
+from train_utils import collate_fn
+
+import matplotlib.pyplot as plt
+import cv2 as cv
+
+
 
 
 # =========================================================
 # TRAINING
 # =========================================================
 
+
 def train():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    dataset = HDF5LfDDataset("/workspace/dataset")
+    dataset = HDF5LfDDataset(os.path.join(os.getcwd(), "../dataset"))
 
     # Split dataset
     train_size = int(0.8 * len(dataset))
@@ -26,21 +32,28 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=32)
-    test_loader = DataLoader(test_ds, batch_size=32)
+    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
-    pose_dim = sample[2].shape[0]
-    action_dim = sample[3].shape[0]
+    pose_dim = sample["gripper_pose"].shape[0]
+    action_dim = sample["action"].shape[0]
 
-    model = CnnPolicy(pose_dim, action_dim).to(device)
+
+    in_channels = dataset[0]["cam_D"].shape[0]
+
+    
+    model = CnnPolicy(pose_dim, action_dim, 
+                      in_channels = in_channels).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     criterion = nn.MSELoss()
 
     best_val = float("inf")
+
+    print("\n ------ Start training \n")
 
     for epoch in range(50):
 
@@ -48,12 +61,16 @@ def train():
         model.train()
         train_loss = 0
 
-        for cam, cam_ext, pose, action in train_loader:
-            cam, cam_ext = cam.to(device), cam_ext.to(device)
-            pose, action = pose.to(device), action.to(device)
+        for b in train_loader:            
+            b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            pred = model(cam, cam_ext, pose)
-            loss = criterion(pred, action)
+            pred = model(
+                b["cam_D"],
+                b["cam_ext_D"],
+                b["gripper_pose"],
+            )
+
+            loss = criterion(pred, b["action"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -68,17 +85,26 @@ def train():
         val_loss = 0
 
         with torch.no_grad():
-            for cam, cam_ext, pose, action in val_loader:
-                cam, cam_ext = cam.to(device), cam_ext.to(device)
-                pose, action = pose.to(device), action.to(device)
+            for b in val_loader:
+                
+            
+                b = {
+                    k: v.to(device, non_blocking=True)
+                    for k, v in b.items()
+                }
 
-                pred = model(cam, cam_ext, pose)
-                val_loss += criterion(pred, action).item()
+                pred = model(
+                    b["cam_D"].to(device, non_blocking = True),
+                    b["cam_ext_D"].to(device, non_blocking = True),
+                    b["gripper_pose"].to(device, non_blocking = True),
+                )
+
+                val_loss = criterion(pred, b["action"]).item()
 
         val_loss /= len(val_loader)
 
         print(f"Epoch {epoch} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")
-
+        
         # Save best model
         if val_loss < best_val:
             best_val = val_loss
@@ -92,14 +118,18 @@ def train():
     mae = 0
 
     with torch.no_grad():
-        for cam, cam_ext, pose, action in test_loader:
-            cam, cam_ext = cam.to(device), cam_ext.to(device)
-            pose, action = pose.to(device), action.to(device)
+        for b in test_loader:
+            
+            cam, cam_ext = b["cam"].to(device), b["cam_ext"].to(device)
+            cam_D, cam_ext_D = b["cam_D"].to(device), b["cam_ext_D"].to(device)
 
-            pred = model(cam, cam_ext, pose)
+            tgt_pose, gripper_pose = b["target_pose"].to(device), b["gripper_pose"].to(device)
+            teacher_action = b["action"].to(device)
 
-            test_loss += criterion(pred, action).item()
-            mae += torch.abs(pred - action).mean().item()
+            pred = model(cam_D, cam_ext_D, gripper_pose)
+
+            test_loss += criterion(pred, teacher_action).item()
+            mae += torch.abs(pred - teacher_action).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)
