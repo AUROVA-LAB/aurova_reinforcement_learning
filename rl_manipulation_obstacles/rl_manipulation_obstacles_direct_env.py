@@ -16,6 +16,8 @@ from .py_dq.src.quat_trans_lie import *
 from .py_dq.src.matrix_lie import *
 from .py_dq.src.euler import *
 
+from .train.networks_lfd import *
+
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.envs import DirectRLEnv
@@ -835,48 +837,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # self.count += 1
         output_dir = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/"
 
-        
         camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
         
         new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
                                                                     t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
         
         self.scene.sensors[camera_key].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
-
         
-        
-   
-        # Obtain images from the sensor
-        image_tensor = self.scene.sensors[camera_key].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
-        image_tensor_ext = self.scene.sensors["camera_ext"].data.output["depth"][:, ..., :3].permute(0, 3, 1, 2).reshape(self.num_envs, -1)
-
-        image_tensor = torch.cat((image_tensor, image_tensor_ext), dim = -1)
-        image_tensor_ = self.scene.sensors["camera"].data.output["rgb"][:, ..., :3]
-
-        image_tensor_D = self.scene.sensors["camera_ext"].data.output["depth"][:, ..., :3].repeat(1,1,1,3)
-        image_tensor_D = torch.clip(image_tensor_D, 0.8, 1.5)
-        image_tensor_D = (image_tensor_D - 0.8) / 1.5
-
-
-        image_tensor_D = self.scene.sensors["camera_ext"].data.output["depth"][:, ..., :3].repeat(1,1,1,3)
-        # image_tensor_D = torch.clip(image_tensor_D, 0.0, 0.5)
-        image_tensor_D = (image_tensor_D - 0.0) / torch.max(image_tensor_D)
-
-
-
-        # Render images every certain amount of steps
-        if self.cfg.save_imgs:
-            if self.count % 5 == 0:
-            # Function to save images (in utils)
-                save_images_grid(images = [image_tensor_D[0]],
-                                 subtitles = ["Camera"],
-                                 title = "RGB Image: Cam0",
-                                 filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
-                
-        return image_tensor
-    
-
-    def save_step(self):
         # ---- Get data ----
         cam = self.scene.sensors["camera"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
         cam_ext = self.scene.sensors["camera_ext"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
@@ -892,19 +859,37 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         cam_D = cam_D * 255
         cam_ext_D = cam_ext_D * 255
 
-        cam = torch.cat((cam, cam_D), dim = 0)
-        cam_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
-
-        cam = cam.cpu().numpy().astype(np.uint8)
-        cam_ext = cam_ext.cpu().numpy().astype(np.uint8)
+        self.camera_w = torch.cat((cam, cam_D), dim = 0)
+        self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
 
 
-        target_pose = self.target_pose_r_lie[0].cpu().numpy()
-        gripper_pose = self.gripper_pose_r_lie[0].cpu().numpy()
-        action = self.trajectory_save[0].cpu().numpy()
+        # Render images every certain amount of steps
+        if self.cfg.save_imgs:
+            if self.count % 5 == 0:
+            # Function to save images (in utils)
+                save_images_grid(images = [self.camera_ext[-1]],
+                                 subtitles = ["Camera"],
+                                 title = "RGB Image: Cam0",
+                                 filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
+                    
+
+    def save_step(self):
+        
+
+        cam = self.camera_w.cpu().numpy().astype(np.uint8)
+        cam_ext = self.camera_ext.cpu().numpy().astype(np.uint8)
+
+
+        target_pose = self.target_pose_r_lie[0].float().cpu().numpy()
+        gripper_pose = self.gripper_pose_r_lie[0].float().cpu().numpy()
+        action = self.trajectory_save[self.count].float().cpu().numpy()
+
+        diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
         # ---- Save step ----
-        self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, self.gripper_action)
+        self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, diff, self.gripper_action)
+
+        self.prev_pose = self.gripper_pose_r_lie
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -921,11 +906,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        # image = self._get_images()
+        self._get_images()
         # image[image == float('inf')] = 255.0
         # image /= 255.0
 
-        self.save_step()
+
+        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
+            self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
@@ -1253,14 +1240,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         for idx, ref in enumerate(references):
                 
-            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(
-                                                    self.cfg.obst_list, 
+            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
                                                     self.cfg.ellipsoid_r, 
                                                     ini = x0, 
                                                     ref = ref[0],
                                                     dt = self.cfg.dt, 
                                                     lie = self.cfg.lie_mpc,)
-            
 
             # ======================================================
             # Simulation loop
@@ -1268,6 +1253,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             
             sol = self.model.solution
 
+
+            # x0 = x0[0].cpu().numpy().tolist()
 
             for k in range(self.cfg.n_steps_mpc):
                 u_opt = self.nmpc.optimize(x0)
@@ -1284,12 +1271,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 if self.cfg.get_img_mpc:
                     fig, ax = get_frame(
-                        x0_tensor[0],
+                        x0_tensor[0].cpu(),
                         tgt=ref[0].cpu().numpy().tolist(),
                         traj=self.trajectory_save,
                         ax=None,
                         obst_centers=self.cfg.obst_list.cpu(),
-                        obst_radii=ellipsoid_r_torch*2,
+                        obst_radii=ellipsoid_r_torch.cpu()*2,
                         rot = True,)
             
                     name = f"{save_idx:03d}.png"
@@ -1324,19 +1311,43 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
+        self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
 
         self.increment_condition = False
         self.gripper_action = False
 
-        self.writer = HDF5EpisodeWriter(
-                                        output_dir=os.path.join(self.current_path, "dataset"),
-                                        episode_idx=self.episode_id,
-                                        max_steps=self.trajectory_save.shape[0]
-                                        )
 
         print("--- Episode: ", self.episode_id)
         self.episode_id += 1
 
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
+        if not self.cfg.test:
+            self.writer = HDF5EpisodeWriter(
+                                            output_dir=os.path.join(self.current_path, "dataset"),
+                                            episode_idx=self.episode_id,
+                                            max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval)
+                                            )
+        else:
+            # Create model
+            self.test_model = CnnPolicy(
+                pose_dim=6,
+                action_dim=7,
+                in_channels=1,
+                hidden_dim=128
+            )
 
+            # Load checkpoint
+            checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
+
+            # If you saved only state_dict
+            self.test_model.load_state_dict(checkpoint)
+
+            # OR if checkpoint is wrapped
+            # self.test_model.load_state_dict(checkpoint["self.model_state_dict"])
+
+            # Move to GPU if available
+            self.test_model.to(self.device)
+
+            # Inference mode
+            self.test_model.eval()
