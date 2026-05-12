@@ -61,9 +61,7 @@ def train():
         model.train()
         train_loss = 0
 
-        for b in train_loader:
-            print("Train")
-            
+        for b in train_loader:            
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
             pred = model(
