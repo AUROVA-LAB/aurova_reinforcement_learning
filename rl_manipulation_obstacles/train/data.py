@@ -119,7 +119,7 @@ class HDF5LfDDataset(Dataset):
         # -------------------------------------------------
 
         self.handles = [
-            h5py.File(path, "r+", libver="latest", swmr=True)
+            h5py.File(path, "r", libver="latest", swmr=True)
             for path in self.files
         ]
 
@@ -130,7 +130,6 @@ class HDF5LfDDataset(Dataset):
         self.index = []  # (file_id, timestep)
 
         for file_id, f in enumerate(self.handles):
-
             length = f["actions"].shape[0]
 
             for t in range(length):
@@ -168,10 +167,13 @@ class HDF5LfDDataset(Dataset):
         cam_ext = f["/images/cam_ext"][t]
 
         target_pose = f["/states/target_pose"][t]
-        gripper_pose = f["/states/gripper_pose"][t]
+        gripper_pose = f["/states/gripper_pose"][t] 
 
-        action = f["actions"][t]
+        action = f["actions"][t] 
+        prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
+        diff = f["diff"][t] 
         gripper_action = f["gripper_action"][t]
+
         
         return {
             "cam": cam[:-1],
@@ -181,6 +183,8 @@ class HDF5LfDDataset(Dataset):
             "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": np.concatenate([action, gripper_action], axis=-1),
+            "diff": diff,
+            "prev_action": prev_action
         }
 
     # =====================================================
