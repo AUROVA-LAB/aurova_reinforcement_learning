@@ -920,7 +920,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # image /= 255.0
 
 
-        if not self.cfg.test and self.count % self.cfg.save_interval == 0:
+        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
             self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
