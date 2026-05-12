@@ -183,10 +183,10 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                                                             contact_offset=0.015),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
         ),
-        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos = [-1.2, -0.11711,  0.05]),
     )
 
-    obstacle_pos = [-5.6190e-01,  1.3330e-01,  0.3]
+    obstacle_pos = [-7.6190e-01,  1.3330e-01,  0.175]
 
     obstacle_cfg: RigidObject = RigidObjectCfg(
         prim_path="/World/envs/env_.*/obstacle",
@@ -430,9 +430,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     obst_list = []
     obst_list.append(obstacle_pos)
 
-    ellipsoid_r = [0.125, 
-                   0.125, 
-                   0.125]
+    ellipsoid_r = [0.3/2, 
+                   0.3/2, 
+                   0.3/2]
 
 
 
@@ -447,23 +447,28 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.01
 
+    test = False
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
+    
+    save_interval = 3
+
 
 
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
     target_pose = [-0.40919, -0.29333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.55308,  0.29333,  0.04,  0, 3, 0]
+    target_pose_2 = [-0.55308,  0.359333,  0.12,  0, 3, 0]
     # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2*0,  0.2*0],
-                         [-0.2*0,   0.2*0],
+                         [-0.2,   -0.15],
                          [-0.35*0,   0.225*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.1*0,  0.1*0],
-                          [-0.1*0,  0.1*0],
+    target_poses_incs2 = [[-0.1,  -0.1],
+                          [0.2,     0.3],
                           [-0.1*0,  0.1*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0],
