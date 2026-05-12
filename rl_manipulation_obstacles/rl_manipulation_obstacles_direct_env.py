@@ -401,6 +401,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
         self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+        self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
+
 
         self.trajectory_save = []
 
@@ -615,14 +617,20 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         else:
 
+
             cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
                                   self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
                                   self.gripper_pose_r_lie)
             
             # actions = self._preprocess_actions(cmd)
 
-            grip_action = actions[:, -1].clone()
-            cmd_lie = actions[:, :-1].clone()
+            grip_action = cmd[:, -1].clone()
+            cmd_lie = cmd[:, :-1].clone()
+
+            print("cmd_lie: ", cmd)
+            # print("Traj: ", self.trajectory_save[self.count])
+            # print("Loss: ", torch.norm(cmd_lie - self.trajectory_save[self.count]))
+            print("\n\n")
 
 
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
@@ -630,6 +638,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
                                            t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
             
+            self.count += 1
             
 
 
@@ -880,11 +889,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         cam_ext = self.camera_ext.cpu().numpy().astype(np.uint8)
 
 
-        target_pose = self.target_pose_r_lie[0].cpu().numpy()
-        gripper_pose = self.gripper_pose_r_lie[0].cpu().numpy()
-        action = self.trajectory_save[self.count].cpu().numpy()
+        target_pose = self.target_pose_r_lie[0].float().cpu().numpy()
+        gripper_pose = self.gripper_pose_r_lie[0].float().cpu().numpy()
+        action = self.trajectory_save[self.count].float().cpu().numpy()
 
-        diff = (self.gripper_pose_r_lie - self.prev_pose)[0].cpu().numpy()
+        diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, diff, self.gripper_action)
@@ -911,7 +920,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # image /= 255.0
 
 
-        if not self.cfg.test and self.count % 5 == 0:
+        if not self.cfg.test and self.count % self.cfg.save_interval == 0:
             self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
@@ -1224,113 +1233,113 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses() 
 
 
-        if not self.cfg.test:
-            self.trajectory = []
-            self.trajectory_save = []
+        
+        self.trajectory = []
+        self.trajectory_save = []
 
-            references = [self.interm_pose_r_lie.clone(), self.target_pose_r_lie.clone(), self.end_target_pose_r_lie.clone()]
+        references = [self.interm_pose_r_lie.clone(), self.target_pose_r_lie.clone(), self.end_target_pose_r_lie.clone()]
 
-            # NMPC model creation
-            self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
-            self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+        # NMPC model creation
+        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+        self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
 
-            self.x0 = self.gripper_pose_r_lie.clone()
-            x0 = torch.cat((self.x0, self.u_opt), dim = -1)
-            x0 = x0[0].cpu().numpy().tolist()
+        self.x0 = self.gripper_pose_r_lie.clone()
+        x0 = torch.cat((self.x0, self.u_opt), dim = -1)
+        x0 = x0[0].cpu().numpy().tolist()
 
-            save_idx = 0
-            self.start_grip_idx = 0
+        save_idx = 0
+        self.start_grip_idx = 0
 
-            for idx, ref in enumerate(references):
-                    
-                self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
-                                                        self.cfg.ellipsoid_r, 
-                                                        ini = x0, 
-                                                        ref = ref[0],
-                                                        dt = self.cfg.dt, 
-                                                        lie = self.cfg.lie_mpc,)
-
-                # ======================================================
-                # Simulation loop
-                # ======================================================
+        for idx, ref in enumerate(references):
                 
-                sol = self.model.solution
+            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
+                                                    self.cfg.ellipsoid_r, 
+                                                    ini = x0, 
+                                                    ref = ref[0],
+                                                    dt = self.cfg.dt, 
+                                                    lie = self.cfg.lie_mpc,)
+
+            # ======================================================
+            # Simulation loop
+            # ======================================================
+            
+            sol = self.model.solution
 
 
-                # x0 = x0[0].cpu().numpy().tolist()
+            # x0 = x0[0].cpu().numpy().tolist()
 
-                for k in range(self.cfg.n_steps_mpc):
-                    u_opt = self.nmpc.optimize(x0)
-                    self.model.simulate(u=u_opt, steps=1)
-                    x0 = sol['x:f']
+            for k in range(self.cfg.n_steps_mpc):
+                u_opt = self.nmpc.optimize(x0)
+                self.model.simulate(u=u_opt, steps=1)
+                x0 = sol['x:f']
 
-                    x0_tensor = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-                                            float(x0[3]), float(x0[4]), float(x0[5])]])
-                    
-                    x0_group = self.exp(x0_tensor)
-                    x0_lab   = self.convert_to_Lab(x0_group)
-
-                    self.trajectory_save.append(x0_tensor[0].numpy().tolist())
-
-                    if self.cfg.get_img_mpc:
-                        fig, ax = get_frame(
-                            x0_tensor[0],
-                            tgt=ref[0].cpu().numpy().tolist(),
-                            traj=self.trajectory_save,
-                            ax=None,
-                            obst_centers=self.cfg.obst_list,
-                            obst_radii=ellipsoid_r_torch*2,
-                            rot = True,)
+                x0_tensor = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
+                                        float(x0[3]), float(x0[4]), float(x0[5])]])
                 
-                        name = f"{save_idx:03d}.png"
-                        # fig.savefig(os.path.join(path, name))
+                x0_group = self.exp(x0_tensor)
+                x0_lab   = self.convert_to_Lab(x0_group)
 
-                        name = f"{save_idx:03d}.png"
-                        ax.view_init(elev=0, azim=0)
-                        fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
+                self.trajectory_save.append(x0_tensor[0].numpy().tolist())
+
+                if self.cfg.get_img_mpc:
+                    fig, ax = get_frame(
+                        x0_tensor[0],
+                        tgt=ref[0].cpu().numpy().tolist(),
+                        traj=self.trajectory_save,
+                        ax=None,
+                        obst_centers=self.cfg.obst_list,
+                        obst_radii=ellipsoid_r_torch*2,
+                        rot = True,)
+            
+                    name = f"{save_idx:03d}.png"
+                    # fig.savefig(os.path.join(path, name))
+
+                    name = f"{save_idx:03d}.png"
+                    ax.view_init(elev=0, azim=0)
+                    fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
 
 
-                        f"side_{save_idx:03d}.png"
-                        # ax.view_init(elev=0, azim=45)
-                        # fig.savefig(os.path.join(path, name))
+                    f"side_{save_idx:03d}.png"
+                    # ax.view_init(elev=0, azim=45)
+                    # fig.savefig(os.path.join(path, name))
 
 
-                        name = f"other_{save_idx:03d}.png"
-                        ax.view_init(elev=90, azim=-0)
-                        fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
-                        
-                        plt.close(fig)
-
-
-                    save_idx += 1
+                    name = f"other_{save_idx:03d}.png"
+                    ax.view_init(elev=90, azim=-0)
+                    fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
                     
-                    if idx == 1:
-                        self.start_grip_idx = save_idx
+                    plt.close(fig)
 
-                    if torch.norm(x0_tensor.to(self.device) - ref).item() < self.cfg.plan_chg_thres:
-                        break
+
+                save_idx += 1
                 
+                if idx == 1:
+                    self.start_grip_idx = save_idx
+
+                if torch.norm(x0_tensor.to(self.device) - ref).item() < self.cfg.plan_chg_thres:
+                    break
+            
 
 
 
-            self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
-            self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
+        self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
+        self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
 
-            self.increment_condition = False
-            self.gripper_action = False
+        self.increment_condition = False
+        self.gripper_action = False
 
-            self.writer = HDF5EpisodeWriter(
-                                            output_dir=os.path.join(self.current_path, "dataset"),
-                                            episode_idx=self.episode_id,
-                                            max_steps=self.trajectory_save.shape[0]
-                                            )
 
-            print("--- Episode: ", self.episode_id)
-            self.episode_id += 1
+        print("--- Episode: ", self.episode_id)
+        self.episode_id += 1
 
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
-        
+        if not self.cfg.test:
+            self.writer = HDF5EpisodeWriter(
+                                            output_dir=os.path.join(self.current_path, "dataset"),
+                                            episode_idx=self.episode_id,
+                                            max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval)
+                                            )
         else:
             # Create model
             self.test_model = CnnPolicy(
