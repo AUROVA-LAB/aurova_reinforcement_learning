@@ -108,9 +108,9 @@ class SimpleCNN(nn.Module):
     def __init__(self, in_channels=3, out_dim=128):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels, 32, 3, stride=2), nn.ReLU(),
-            nn.Conv2d(32, 64, 3, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 128, 3, stride=2), nn.ReLU(),
+            nn.Conv2d(in_channels, 32, 3, stride=2), nn.Tanh(),
+            nn.Conv2d(32, 64, 3, stride=2), nn.Tanh(),
+            nn.Conv2d(64, 128, 3, stride=2), nn.Tanh(),
             nn.Flatten(),
             nn.Linear(596608, out_dim)  # adapt if resolution changes
         )
@@ -123,18 +123,21 @@ class CnnPolicy(nn.Module):
     def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128):
         super().__init__()
 
-        self.cnn = SimpleCNN(in_channels=in_channels, 
+        self.cnn1 = SimpleCNN(in_channels=in_channels, 
+                             out_dim=hidden_dim)
+        self.cnn2 = SimpleCNN(in_channels=in_channels, 
                              out_dim=hidden_dim)
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
-            nn.ReLU()
+            nn.Tanh()
         )
+
 
         # 🔥 Proper fusion layer (fixed)
         self.fusion = nn.Sequential(
             nn.Linear(3 * hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.LayerNorm(hidden_dim)
         )
 
@@ -143,13 +146,13 @@ class CnnPolicy(nn.Module):
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(hidden_dim, action_dim)
         )
 
     def forward(self, cam, cam_ext, pose):
-        f1 = self.cnn(cam)
-        f2 = self.cnn(cam_ext)
+        f1 = self.cnn1(cam)
+        f2 = self.cnn2(cam_ext)
         f_pose = self.pose_mlp(pose)
 
         fused_raw = torch.cat([f1, f2, f_pose], dim=-1)
