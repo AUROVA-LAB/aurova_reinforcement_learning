@@ -267,8 +267,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         colorize_instance_id_segmentation=True,
     )
 
-    tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
-        prim_path="/World/envs/env_.*/camera_ext_2",
+    tiled_camera_ext_front: TiledCameraCfg = TiledCameraCfg(
+        prim_path="/World/envs/env_.*/camera_ext_front",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
         data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
         depth_clipping_behavior = "max",
@@ -299,8 +299,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
 
-    camera_ext_trans_2 = [[0.2778,  -0.9,  1.2721]]
-    camera_ext_rot_2 = [[1.0, 0.0, 0.0, 0.0]]
+    camera_ext_trans_front = [[-0.5,  0.13,  0.675]]
+    camera_ext_rot_front = [[1.0, 0.0, 0.0, 0.0]]
 
     rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(pi/2 * np.array([-1, -1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
     rot_neg90_xy_2[:, 0], rot_neg90_xy_2[:, 1:] = rot_neg90_xy_2.clone()[:, 3], rot_neg90_xy_2.clone()[:, :3]

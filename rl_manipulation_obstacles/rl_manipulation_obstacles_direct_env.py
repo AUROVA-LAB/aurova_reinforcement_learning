@@ -395,9 +395,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
         #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
         self.scene.sensors["camera_ext"].set_world_poses(positions = self.cfg.camera_ext_trans, orientations = self.cfg.camera_ext_rot)
+        self.scene.sensors["camera_front"].set_world_poses(positions = self.cfg.camera_front_trans, orientations = self.cfg.camera_front_rot)
 
         self.camera_ext = None
         self.camera_w = None
+        self.camera_front = None
 
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
         self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
@@ -488,7 +490,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.scene.sensors["camera"] = TiledCamera(self.cfg.tiled_camera)
         self.scene.sensors["camera_ext"] = TiledCamera(self.cfg.tiled_camera_ext)
-        # self.scene.sensors["camera_ext_2"] = TiledCamera(self.cfg.tiled_camera_ext_2)
+        self.scene.sensors["camera_front"] = TiledCamera(self.cfg.tiled_camera_front)
 
         # Correct collision sensors 
         self.cfg = update_collisions(self.cfg, num_envs = self.num_envs)
