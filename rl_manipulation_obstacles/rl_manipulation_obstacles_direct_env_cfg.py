@@ -380,12 +380,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
                     [-0.3,  0.3],
-                    [-0.5,  0.5],
-                    [-0.5,  0.5],
-                    [-0.5,  0.5]]
+                    [-0.7,  0.7],
+                    [-0.7,  0.7],
+                    [-0.7,  0.7]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, False, False, False]
+    apply_range = [False, False, True, False]
 
     ee_translation = [0.0, 0.0, 0.25]
     ee_rotation = [1.0, 0.0, 0.0, 0.0]
@@ -450,6 +450,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     dt = 0.1
 
     get_img_mpc = False
+    get_rot = True
 
     plan_chg_thres = 0.01
 
