@@ -91,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = False            # Activate image saving from cameras
-    render_imgs = False          # Activate image rendering
+    save_imgs = True            # Activate image saving from cameras
+    render_imgs = True          # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -267,7 +267,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         colorize_instance_id_segmentation=True,
     )
 
-    tiled_camera_ext_front: TiledCameraCfg = TiledCameraCfg(
+    tiled_camera_front: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext_front",
         offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
         data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
@@ -299,7 +299,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
 
-    camera_ext_trans_front = [[-0.5,  0.13,  0.675]]
+    camera_ext_trans_front = [[-0.6,  0.13,  0.675]]
     camera_ext_rot_front = [[1.0, 0.0, 0.0, 0.0]]
 
     rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(pi/2 * np.array([-1, -1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
@@ -539,8 +539,8 @@ def update_cfg(cfg, num_envs, device):
     cfg.camera_rot = torch.tensor(cfg.camera_rot).repeat(num_envs, 1).to(device)
     cfg.camera_ext_trans = torch.tensor(cfg.camera_ext_trans).repeat(num_envs, 1).to(device)
     cfg.camera_ext_rot = torch.tensor(cfg.camera_ext_rot).repeat(num_envs, 1).to(device)
-    cfg.camera_ext_trans_2 = torch.tensor(cfg.camera_ext_trans_2).repeat(num_envs, 1).to(device)
-    cfg.camera_ext_rot_2 = torch.tensor(cfg.camera_ext_rot_2).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_trans_front = torch.tensor(cfg.camera_ext_trans_front).repeat(num_envs, 1).to(device)
+    cfg.camera_ext_rot_front = torch.tensor(cfg.camera_ext_rot_front).repeat(num_envs, 1).to(device)
     cfg.ee_translation = torch.tensor(cfg.ee_translation).repeat(num_envs, 1).to(device)
     cfg.ee_rotation = torch.tensor(cfg.ee_rotation).repeat(num_envs, 1).to(device)
     cfg.object_translation = torch.tensor(cfg.object_translation).repeat(num_envs, 1).to(device)

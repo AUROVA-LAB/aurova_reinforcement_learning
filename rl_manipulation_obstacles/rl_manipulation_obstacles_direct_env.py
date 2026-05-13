@@ -388,14 +388,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.cfg.camera_ext_trans, self.cfg.camera_ext_rot = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
                                                                                       t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
         
-        self.cfg.camera_ext_trans_2, self.cfg.camera_ext_rot_2 = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
+        self.cfg.camera_ext_trans_front, self.cfg.camera_ext_rot_front = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
+                                                                                      t12  =self.cfg.camera_ext_trans_front,   q12 = self.cfg.camera_ext_rot_front)
         
 
         # new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
         #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
         self.scene.sensors["camera_ext"].set_world_poses(positions = self.cfg.camera_ext_trans, orientations = self.cfg.camera_ext_rot)
-        self.scene.sensors["camera_front"].set_world_poses(positions = self.cfg.camera_front_trans, orientations = self.cfg.camera_front_rot)
+        self.scene.sensors["camera_front"].set_world_poses(positions = self.cfg.camera_ext_trans_front, orientations = self.cfg.camera_ext_rot_front)
 
         self.camera_ext = None
         self.camera_w = None
