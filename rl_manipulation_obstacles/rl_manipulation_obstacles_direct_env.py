@@ -596,14 +596,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if not self.cfg.test:
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
-
-
-            # cmd = torch.cat((self.gripper_pose_r[:, :3], -cmd[:, 3:]), dim = -1)
-
+            cmd[:, 3:] = self.target_pose_r[:, 3:]
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
-                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)    
-
+                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
+                                           
 
 
             self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
@@ -617,7 +614,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         else:
 
-
+            
             cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
                                   self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
                                   self.gripper_pose_r_lie)
@@ -627,12 +624,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action = cmd[:, -1].clone()
             cmd_lie = cmd[:, :-1].clone()
 
-            print("cmd_lie: ", cmd)
-            # print("Traj: ", self.trajectory_save[self.count])
-            # print("Loss: ", torch.norm(cmd_lie - self.trajectory_save[self.count]))
-            print("\n\n")
-
-
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
@@ -640,7 +631,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             
             self.count += 1
             
-
 
         self.controller.set_command(torch.cat(cmd, dim = -1))
 
@@ -1289,7 +1279,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         ax=None,
                         obst_centers=self.cfg.obst_list,
                         obst_radii=ellipsoid_r_torch*2,
-                        rot = True,)
+                        rot = self.cfg.get_rot,)
             
                     name = f"{save_idx:03d}.png"
                     # fig.savefig(os.path.join(path, name))
