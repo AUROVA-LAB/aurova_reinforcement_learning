@@ -43,7 +43,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 
 
 rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0.05, 0.05, 1.05]))     # Positive 45 degrees rotation in Z axis 
 
 
 
@@ -192,7 +192,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         prim_path="/World/envs/env_.*/obstacle",
 
         spawn=sim_utils.CuboidCfg(
-            size = [0.25, 0.25, 0.25],
+            size = [0.25, 0.15, 0.15],
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
             mass_props=sim_utils.MassPropertiesCfg(mass=25),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -384,7 +384,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  -2.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
 
     # Obtain Euler angles from the quaternion
@@ -428,11 +428,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
 
     obst_list = []
-    obst_list.append(obstacle_pos)
+    obst_list.append([obstacle_pos[0] / 2.0, obstacle_pos[1] / 2.0, obstacle_pos[2] / 2.0])
 
-    ellipsoid_r = [0.3/2, 
-                   0.3/2, 
-                   0.3/2]
+    ellipsoid_r = [0.25/2.0, 
+                   0.15/2.0, 
+                   0.15/2.0]
 
 
 
@@ -450,7 +450,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     test = False
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
     
-    save_interval = 3
+    save_interval = 1
 
 
 

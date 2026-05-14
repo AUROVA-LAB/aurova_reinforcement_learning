@@ -578,63 +578,62 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''
 
         grip_action = actions[:, -1]
-        actions = actions[:, :-1]
+        # actions = actions[:, :-1]
 
-        # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
+        # # Perform increment in the algebra and exponential map -> (plus operator)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
 
-        # Convert to IsaacLab representation (translation, quaternion)
-        action_pose_lab = self.convert_to_Lab(action_pose)
+        # # Convert to IsaacLab representation (translation, quaternion)
+        # action_pose_lab = self.convert_to_Lab(action_pose)
 
-
-        # ============================================ MPC ================================================
-
-        # grip_action = self.prim_g_action
-        # action_pose_lab[:, :3] += self.prim_action[:, :3]
-        # self.prim_action = torch.zeros_like(self.prim_action).to(self.device)
-        # self.prim_g_action = torch.zeros_like(self.prim_g_action).to(self.device)
-
-        # vel_pos = torch.cat((self.x0, self.u_opt), dim = -1)
-        # # vel_pos = torch.cat((robot_pose[:, :3], robot_euler, self.u_opt), dim = -1)
-
-
-        # u_opt = self.nmpc.optimize(vel_pos[0].cpu().numpy())
-        # self.model.simulate(u=u_opt, steps=1)
-        # x0 = self.model.solution['x:f']
-
-        # self.x0 = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-        #                     float(x0[3]), float(x0[4]), float(x0[5])]]).to(self.device)
-        # self.u_opt = torch.tensor([[float(u_opt[0]), float(u_opt[1]), float(u_opt[2]), 
-        #                             float(u_opt[3]), float(u_opt[4]), float(u_opt[5])]]).to(self.device)
-        
-        # print("X0: ", x0)
-        # =================================================================================================
-        cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
-        cmd = self.convert_to_Lab(self.exp(cmd_lie))
-
-
-        # cmd = torch.cat((self.gripper_pose_r[:, :3], -cmd[:, 3:]), dim = -1)
 
         
-        cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
-                                       t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)    
+        if not self.cfg.test:
+            if self.count < self.start_grip_idx:
+                self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+            cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
+            cmd = self.convert_to_Lab(self.exp(cmd_lie))
+            
+            cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
+                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
+                                           
 
 
-        # Set the command for the IKDifferentialController
+            self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
+            
+            self.increment_condition = (self.count < self.trajectory_save.shape[0] and not self.gripper_action) or self.increment_condition
+
+            if self.increment_condition:
+                self.count += 1
+
+            grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
+        
+        else:
+
+            
+            cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
+                                  self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
+                                  self.gripper_pose_r_lie)
+            
+            # actions = self._preprocess_actions(cmd)
+
+            grip_action = cmd[:, -1].clone()
+            cmd_lie = cmd[:, :-1].clone()
+
+            cmd = self.convert_to_Lab(self.exp(cmd_lie))
+            
+            cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
+                                           t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
+            
+            self.count += 1
+            
+
         self.controller.set_command(torch.cat(cmd, dim = -1))
 
-        self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
+        # Set the command for the IKDifferentialController
         
-        self.increment_condition = (self.count < self.trajectory_save.shape[0] and not self.gripper_action) or self.increment_condition
-
-        if self.increment_condition:
-            self.count += 1
-
-        grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
-        
-
         # Obtains the poses
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
 
@@ -653,6 +652,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.actions[:, 6:] = grip_action.unsqueeze(-1) * self.cfg.moving_joints_gripper + actual_gripper_pos
 
 
+
     # Method called before executing control actions on the simulation --> Overrides method of DirecRLEnv
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         '''
@@ -668,6 +668,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
+
+        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
+            self.save_step()
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -910,9 +913,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # image[image == float('inf')] = 255.0
         # image /= 255.0
 
-
-        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
-            self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
@@ -1239,7 +1239,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.start_grip_idx = 0
 
         for idx, ref in enumerate(references):
-                
+
             self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
                                                     self.cfg.ellipsoid_r, 
                                                     ini = x0, 
