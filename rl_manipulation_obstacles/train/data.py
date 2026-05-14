@@ -21,7 +21,7 @@ class HDF5EpisodeWriter:
         # Lazy init (we don’t know shapes yet)
         self.initialized = False
 
-    def _init_datasets(self, cam_shape, cam_ext_shape, pose_dim, action_dim, gripper_action_dim):
+    def _init_datasets(self, cam_shape, cam_ext_shape, cam_front_shape, pose_dim, action_dim, gripper_action_dim):
         T = self.max_steps
 
         self.cam_ds = self.file.create_dataset(
@@ -29,6 +29,9 @@ class HDF5EpisodeWriter:
         )
         self.cam_ext_ds = self.file.create_dataset(
             "images/cam_ext", (T, *cam_ext_shape), dtype="uint8"
+        )
+        self.cam_front_ds = self.file.create_dataset(
+            "images/cam_front", (T, *cam_front_shape), dtype="uint8"
         )
 
         self.target_pose_ds = self.file.create_dataset(
@@ -52,7 +55,7 @@ class HDF5EpisodeWriter:
 
         self.initialized = True
 
-    def add_step(self, cam, cam_ext, target_pose, gripper_pose, action, diff, gripper_action):
+    def add_step(self, cam, cam_ext, cam_front, target_pose, gripper_pose, action, diff, gripper_action):
         """
         cam, cam_ext: (H, W, 3) uint8
         poses: (D,)
@@ -65,6 +68,7 @@ class HDF5EpisodeWriter:
             self._init_datasets(
                 cam.shape,
                 cam_ext.shape,
+                cam_front.shape,
                 target_pose.shape[0],
                 action.shape[0],
                 gripper_action
@@ -74,6 +78,7 @@ class HDF5EpisodeWriter:
 
         self.cam_ds[idx] = cam
         self.cam_ext_ds[idx] = cam_ext
+        self.cam_front_ds[idx] = cam_front
         self.target_pose_ds[idx] = target_pose
         self.gripper_pose_ds[idx] = gripper_pose
         self.action_ds[idx] = action
@@ -119,7 +124,7 @@ class HDF5LfDDataset(Dataset):
         # -------------------------------------------------
 
         self.handles = [
-            h5py.File(path, "r", libver="latest", swmr=True)
+            h5py.File(path, "r+", libver="latest", swmr=True)
             for path in self.files
         ]
 
@@ -133,6 +138,9 @@ class HDF5LfDDataset(Dataset):
             length = f["actions"].shape[0]
 
             for t in range(length):
+                if np.all(f["actions"][t] == 0.0):
+                    continue
+                
                 self.index.append((file_id, t))
 
     # =====================================================
@@ -165,6 +173,7 @@ class HDF5LfDDataset(Dataset):
 
         cam = f["/images/cam"][t]
         cam_ext = f["/images/cam_ext"][t]
+        cam_front = f["/images/cam_front"][t]
 
         target_pose = f["/states/target_pose"][t]
         gripper_pose = f["/states/gripper_pose"][t] 
@@ -180,6 +189,8 @@ class HDF5LfDDataset(Dataset):
             "cam_D": cam[-1][None] / 255.0,
             "cam_ext": cam_ext[:-1],
             "cam_ext_D": cam_ext[-1][None] / 255.0,
+            "cam_front": cam_front[:-1],
+            "cam_front_D": cam_front[-1][None] / 255.0,
             "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": np.concatenate([action, gripper_action], axis=-1),
