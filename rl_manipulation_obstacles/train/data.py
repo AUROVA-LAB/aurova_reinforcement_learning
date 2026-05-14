@@ -136,6 +136,7 @@ class HDF5LfDDataset(Dataset):
 
         for file_id, f in enumerate(self.handles):
             length = f["actions"].shape[0]
+            print(length)
 
             for t in range(length):
                 if np.all(f["actions"][t] == 0.0):
