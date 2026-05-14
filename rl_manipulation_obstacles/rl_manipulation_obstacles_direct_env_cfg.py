@@ -43,7 +43,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 
 
 rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
-rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0, 0, 1]))     # Positive 45 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0.05, 0.05, 1.05]))     # Positive 45 degrees rotation in Z axis 
 
 
 
@@ -91,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = True            # Activate image saving from cameras
-    render_imgs = True          # Activate image rendering
+    save_imgs = False           # Activate image saving from cameras
+    render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -268,17 +268,26 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     )
 
     tiled_camera_front: TiledCameraCfg = TiledCameraCfg(
-        prim_path="/World/envs/env_.*/camera_ext_front",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+        prim_path="/World/envs/env_.*/camera_front",
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 20.0),
+        ),
+
         width=img_width,
         height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
 
@@ -299,12 +308,16 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
 
-    camera_ext_trans_front = [[-0.6,  0.13,  0.675]]
+    camera_ext_trans_front = [[-0.85,  0.13,  0.6]]
     camera_ext_rot_front = [[1.0, 0.0, 0.0, 0.0]]
 
-    rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(pi/2 * np.array([-1, -1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy_2 = torch.tensor([(Rotation.from_rotvec(1.4*pi/2 * np.array([0, 1, 0]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
     rot_neg90_xy_2[:, 0], rot_neg90_xy_2[:, 1:] = rot_neg90_xy_2.clone()[:, 3], rot_neg90_xy_2.clone()[:, :3]
     rot_neg90_xy_2 = rot_neg90_xy_2.numpy().tolist()
+
+    rot_neg90_xy_3 = torch.tensor([(Rotation.from_rotvec(-pi/2 * np.array([0, 0, 1]))).as_quat()])               # Negative 90 degrees rotation in Y axis 
+    rot_neg90_xy_3[:, 0], rot_neg90_xy_3[:, 1:] = rot_neg90_xy_3.clone()[:, 3], rot_neg90_xy_3.clone()[:, :3]
+    rot_neg90_xy_3 = rot_neg90_xy_3.numpy().tolist()
 
 
 
@@ -457,7 +470,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     test = False
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
     
-    save_interval = 3
+    save_interval = 1
 
 
 
@@ -548,6 +561,7 @@ def update_cfg(cfg, num_envs, device):
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
+    cfg.rot_neg90_xy_3 = torch.tensor(cfg.rot_neg90_xy_3).repeat(num_envs, 1).to(device)
 
     cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
     cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
