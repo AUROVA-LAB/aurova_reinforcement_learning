@@ -389,8 +389,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                                       t12  =self.cfg.camera_ext_trans,   q12 = self.cfg.camera_ext_rot)
         
         self.cfg.camera_ext_trans_front, self.cfg.camera_ext_rot_front = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],     q01 = self.root_robot_pose[:, 3:7],
-                                                                                      t12  =self.cfg.camera_ext_trans_front,   q12 = self.cfg.camera_ext_rot_front)
+                                                                                      t12  =self.cfg.camera_ext_trans_front,   q12 = self.cfg.rot_neg90_xy_2)
         
+
+
+        self.cfg.camera_ext_trans_front, self.cfg.camera_ext_rot_front = combine_frame_transforms(t01 = self.cfg.camera_ext_trans_front,   q01 = self.cfg.camera_ext_rot_front,
+                                                                                                  t12 = torch.zeros_like(self.cfg.camera_ext_trans_front).to(self.device),   q12 = self.cfg.rot_neg90_xy_3)
+
 
         # new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
         #                                                     t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
@@ -596,9 +601,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         
         if not self.cfg.test:
+            if self.count < self.subs_limit:
+                self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
-            cmd[:, 3:] = self.target_pose_r[:, 3:]
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
                                         t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
@@ -666,11 +672,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - None
         '''
 
+
         # Preprocessing actions
         # actions = self._preprocess_actions(actions)
 
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
+
+        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
+            self.save_step()
 
 
     # Applies the preprocessed action in the environment --> Overrides method of DirecRLEnv
@@ -800,8 +810,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
 
-        # print(self.log(self.target_pose_r_group))
-
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
@@ -848,27 +856,37 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # ---- Get data ----
         cam = self.scene.sensors["camera"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
         cam_ext = self.scene.sensors["camera_ext"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
+        cam_front = self.scene.sensors["camera_front"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
+
         cam_D = self.scene.sensors["camera"].data.output["depth"][0, ..., 0].unsqueeze(0)
         cam_ext_D = self.scene.sensors["camera_ext"].data.output["depth"][0, ..., 0].unsqueeze(0)
+        cam_front_D = self.scene.sensors["camera_front"].data.output["depth"][0, ..., 0].unsqueeze(0)
 
         cam_ext_D = torch.clip(cam_ext_D, 0.8, 1.5)
         cam_ext_D = (cam_ext_D - 0.8) / 1.5
 
+        # cam_front_D = torch.clip(cam_front_D, 0.8, 1.5)
+        # cam_front_D = (cam_front_D - 0.8) / 1.5
+
 
         cam = cam * 100
         cam_ext = cam_ext * 100
+        cam_front = cam_front * 100
+
         cam_D = cam_D * 255
         cam_ext_D = cam_ext_D * 255
+        cam_front_D = cam_front_D * 255
 
         self.camera_w = torch.cat((cam, cam_D), dim = 0)
         self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
+        self.camera_front = torch.cat((cam_front, cam_front_D), dim = 0)
 
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
             if self.count % 5 == 0:
             # Function to save images (in utils)
-                save_images_grid(images = [self.camera_ext[-1]],
+                save_images_grid(images = [self.camera_front[-1]],
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
@@ -879,6 +897,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         cam = self.camera_w.cpu().numpy().astype(np.uint8)
         cam_ext = self.camera_ext.cpu().numpy().astype(np.uint8)
+        cam_front = self.camera_front.cpu().numpy().astype(np.uint8)
 
 
         target_pose = self.target_pose_r_lie[0].float().cpu().numpy()
@@ -888,7 +907,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
         # ---- Save step ----
-        self.writer.add_step(cam, cam_ext, target_pose, gripper_pose, action, diff, self.gripper_action)
+        self.writer.add_step(cam, cam_ext, cam_front,target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
 
@@ -910,10 +929,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self._get_images()
         # image[image == float('inf')] = 255.0
         # image /= 255.0
-
-
-        if not self.cfg.test and self.count % self.cfg.save_interval == 0 and self.count < (len(self.trajectory_save) - self.cfg.save_interval):
-            self.save_step()
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
@@ -984,7 +999,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
     
         # Computes time out indicators
         if not self.cfg.test:
-            time_out = torch.tensor(self.count >= self.trajectory_save.shape[0]).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
+            time_out = torch.tensor(self.count >= self.trajectory_save.shape[0] - 1).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
         else:
             time_out = self.episode_length_buf >= self.max_episode_length - 1
 
@@ -1243,6 +1258,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.start_grip_idx = 0
 
         for idx, ref in enumerate(references):
+
+            
                 
             self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
                                                     self.cfg.ellipsoid_r, 
@@ -1310,6 +1327,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 if torch.norm(x0_tensor.to(self.device) - ref).item() < self.cfg.plan_chg_thres:
                     break
+
+            if idx == 1:
+                self.subs_limit = save_idx
             
 
 
