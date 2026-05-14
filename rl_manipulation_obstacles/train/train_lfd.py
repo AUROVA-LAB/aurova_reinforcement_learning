@@ -44,6 +44,7 @@ def train():
 
     in_channels = dataset[0]["cam_D"].shape[0]
 
+
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = in_channels).to(device)
@@ -67,10 +68,11 @@ def train():
             pred = model(
                 b["cam_D"],
                 b["cam_ext_D"],
+                b["cam_front_D"],
                 b["gripper_pose"],
             )
 
-            loss = criterion(pred, b["action"])
+            loss = criterion(pred, b["diff"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -96,10 +98,11 @@ def train():
                 pred = model(
                     b["cam_D"].to(device, non_blocking = True),
                     b["cam_ext_D"].to(device, non_blocking = True),
+                    b["cam_front_D"].to(device, non_blocking = True),
                     b["gripper_pose"].to(device, non_blocking = True),
                 )
 
-                val_loss = criterion(pred, b["action"]).item()
+                val_loss = criterion(pred, b["diff"]).item()
 
         val_loss /= len(val_loader)
 
@@ -109,33 +112,6 @@ def train():
         if val_loss < best_val:
             best_val = val_loss
             torch.save(model.state_dict(), "best_model.pth")
-
-    # ================= TEST =================
-    model.load_state_dict(torch.load("best_model.pth"))
-    model.eval()
-
-    test_loss = 0
-    mae = 0
-
-    with torch.no_grad():
-        for b in test_loader:
-            
-            cam, cam_ext = b["cam"].to(device), b["cam_ext"].to(device)
-            cam_D, cam_ext_D = b["cam_D"].to(device), b["cam_ext_D"].to(device)
-
-            tgt_pose, gripper_pose = b["target_pose"].to(device), b["gripper_pose"].to(device)
-            teacher_action = b["action"].to(device)
-
-            pred = model(cam_D, cam_ext_D, gripper_pose)
-
-            test_loss += criterion(pred, teacher_action).item()
-            mae += torch.abs(pred - teacher_action).mean().item()
-
-    test_loss /= len(test_loader)
-    mae /= len(test_loader)
-
-    print(f"\nTest MSE: {test_loss:.4f}")
-    print(f"Test MAE: {mae:.4f}")
 
 
 if __name__ == "__main__":
