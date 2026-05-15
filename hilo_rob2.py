@@ -34,8 +34,7 @@ from math import atan, atan2, pi
 
 
 
-
-def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
+def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, rot = False):
     """
     x     : current state (at least X,Y,Z)
     tgt   : [Xt, Yt, Zt]
@@ -45,8 +44,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     ax    : matplotlib 3D axis
     """
 
-    import numpy as np
-    import matplotlib.pyplot as plt
+    
 
     def plot_ellipsoid(ax, center, radii, color='orange', alpha=1, resolution=20):
         u = np.linspace(0, 2 * np.pi, resolution)
@@ -68,8 +66,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     # =========================
     # Extract positions
     # =========================
-    X, Y, Z = float(x[0]), float(x[1]), float(x[2])
-    Xt, Yt, Zt = tgt
+    X, Y, Z = float(x[0 + 3*int(rot)]), float(x[1 + 3*int(rot)]), float(x[2 + 3*int(rot)])
+    Xt, Yt, Zt = float(tgt[0 + 3*int(rot)]), float(tgt[1 + 3*int(rot)]), float(tgt[2 + 3*int(rot)])
 
     # =========================
     # Create / clear axis
@@ -87,13 +85,13 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     if traj is not None and len(traj) > 1:
         traj = np.asarray(traj)
         ax.plot(
-            traj[:, 0], traj[:, 1], traj[:, 2],
+            traj[:, 0 + 3*int(rot)], traj[:, 1 + 3*int(rot)], traj[:, 2 + 3*int(rot)],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
     # =========================
     # Plot obstacles (ellipsoids)
     # =========================
-    if obst_centers is not None and obst_radii is not None:
+    if obst_centers.cpu().numpy().tolist()[0] != [] and obst_radii.cpu().numpy().tolist()[0] != []:
         for center, radii in zip(obst_centers, obst_radii):
             plot_ellipsoid(ax, center, radii)
 
@@ -120,7 +118,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
     ys = [Y, Yt, 0]
     zs = [Z, Zt, 0]
 
-    if obst_centers is not None:
+
+    if obst_centers.cpu().numpy().tolist()[0] != []:
         for c in obst_centers:
             xs.append(c[0])
             ys.append(c[1])
@@ -146,117 +145,91 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None):
 
 
 
-# ======================================================
-# Obstacle avoidance via algebraic constraint
-# ======================================================
-
-# Shelf poses
-p1 = [-0.75, -0.6, 0.25, 1,0,0,0]
-p2 = [-0.75, -0.35, 0.0, 1,0,0,0]
-
-obst_list = []
-
-for i in range(2):
-    if i == 0:
-        obst_list.append(p1)
-        p_ = copy.deepcopy(p1)
-    else:
-        obst_list.append(p2)
-        p_ = copy.deepcopy(p2)
-
-    for j in range(4):
-
-        if j != 0:
-            p_[1] += 0.5
-            obst_list.append(copy.deepcopy(p_))
-        
-        p__ = copy.deepcopy(p_)
-
-        for k in range(3):
-            p__[2] += 0.5
-            obst_list.append(copy.deepcopy(p__))
+references = [torch.tensor([[ 0.9753,  1.2177,  0.0294, -0.2032, -0.2433,  0.1176]], device='cuda:0'), 
+              torch.tensor([[ 0.9753,  1.2177,  0.0294, -0.2032, -0.2433,  0.0051]], device='cuda:0'), 
+              torch.tensor([[ 0.0000,  1.5000,  0.0000, -0.3265,  0.2903,  0.15600]], device='cuda:0')]
 
 
-x0 = [-0.3958,  0.1400,  0.6118, -3.0582,  0.9217,  2.6561,  
-       0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
+x0 = [0.08660679310560226, -1.157797932624817, -0.3822425305843353, -0.2346031814813614, 0.03121274895966053, 0.12371678650379181, 
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400+0.5, -3.0582, 0.9217, 2.6561]])
+obst_list = torch.tensor([[-0.3810,  0.0667,  0.0875]], device='cuda:0')
+ellipsoid_r = [0.16, 0.16, 0.16]
+dt = 0.1
+n_steps_mpc = 200
+path_traj_mpc = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/trajectories"
 
-
-
-
-
-ellipsoid_r = [0.43, 
-               0.2, 
-               0.435 ]
-
-obst_list = torch.tensor(obst_list)
-
-model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list=obst_list, 
-                              ellipsoid_r=ellipsoid_r, 
-                              ini = torch.tensor(x0), 
-                              ref = ref_lab[0])
-
-
-# ======================================================
-# Simulation loop
-# ======================================================
-n_steps = 500
-sol = model.solution
-
-t_dir = "."
-
-trajectory = []
+save_idx = 0
 trajectory_save = []
 
-for k in range(n_steps):
-    u_opt = nmpc.optimize(x0)
-    model.simulate(u=u_opt, steps=1)
-    x0 = sol['x:f']
+for idx, ref in enumerate(references):
 
-    x0_tensor = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-                        float(x0[3]), float(x0[4]), float(x0[5])]])
+    model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list, 
+                                            ellipsoid_r, 
+                                            ini = x0, 
+                                            ref = ref[0],
+                                            dt = dt, 
+                                            lie = True,)
+
+    # ======================================================
+    # Simulation loop
+    # ======================================================
     
-    # x0_group = exp_bruno(x0_tensor)
-    # x0_lab = convert_dq_to_Lab(x0_group)
-
-    # print(u_opt)    
-
-    print("Step: ", k)
-
-    trajectory.append([x0_tensor[0, 0].item(), x0_tensor[0, 1].item(), x0_tensor[0, 2].item()])
-    trajectory_save.append(x0_tensor[0].numpy().tolist())
-
-    fig, ax = get_frame(
-        x0_tensor[0],
-        tgt=[ref_lab[0,0].item(), ref_lab[0,1].item(), ref_lab[0,2].item()],
-        traj=trajectory,
-        ax=None,
-        obst_centers=obst_list[:, :3],
-        obst_radii=ellipsoid_r_torch
-    )
+    sol = model.solution
 
 
+    # x0 = x0[0].cpu().numpy().tolist()
 
-    # fig.savefig(f"{k:03d}.png")
+    for k in range(n_steps_mpc):
+        u_opt = nmpc.optimize(x0)
+        model.simulate(u=u_opt, steps=1)
+        x0 = sol['x:f']
 
-    ax.view_init(elev=0, azim=0)
-    fig.savefig(f"{k:03d}.png")
+        x0_tensor = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
+                                float(x0[3]), float(x0[4]), float(x0[5])]])
+        
+        x0_group = exp_bruno(x0_tensor)
+        x0_lab   = convert_dq_to_Lab(x0_group)
 
-    # ax.view_init(elev=0, azim=45)
-    # fig.savefig(f"side_{k:03d}.png")
+        trajectory_save.append(x0_tensor[0].numpy().tolist())
 
-
-    ax.view_init(elev=90, azim=-0)
-    fig.savefig(f"other_{k:03d}.png")
-
+        if True:
+            fig, ax = get_frame(
+                x0_tensor[0].cpu(),
+                tgt=ref[0].cpu().numpy().tolist(),
+                traj=trajectory_save,
+                ax=None,
+                obst_centers=obst_list.cpu(),
+                obst_radii=ellipsoid_r_torch.cpu(),
+                rot = True,)
     
-    plt.close(fig)
+            name = f"{save_idx:03d}.png"
+            # fig.savefig(os.path.join(path, name))
 
-    
+            name = f"{save_idx:03d}.png"
+            ax.view_init(elev=0, azim=0)
+            fig.savefig(os.path.join(path_traj_mpc, name))
 
-print("Simulation finished")
-save_traj(trajectory_save, lie = False)
+
+            f"side_{save_idx:03d}.png"
+            # ax.view_init(elev=0, azim=45)
+            # fig.savefig(os.path.join(path, name))
+
+
+            name = f"other_{save_idx:03d}.png"
+            ax.view_init(elev=90, azim=-0)
+            fig.savefig(os.path.join(path_traj_mpc, name))
+            
+            plt.close(fig)
+
+
+        save_idx += 1
+        
+        if idx == 1:
+            start_grip_idx = save_idx
+
+        if torch.norm(x0_tensor.to("cuda:0") - ref).item() < 0.08:
+            break
 
 
 # torch.save(torch.tensor(trajectory_save), "./rl_manipulation_obstacles/traj.pt")
