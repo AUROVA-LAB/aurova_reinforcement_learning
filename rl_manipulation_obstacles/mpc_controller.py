@@ -123,9 +123,9 @@ def drop_NMPC_setup(obst_list,
 
             change_idx = idx >= int(n_obst / 2)
 
-            rhs.append((X - o[0].item())**2   / ((ellipsoid_r[0]))**2 + \
-                       (Y - o[1].item())**2   / ((ellipsoid_r[1]))**2 + \
-                       (Z - o[2].item())**2   / ((ellipsoid_r[2]))**2 - 1 - z[idx])
+            rhs.append((X_ - o[0].item())**2   / ((ellipsoid_r[0]))**2 + \
+                       (Y_ - o[1].item())**2   / ((ellipsoid_r[1]))**2 + \
+                       (Z_ - o[2].item())**2   / ((ellipsoid_r[2]))**2 - 1 - z[idx])
             
             ellipsoid_r_torch.append([ellipsoid_r[0], 
                                       ellipsoid_r[1], 
@@ -188,12 +188,12 @@ def drop_NMPC_setup(obst_list,
 
     # Box constraints
     nmpc.set_box_constraints(
-        x_lb=[-10, -10, -10, -10, -10, -10, 
+        x_lb=[-10, -10, -10, -10, -10, 0, 
             -10, -10, -10, -10, -10, -10],
         x_ub=[10, 10, 10, 10, 10, 10,
             10, 10, 10, 10, 10, 10],
-        u_lb=[-0.75, -0.75, -0.75, -0.01, -0.01, -0.01],
-        u_ub=[0.75, 0.75, 0.75, 0.01, 0.01, 0.01],
+        u_lb=[-0.01, -0.01, -0.01, -0.01, -0.01, -0.01],
+        u_ub=[0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
         z_lb=[0.0]*n_obst,      # <-- enforces obstacle avoidance
         z_ub=[ca.inf]*n_obst
     )
