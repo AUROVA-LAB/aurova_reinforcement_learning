@@ -105,7 +105,7 @@ def save_images_grid(
     plt.close()
 
 
-def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, rot = False):
+def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, trans = False):
     """
     x     : current state (at least X,Y,Z)
     tgt   : [Xt, Yt, Zt]
@@ -137,8 +137,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     # =========================
     # Extract positions
     # =========================
-    X, Y, Z = float(x[0 + 3*int(rot)]), float(x[1 + 3*int(rot)]), float(x[2 + 3*int(rot)])
-    Xt, Yt, Zt = float(tgt[0 + 3*int(rot)]), float(tgt[1 + 3*int(rot)]), float(tgt[2 + 3*int(rot)])
+    X, Y, Z = float(x[0 + 3*int(trans)]), float(x[1 + 3*int(trans)]), float(x[2 + 3*int(trans)])
+    Xt, Yt, Zt = float(tgt[0 + 3*int(trans)]), float(tgt[1 + 3*int(trans)]), float(tgt[2 + 3*int(trans)])
 
     # =========================
     # Create / clear axis
@@ -156,7 +156,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     if traj is not None and len(traj) > 1:
         traj = np.asarray(traj)
         ax.plot(
-            traj[:, 0 + 3*int(rot)], traj[:, 1 + 3*int(rot)], traj[:, 2 + 3*int(rot)],
+            traj[:, 0 + 3*int(trans)], traj[:, 1 + 3*int(trans)], traj[:, 2 + 3*int(trans)],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
     # =========================
@@ -593,6 +593,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if not self.cfg.test:
             if self.count < self.start_grip_idx:
                 self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+            else:
+                self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
             
@@ -1276,8 +1278,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         traj=self.trajectory_save,
                         ax=None,
                         obst_centers=self.cfg.obst_list.cpu(),
-                        obst_radii=ellipsoid_r_torch.cpu()*2,
-                        rot = True,)
+                        obst_radii=ellipsoid_r_torch.cpu(),
+                        trans = self.cfg.get_trans,)
             
                     name = f"{save_idx:03d}.png"
                     # fig.savefig(os.path.join(path, name))

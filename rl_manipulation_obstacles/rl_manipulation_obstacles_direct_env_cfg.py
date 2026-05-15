@@ -186,7 +186,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1.2, -0.11711,  0.05]),
     )
 
-    obstacle_pos = [-7.6190e-01,  1.3330e-01,  0.175]
+    obstacle_pos = [-6.6190e-01,  1.3330e-01,  0.175]
 
     obstacle_cfg: RigidObject = RigidObjectCfg(
         prim_path="/World/envs/env_.*/obstacle",
@@ -430,9 +430,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     obst_list = []
     obst_list.append([obstacle_pos[0] / 2.0, obstacle_pos[1] / 2.0, obstacle_pos[2] / 2.0])
 
-    ellipsoid_r = [0.25/2.0, 
-                   0.15/2.0, 
-                   0.15/2.0]
+    ellipsoid_r = [0.16, 
+                   0.16, 
+                   0.16]
 
 
 
@@ -444,6 +444,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     dt = 0.1
 
     get_img_mpc = True
+    get_trans = False
 
     plan_chg_thres = 0.01
 
@@ -457,7 +458,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
     target_pose = [-0.40919, -0.29333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.55308,  0.359333,  0.12,  0, 3, 0]
+    target_pose_2 = [-0.405308,  0.259333,  0.15,  0, 3, 0]
     # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2*0,  0.2*0],
