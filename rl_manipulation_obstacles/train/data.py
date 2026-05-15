@@ -124,7 +124,7 @@ class HDF5LfDDataset(Dataset):
         # -------------------------------------------------
 
         self.handles = [
-            h5py.File(path, "r+", libver="latest", swmr=True)
+            h5py.File(path, "r", libver="latest", swmr=True)
             for path in self.files
         ]
 
