@@ -4,6 +4,7 @@ import os
 import torch
 from collections.abc import Sequence
 import copy
+import random
 
 from .rl_manipulation_obstacles_direct_env_cfg import RLManipulationObstaclesDirectCfg, update_cfg, update_collisions
 
@@ -1135,19 +1136,30 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.controller.reset()
         
         # --- Reset target ---
+        change = random.random() > 0.5
+
+        end_ranges = self.target_pose_ranges
+        end = (self.target_pose_r, self.target_pose_r_group, self.target_pose_r_lie)
+
+        obj_ranges = self.target_pose_ranges2
+        obj = (self.end_target_pose_r, self.end_target_pose_r_group, self.end_target_pose_r_lie)
+
+        if not change:
+            obj_ranges = self.target_pose_ranges
+            obj = (self.target_pose_r, self.target_pose_r_group, self.target_pose_r_lie)
+
+            end_range = self.target_pose_ranges2
+            end = (self.end_target_pose_r, self.end_target_pose_r_group, self.end_target_pose_r_lie)
+
         # Samples the new initial pose for the object
         self.target_pose_r, self.target_pose_r_group, self.target_pose_r_lie = self.reset_target(env_ids = env_ids,
-                                                                                                 targets=(self.target_pose_r, 
-                                                                                                          self.target_pose_r_group, 
-                                                                                                          self.target_pose_r_lie),
-                                                                                                 ranges = self.target_pose_ranges)
+                                                                                                 targets=obj,
+                                                                                                 ranges = obj_ranges)
 
         # Samples the initial pose for the end target
         self.end_target_pose_r, self.end_target_pose_r_group, self.end_target_pose_r_lie = self.reset_target(env_ids = env_ids,
-                                                                                                             targets=(self.end_target_pose_r, 
-                                                                                                                      self.end_target_pose_r_group, 
-                                                                                                                      self.end_target_pose_r_lie),
-                                                                                                             ranges = self.target_pose_ranges2)
+                                                                                                             targets = end,
+                                                                                                             ranges = end_ranges)
         
 
         grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = self.target_pose_r[:, :3], q01 = self.target_pose_r[:, 3:],

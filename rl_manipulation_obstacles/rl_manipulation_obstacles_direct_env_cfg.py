@@ -443,7 +443,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     lie_mpc = True
     dt = 0.1
 
-    get_img_mpc = True
+    get_img_mpc = False
     get_trans = False
 
     plan_chg_thres = 0.01
@@ -458,7 +458,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
     target_pose = [-0.40919, -0.29333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.405308,  0.259333,  0.15,  0, 3, 0]
+    target_pose_2 = [-0.405308,  0.259333,  0.04,  0, 3, 0] # 0.15
     # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
     target_poses_incs = [[-0.2*0,  0.2*0],
