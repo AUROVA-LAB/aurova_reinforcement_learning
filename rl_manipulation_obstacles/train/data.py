@@ -130,6 +130,9 @@ class HDF5LfDDataset(Dataset):
         self.index = []  # (file_id, timestep)
 
         for file_id, f in enumerate(self.handles):
+            if list(f.keys()) == []:
+                continue
+            
             length = f["actions"].shape[0]
 
             for t in range(length):
