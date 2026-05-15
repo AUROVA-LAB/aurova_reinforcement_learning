@@ -88,10 +88,12 @@ class HDF5EpisodeWriter:
         self.step += 1
 
     def close(self):
-        # Trim unused space
-        for key in self.file.keys():
-            pass  # optional: skip resizing for simplicity
+        # # Trim unused space
+        # for key in self.file.keys():
+        #     pass  # optional: skip resizing for simplicity
 
+        # self.file.close()
+        self.file.flush()
         self.file.close()
 
 

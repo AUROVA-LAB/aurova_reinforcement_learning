@@ -1000,6 +1000,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Computes time out indicators
         if not self.cfg.test:
             time_out = torch.tensor(self.count >= self.trajectory_save.shape[0] - 1).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
+            if time_out.item():
+                self.writer.close()
         else:
             time_out = self.episode_length_buf >= self.max_episode_length - 1
 
