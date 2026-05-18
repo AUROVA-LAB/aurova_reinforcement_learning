@@ -150,11 +150,11 @@ references = [torch.tensor([[ 0.9753,  1.2177,  0.0294, -0.2032, -0.2433,  0.117
               torch.tensor([[ 0.0000,  1.5000,  0.0000, -0.3265,  0.2903,  0.15600]], device='cuda:0')]
 
 
-x0 = [0.08660679310560226, -1.157797932624817, -0.3822425305843353, -0.2346031814813614, 0.03121274895966053, 0.12371678650379181, 
+x0 = [0.08660679310560226, -1.157797932624817, -0.3822425305843353, -0.2346031814813614, -0.03121274895966053, 0.12371678650379181, 
       0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-obst_list = torch.tensor([[-0.3810,  0.0667,  0.0875]], device='cuda:0')
-ellipsoid_r = [0.16, 0.16, 0.16]
+obst_list = torch.tensor([[-0.231,  0.0667,  0.0875]], device='cuda:0')
+ellipsoid_r = [0.32, 0.08, 0.14]
 dt = 0.1
 n_steps_mpc = 200
 path_traj_mpc = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/trajectories"
