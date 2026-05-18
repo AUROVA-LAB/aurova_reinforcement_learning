@@ -51,16 +51,20 @@ def test():
     with torch.no_grad():
         for b in test_loader:
             
-            cam, cam_ext = b["cam"].to(device), b["cam_ext"].to(device)
-            cam_D, cam_ext_D = b["cam_D"].to(device), b["cam_ext_D"].to(device)
+            b = {
+                    k: v.to(device, non_blocking=True)
+                    for k, v in b.items()
+                }
 
-            tgt_pose, gripper_pose = b["target_pose"].to(device), b["gripper_pose"].to(device)
-            teacher_action = b["action"].to(device)
+            pred = model(
+                b["cam_D"].to(device, non_blocking = True),
+                b["cam_ext_D"].to(device, non_blocking = True),
+                b["cam_front_D"].to(device, non_blocking = True),
+                b["gripper_pose"].to(device, non_blocking = True),
+            )
 
-            pred = model(cam_D, cam_ext_D, gripper_pose)
-
-            test_loss += criterion(pred, teacher_action).item()
-            mae += torch.abs(pred - teacher_action).mean().item()
+            test_loss += criterion(pred, b["action"]).item()
+            mae += torch.abs(pred - b["action"]).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)
