@@ -1138,7 +1138,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # --- Reset target ---
         change = random.random() > 0.5
 
-        end_ranges = self.target_pose_ranges
+        end_range = self.target_pose_ranges
         end = (self.target_pose_r, self.target_pose_r_group, self.target_pose_r_lie)
 
         obj_ranges = self.target_pose_ranges2
@@ -1159,7 +1159,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Samples the initial pose for the end target
         self.end_target_pose_r, self.end_target_pose_r_group, self.end_target_pose_r_lie = self.reset_target(env_ids = env_ids,
                                                                                                              targets = end,
-                                                                                                             ranges = end_ranges)
+                                                                                                             ranges = end_range)
         
 
         grasp_point_obj_pos_r_rot, grasp_point_obj_quat_r_rot = combine_frame_transforms(t01 = self.target_pose_r[:, :3], q01 = self.target_pose_r[:, 3:],
@@ -1318,7 +1318,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 if idx == 1:
                     self.start_grip_idx = save_idx
 
-                if torch.norm(x0_tensor.to(self.device) - ref).item() < self.cfg.plan_chg_thres:
+                if torch.norm(x0_tensor[:, 3:].to(self.device) - ref[:, 3:]).item() < self.cfg.plan_chg_thres:
                     break
             
 
