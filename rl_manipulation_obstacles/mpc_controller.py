@@ -180,7 +180,7 @@ def drop_NMPC_setup(obst_list,
     )
 
     # Horizon
-    nmpc.horizon = 15
+    nmpc.horizon = 45
 
     # print(obst_list)
     # print(n_obst)
@@ -188,10 +188,9 @@ def drop_NMPC_setup(obst_list,
 
     # Box constraints
     nmpc.set_box_constraints(
-        x_lb=[-10, -10, -10, -10, -10, 0, 
-            -10, -10, -10, -10, -10, -10],
-        x_ub=[10, 10, 10, 10, 10, 10,
-            10, 10, 10, 10, 10, 10],
+        x_lb=[-10, -10, -10, -10, -10,  0,      -10, -10, -10, -10, -10, -10],
+        x_ub=[ 10,  10,  10,   0,  10, 10,       10,  10,  10,  10,  10,  10],
+
         u_lb=[-0.01, -0.01, -0.01, -0.01, -0.01, -0.01],
         u_ub=[0.01, 0.01, 0.01, 0.01, 0.01, 0.01],
         z_lb=[0.0]*n_obst,      # <-- enforces obstacle avoidance
