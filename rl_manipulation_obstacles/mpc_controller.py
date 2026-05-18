@@ -5,21 +5,12 @@ from hilo_mpc import NMPC, Model
 import casadi as ca
 import warnings
 
-import matplotlib.pyplot as plt
-import os
-
-import copy
-
-import numpy as np
 
 warnings.filterwarnings("ignore")
 
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
-import matplotlib.pyplot as plt
-
 import torch
 import pickle
+import math
 
 
 
@@ -32,7 +23,8 @@ def drop_NMPC_setup(obst_list,
                     ref = [1.0, 1.0, 1.0, 
                            0.0, 0.0, 0.0], 
                     dt = 0.01,
-                    lie = False,):
+                    lie = False,
+                    obst_rot = [0.0, 0.0, 0.0]):
         
     # ======================================================
     # Create model
@@ -96,41 +88,69 @@ def drop_NMPC_setup(obst_list,
 
 
 
-
     rhs = []
-
+    ellipsoid_r_torch = []
     n_obst = obst_list.shape[0]
 
-    idx_obst = [[0, 1, 2], [2, 0, 1]]
-
-    ellipsoid_r_torch = []
+    theta_roll, theta_pitch, theta_yaw = obst_rot[0], obst_rot[1], obst_rot[2]
 
     if n_obst > 0:
         z = model.set_algebraic_states(['c_obs' + str(idx) for idx in range(len(obst_list))])
-        
-        # Obstacle parameters
+
         for idx, o in enumerate(obst_list):
 
-            # Algebraic state (constraint slack, optional)
+            # Center of obstacle
+            o_vec = ca.DM([o[0].item(), o[1].item(), o[2].item()])
 
-            # Constraint equation: c_obs = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1 ->
-            '''
-            sería algo así como:
-                rhs = (z = ((X-Xo)/a)^2 + ((Y-Yo)/b)^2 + ((Z - Zo)/c)^2- 1)
+            # Semi-axes
+            a = ellipsoid_r[0]
+            b = ellipsoid_r[1]
+            c = ellipsoid_r[2]
 
-            pero lo tienes que poner de manera que rhs = 0 para que entre en "set_algebraic_equations" 
-            '''
+            # -----------------------------
+            # Rotation (replace these with your stored angles)
+            # -----------------------------
+            roll  = theta_roll[idx] if isinstance(theta_roll, (list, tuple)) else 0.0
+            pitch = theta_pitch[idx] if isinstance(theta_pitch, (list, tuple)) else 0.0
+            yaw   = theta_yaw[idx] if isinstance(theta_yaw, (list, tuple)) else 0.0
 
-            change_idx = idx >= int(n_obst / 2)
+            Rz = ca.vertcat(
+                ca.horzcat(ca.cos(yaw), -ca.sin(yaw), 0),
+                ca.horzcat(ca.sin(yaw),  ca.cos(yaw), 0),
+                ca.horzcat(0, 0, 1)
+            )
 
-            rhs.append((X_ - o[0].item())**2   / ((ellipsoid_r[0]))**2 + \
-                       (Y_ - o[1].item())**2   / ((ellipsoid_r[1]))**2 + \
-                       (Z_ - o[2].item())**2   / ((ellipsoid_r[2]))**2 - 1 - z[idx])
-            
-            ellipsoid_r_torch.append([ellipsoid_r[0], 
-                                      ellipsoid_r[1], 
-                                      ellipsoid_r[2]])
-        
+            Ry = ca.vertcat(
+                ca.horzcat(ca.cos(pitch), 0, ca.sin(pitch)),
+                ca.horzcat(0, 1, 0),
+                ca.horzcat(-ca.sin(pitch), 0, ca.cos(pitch))
+            )
+
+            Rx = ca.vertcat(
+                ca.horzcat(1, 0, 0),
+                ca.horzcat(0, ca.cos(roll), -ca.sin(roll)),
+                ca.horzcat(0, ca.sin(roll),  ca.cos(roll))
+            )
+
+            R = Rz @ Ry @ Rx
+
+            # -----------------------------
+            # Rotated ellipsoid constraint
+            # -----------------------------
+            p = ca.vertcat(X_, Y_, Z_)
+            d = p - o_vec
+
+            d_rot = R @ d
+
+            rhs.append(
+                (d_rot[0] / a)**2 +
+                (d_rot[1] / b)**2 +
+                (d_rot[2] / c)**2
+                - 1 - z[idx]
+            )
+
+            ellipsoid_r_torch.append([a, b, c])
+
         ellipsoid_r_torch = torch.tensor(ellipsoid_r_torch)
         model.set_algebraic_equations(ca.vertcat(*rhs))
 

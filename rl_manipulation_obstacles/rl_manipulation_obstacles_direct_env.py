@@ -106,33 +106,38 @@ def save_images_grid(
     plt.close()
 
 
-def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, trans = False):
-    """
-    x     : current state (at least X,Y,Z)
-    tgt   : [Xt, Yt, Zt]
-    obst_centers : list or array [[xo, yo, zo], ...]
-    obst_radii   : list or array [[rx, ry, rz], ...]
-    traj  : list or array of past positions [[x,y,z], ...]
-    ax    : matplotlib 3D axis
-    """
+def get_frame(x, tgt, obst_centers=None, obst_radii=None, obst_rot=None,
+              traj=None, ax=None, trans = True):
 
-    
+    def plot_ellipsoid(ax, center, radii, R=None, color='orange', alpha=1, resolution=20):
 
-    def plot_ellipsoid(ax, center, radii, color='orange', alpha=1, resolution=20):
         u = np.linspace(0, 2 * np.pi, resolution)
         v = np.linspace(0, np.pi, resolution)
 
-        x = radii[0] * np.outer(np.cos(u), np.sin(v)) + center[0]
-        y = radii[1] * np.outer(np.sin(u), np.sin(v)) + center[1]
-        z = radii[2] * np.outer(np.ones_like(u), np.cos(v)) + center[2]
+        # Base ellipsoid (centered at origin)
+        X = radii[0] * np.outer(np.cos(u), np.sin(v))
+        Y = radii[1] * np.outer(np.sin(u), np.sin(v))
+        Z = radii[2] * np.outer(np.ones_like(u), np.cos(v))
+
+        # Stack points
+        pts = np.stack([X, Y, Z], axis=-1)  # (N, M, 3)
+
+        # Apply rotation if provided
+        if R is not None:
+            pts = pts @ np.transpose(R)
+
+        # Translate to center
+        Xr = pts[:, :, 0] + center[0]
+        Yr = pts[:, :, 1] + center[1]
+        Zr = pts[:, :, 2] + center[2]
 
         ax.plot_surface(
-            x, y, z,
+            Xr, Yr, Zr,
             color=color,
             alpha=alpha,
             linewidth=0,
             shade=True,
-            zorder = 6
+            zorder=6
         )
 
     # =========================
@@ -157,15 +162,48 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, tr
     if traj is not None and len(traj) > 1:
         traj = np.asarray(traj)
         ax.plot(
-            traj[:, 0 + 3*int(trans)], traj[:, 1 + 3*int(trans)], traj[:, 2 + 3*int(trans)],
+            traj[:, 0 + 3*int(trans)],
+            traj[:, 1 + 3*int(trans)],
+            traj[:, 2 + 3*int(trans)],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
+
     # =========================
-    # Plot obstacles (ellipsoids)
+    # Plot obstacles (rotated ellipsoids)
     # =========================
-    if obst_centers.cpu().numpy().tolist()[0] != [] and obst_radii.cpu().numpy().tolist()[0] != []:
-        for center, radii in zip(obst_centers, obst_radii):
-            plot_ellipsoid(ax, center, radii)
+    if obst_centers is not None and obst_radii is not None:
+
+        obst_centers = obst_centers.cpu().numpy()
+        obst_radii = obst_radii.cpu().numpy()
+
+        for i, (center, radii) in enumerate(zip(obst_centers, obst_radii)):
+
+            R = None
+
+            if obst_rot is not None:
+                roll, pitch, yaw = obst_rot
+
+                Rz = np.array([
+                    [np.cos(yaw), -np.sin(yaw), 0],
+                    [np.sin(yaw),  np.cos(yaw), 0],
+                    [0, 0, 1]
+                ])
+
+                Ry = np.array([
+                    [np.cos(pitch), 0, np.sin(pitch)],
+                    [0, 1, 0],
+                    [-np.sin(pitch), 0, np.cos(pitch)]
+                ])
+
+                Rx = np.array([
+                    [1, 0, 0],
+                    [0, np.cos(roll), -np.sin(roll)],
+                    [0, np.sin(roll),  np.cos(roll)]
+                ])
+
+                R = Rz @ Ry @ Rx
+
+            plot_ellipsoid(ax, center, radii, R=R)
 
     # =========================
     # Plot robot
@@ -177,9 +215,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, tr
     # =========================
     ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
 
-
     # =========================
-    # Plot origin
+    # Origin
     # =========================
     ax.scatter(0, 0, 0, c='r', s=80, label="Origin")
 
@@ -190,8 +227,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, tr
     ys = [Y, Yt, 0]
     zs = [Z, Zt, 0]
 
-
-    if obst_centers.cpu().numpy().tolist()[0] != []:
+    if obst_centers is not None:
         for c in obst_centers:
             xs.append(c[0])
             ys.append(c[1])
@@ -208,10 +244,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, tr
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
-    ax.set_title("3D Robot Trajectory with Obstacles")
+    ax.set_title("3D Robot Trajectory with Rotated Obstacles")
     ax.legend(loc="upper left")
-
-
 
     return fig, ax
 
@@ -603,7 +637,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                         t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
                                            
 
-
+            print(self.is_contact)
             self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
             
             self.increment_condition = (self.count < self.trajectory_save.shape[0] and not self.gripper_action) or self.increment_condition
@@ -1223,6 +1257,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((new_obj_pose_w), dim = -1), env_ids = env_ids)
         # self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
 
+        obstacle_angle = random.random() * (self.cfg.obstacle_poses_incs[1] - self.cfg.obstacle_poses_incs[0]) + self.cfg.obstacle_poses_incs[0]
+        obstacle_rot = [0.0, 0.0, obstacle_angle]
 
 
         # Writes the new object position to the simulation
@@ -1259,7 +1295,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                     ini = x0, 
                                                     ref = ref[0],
                                                     dt = self.cfg.dt, 
-                                                    lie = self.cfg.lie_mpc,)
+                                                    lie = self.cfg.lie_mpc,
+                                                    obst_rot = obstacle_rot)
 
             # ======================================================
             # Simulation loop
@@ -1291,8 +1328,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         ax=None,
                         obst_centers=self.cfg.obst_list.cpu(),
                         obst_radii=ellipsoid_r_torch.cpu(),
-                        trans = self.cfg.get_trans,)
-            
+                        trans = self.cfg.get_trans,
+                        obst_rot = obstacle_rot)
+
                     name = f"{save_idx:03d}.png"
                     # fig.savefig(os.path.join(path, name))
 

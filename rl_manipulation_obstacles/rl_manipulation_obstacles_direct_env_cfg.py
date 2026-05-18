@@ -426,13 +426,15 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     apply_range_tgt = True
 
     
+    obstacle_pose = [obstacle_pos[0], obstacle_pos[1], obstacle_pos[2],  0, 0, 0]
+    obstacle_poses_incs = [-pi/8, pi/8]
 
     obst_list = []
     obst_list.append([obstacle_pos[0] / 2.0, obstacle_pos[1] / 2.0, obstacle_pos[2] / 2.0])
 
-    ellipsoid_r = [0.32, 
-                   0.08, 
-                   0.08]
+    ellipsoid_r = [0.18, 
+                   0.10, 
+                   0.10]
 
 
 
@@ -443,7 +445,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     lie_mpc = True
     dt = 0.1
 
-    get_img_mpc = True
+    get_img_mpc = False
     get_trans = True
 
     plan_chg_thres = 0.01
@@ -457,12 +459,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses for Pick-and-Place ----
     # ---- Target poses ----
-    target_pose = [-0.40919, -0.29333, 0.04, 0, 3, 0]
-    target_pose_2 = [-0.405308,  0.259333,  0.04,  0, 3, 0] # 0.15
-    # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
+    target_pose = [-0.40919, -0.329333, 0.04, 0, 3, 0]
+    target_pose_2 = [-0.405308,  0.3259333,  0.04,  0, 3, 0] # 0.15
 
     target_poses_incs = [[-0.2*0,  0.2*0],
-                         [-0.2,   -0.15],
+                         [-0.2*0,   -0.15*0],
                          [-0.35*0,   0.225*0],
                          [-3*pi/5*0,  3*pi/5*0],
                          [-3*pi/5*0,  3*pi/5*0],

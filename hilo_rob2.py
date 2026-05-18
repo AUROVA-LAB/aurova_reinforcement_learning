@@ -33,34 +33,38 @@ from scipy.spatial.transform import Rotation
 from math import atan, atan2, pi
 
 
+def get_frame(x, tgt, obst_centers=None, obst_radii=None, obst_rot=None,
+              traj=None, ax=None, rot=False):
 
-def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, rot = False):
-    """
-    x     : current state (at least X,Y,Z)
-    tgt   : [Xt, Yt, Zt]
-    obst_centers : list or array [[xo, yo, zo], ...]
-    obst_radii   : list or array [[rx, ry, rz], ...]
-    traj  : list or array of past positions [[x,y,z], ...]
-    ax    : matplotlib 3D axis
-    """
+    def plot_ellipsoid(ax, center, radii, R=None, color='orange', alpha=1, resolution=20):
 
-    
-
-    def plot_ellipsoid(ax, center, radii, color='orange', alpha=1, resolution=20):
         u = np.linspace(0, 2 * np.pi, resolution)
         v = np.linspace(0, np.pi, resolution)
 
-        x = radii[0] * np.outer(np.cos(u), np.sin(v)) + center[0]
-        y = radii[1] * np.outer(np.sin(u), np.sin(v)) + center[1]
-        z = radii[2] * np.outer(np.ones_like(u), np.cos(v)) + center[2]
+        # Base ellipsoid (centered at origin)
+        X = radii[0] * np.outer(np.cos(u), np.sin(v))
+        Y = radii[1] * np.outer(np.sin(u), np.sin(v))
+        Z = radii[2] * np.outer(np.ones_like(u), np.cos(v))
+
+        # Stack points
+        pts = np.stack([X, Y, Z], axis=-1)  # (N, M, 3)
+
+        # Apply rotation if provided
+        if R is not None:
+            pts = pts @ np.transpose(R)
+
+        # Translate to center
+        Xr = pts[:, :, 0] + center[0]
+        Yr = pts[:, :, 1] + center[1]
+        Zr = pts[:, :, 2] + center[2]
 
         ax.plot_surface(
-            x, y, z,
+            Xr, Yr, Zr,
             color=color,
             alpha=alpha,
             linewidth=0,
             shade=True,
-            zorder = 6
+            zorder=6
         )
 
     # =========================
@@ -85,15 +89,48 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     if traj is not None and len(traj) > 1:
         traj = np.asarray(traj)
         ax.plot(
-            traj[:, 0 + 3*int(rot)], traj[:, 1 + 3*int(rot)], traj[:, 2 + 3*int(rot)],
+            traj[:, 0 + 3*int(rot)],
+            traj[:, 1 + 3*int(rot)],
+            traj[:, 2 + 3*int(rot)],
             'k-', linewidth=2, alpha=0.7, label="Trajectory"
         )
+
     # =========================
-    # Plot obstacles (ellipsoids)
+    # Plot obstacles (rotated ellipsoids)
     # =========================
-    if obst_centers.cpu().numpy().tolist()[0] != [] and obst_radii.cpu().numpy().tolist()[0] != []:
-        for center, radii in zip(obst_centers, obst_radii):
-            plot_ellipsoid(ax, center, radii)
+    if obst_centers is not None and obst_radii is not None:
+
+        obst_centers = obst_centers.cpu().numpy()
+        obst_radii = obst_radii.cpu().numpy()
+
+        for i, (center, radii) in enumerate(zip(obst_centers, obst_radii)):
+
+            R = None
+
+            if obst_rot is not None:
+                roll, pitch, yaw = obst_rot
+
+                Rz = np.array([
+                    [np.cos(yaw), -np.sin(yaw), 0],
+                    [np.sin(yaw),  np.cos(yaw), 0],
+                    [0, 0, 1]
+                ])
+
+                Ry = np.array([
+                    [np.cos(pitch), 0, np.sin(pitch)],
+                    [0, 1, 0],
+                    [-np.sin(pitch), 0, np.cos(pitch)]
+                ])
+
+                Rx = np.array([
+                    [1, 0, 0],
+                    [0, np.cos(roll), -np.sin(roll)],
+                    [0, np.sin(roll),  np.cos(roll)]
+                ])
+
+                R = Rz @ Ry @ Rx
+
+            plot_ellipsoid(ax, center, radii, R=R)
 
     # =========================
     # Plot robot
@@ -105,9 +142,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     # =========================
     ax.scatter(Xt, Yt, Zt, c='g', s=100, label="Target", zorder=5)
 
-
     # =========================
-    # Plot origin
+    # Origin
     # =========================
     ax.scatter(0, 0, 0, c='r', s=80, label="Origin")
 
@@ -118,8 +154,7 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     ys = [Y, Yt, 0]
     zs = [Z, Zt, 0]
 
-
-    if obst_centers.cpu().numpy().tolist()[0] != []:
+    if obst_centers is not None:
         for c in obst_centers:
             xs.append(c[0])
             ys.append(c[1])
@@ -136,10 +171,8 @@ def get_frame(x, tgt, obst_centers=None, obst_radii=None, traj=None, ax=None, ro
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
-    ax.set_title("3D Robot Trajectory with Obstacles")
+    ax.set_title("3D Robot Trajectory with Rotated Obstacles")
     ax.legend(loc="upper left")
-
-
 
     return fig, ax
 
@@ -162,6 +195,8 @@ path_traj_mpc = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manage
 save_idx = 0
 trajectory_save = []
 
+obst_rot = [0.0, 0.0, 0.5]
+
 for idx, ref in enumerate(references):
 
     model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list, 
@@ -169,7 +204,8 @@ for idx, ref in enumerate(references):
                                             ini = x0, 
                                             ref = ref[0],
                                             dt = dt, 
-                                            lie = True,)
+                                            lie = True,
+                                            obst_rot = obst_rot)
 
     # ======================================================
     # Simulation loop
@@ -201,7 +237,8 @@ for idx, ref in enumerate(references):
                 ax=None,
                 obst_centers=obst_list.cpu(),
                 obst_radii=ellipsoid_r_torch.cpu(),
-                rot = True,)
+                rot = True,
+                obst_rot = obst_rot)
     
             name = f"{save_idx:03d}.png"
             # fig.savefig(os.path.join(path, name))
@@ -228,7 +265,7 @@ for idx, ref in enumerate(references):
         if idx == 1:
             start_grip_idx = save_idx
 
-        if torch.norm(x0_tensor.to("cuda:0") - ref).item() < 0.08:
+        if torch.norm(x0_tensor[:, 3:].to("cuda:0") - ref[:, 3:]).item() < 0.08:
             break
 
 
