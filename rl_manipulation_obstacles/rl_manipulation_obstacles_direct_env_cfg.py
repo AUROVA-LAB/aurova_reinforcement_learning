@@ -186,13 +186,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1.2, -0.11711,  0.05]),
     )
 
-    obstacle_pos = [-6.6190e-01,  1.3330e-01,  0.175]
+    obstacle_pos = [-4.06190e-01,  1.3330e-01,  0.1]
 
     obstacle_cfg: RigidObject = RigidObjectCfg(
         prim_path="/World/envs/env_.*/obstacle",
 
         spawn=sim_utils.CuboidCfg(
-            size = [0.25, 0.15, 0.15],
+            size = [0.275, 0.10, 0.10],
             rigid_props=sim_utils.RigidBodyPropertiesCfg(disable_gravity = False),
             mass_props=sim_utils.MassPropertiesCfg(mass=25),
             collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled = True,
@@ -384,7 +384,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-4.9190e-01,  -2.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  -2.9330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
 
     # Obtain Euler angles from the quaternion
@@ -415,13 +415,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
     # ---- Target poses for obstacles ----
-    target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.2,  0.2],
-                         [-0.2,   0.2],
-                         [-0.35,   0.225],
-                         [-3*pi/5,  3*pi/5],
-                         [-3*pi/5,  3*pi/5],
-                         [-pi/2,  pi/2]]
+    # target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
+    # target_poses_incs = [[-0.2,  0.2],
+    #                      [-0.2,   0.2],
+    #                      [-0.35,   0.225],
+    #                      [-3*pi/5,  3*pi/5],
+    #                      [-3*pi/5,  3*pi/5],
+    #                      [-pi/2,  pi/2]]
 
     apply_range_tgt = True
 
@@ -430,9 +430,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     obst_list = []
     obst_list.append([obstacle_pos[0] / 2.0, obstacle_pos[1] / 2.0, obstacle_pos[2] / 2.0])
 
-    ellipsoid_r = [0.16, 
-                   0.16, 
-                   0.16]
+    ellipsoid_r = [0.32, 
+                   0.08, 
+                   0.08]
 
 
 
@@ -443,8 +443,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     lie_mpc = True
     dt = 0.1
 
-    get_img_mpc = False
-    get_trans = False
+    get_img_mpc = True
+    get_trans = True
 
     plan_chg_thres = 0.01
 
@@ -468,9 +468,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                          [-3*pi/5*0,  3*pi/5*0],
                          [-pi/2,  pi/2]]
     
-    target_poses_incs2 = [[-0.1,  -0.1],
-                          [0.2,     0.3],
-                          [-0.1*0,  0.1*0],
+    target_poses_incs2 = [[-0.1*0,   -0.1*0],
+                          [0.2*0,     0.3*0],
+                          [-0.1*0,    0.1*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0],
                           [-1*pi/5*0,  1*pi/5*0]]
