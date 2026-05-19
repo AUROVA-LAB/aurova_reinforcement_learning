@@ -625,6 +625,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             
             cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
                                   self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
+                                  self.camera_front[-1].unsqueeze(0).unsqueeze(0) / 255.0,
                                   self.gripper_pose_r_lie)
             
             # actions = self._preprocess_actions(cmd)
