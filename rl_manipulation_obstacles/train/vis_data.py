@@ -25,7 +25,8 @@ def vis():
 
 
     for i in range(len(dataset)):
-        print(i)
+        cv.imshow("aaa", np.transpose(dataset[i]["cam_D"], (1,2,0)))
+        cv.waitKey(1)
 
 
 if __name__ == "__main__":
