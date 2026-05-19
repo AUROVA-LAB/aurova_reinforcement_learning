@@ -189,11 +189,11 @@ class HDF5LfDDataset(Dataset):
         
         return {
             "cam": cam[:-1],
-            "cam_D": cam[-1][None] / 255.0,
+            "cam_D": np.repeat((cam[-1][None] / 255.0), 3, axis=0),
             "cam_ext": cam_ext[:-1],
-            "cam_ext_D": cam_ext[-1][None] / 255.0,
+            "cam_ext_D": np.repeat((cam_ext[-1][None] / 255.0), 3, axis=0),
             "cam_front": cam_front[:-1],
-            "cam_front_D": cam_front[-1][None] / 255.0,
+            "cam_front_D": np.repeat((cam_front[-1][None] / 255.0), 3, axis=0),
             "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": np.concatenate([action, gripper_action], axis=-1),
