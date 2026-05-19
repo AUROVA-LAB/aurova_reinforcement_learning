@@ -120,7 +120,7 @@ class SimpleCNN(nn.Module):
 
 
 class CnnPolicy(nn.Module):
-    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = False):
+    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True):
         super().__init__()
 
         if pretrained:
