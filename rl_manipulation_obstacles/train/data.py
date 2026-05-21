@@ -21,7 +21,10 @@ class HDF5EpisodeWriter:
         # Lazy init (we don’t know shapes yet)
         self.initialized = False
 
-    def _init_datasets(self, cam_shape, cam_ext_shape, cam_front_shape, pose_dim, action_dim, gripper_action_dim):
+    def _init_datasets(self, cam_shape, cam_ext_shape, cam_front_shape, 
+                       cam_p_shape, cam_ext_p_shape, cam_front_p_shape, 
+                       pc_shape, pc_ext_shape, pc_front_shape, 
+                       pose_dim, action_dim, gripper_action_dim):
         T = self.max_steps
 
         self.cam_ds = self.file.create_dataset(
@@ -32,6 +35,30 @@ class HDF5EpisodeWriter:
         )
         self.cam_front_ds = self.file.create_dataset(
             "images/cam_front", (T, *cam_front_shape), dtype="uint8"
+        )
+
+        
+        
+        self.cam_p_ds = self.file.create_dataset(
+            "images/cam_p", (T, *cam_p_shape), dtype="uint8"
+        )
+        self.cam_ext_p_ds = self.file.create_dataset(
+            "images/cam_ext_p", (T, *cam_ext_p_shape), dtype="uint8"
+        )
+        self.cam_front_p_ds = self.file.create_dataset(
+            "images/cam_front_p", (T, *cam_front_p_shape), dtype="uint8"
+        )
+
+
+
+        self.pc_ds = self.file.create_dataset(
+            "pc/pc", (T, *pc_shape), dtype="uint8"
+        )
+        self.pc_ext_ds = self.file.create_dataset(
+            "pc/pc_ext", (T, *pc_ext_shape), dtype="uint8"
+        )
+        self.pc_front_ds = self.file.create_dataset(
+            "pc/pc_front", (T, *pc_front_shape), dtype="uint8"
         )
 
         self.target_pose_ds = self.file.create_dataset(
@@ -55,9 +82,13 @@ class HDF5EpisodeWriter:
 
         self.initialized = True
 
-    def add_step(self, cam, cam_ext, cam_front, target_pose, gripper_pose, action, diff, gripper_action):
+    def add_step(self, cam, cam_ext, cam_front, 
+                 cam_p, cam_ext_p, cam_front_p,
+                 pc_w, pc_ext, pc_front, 
+                 target_pose, gripper_pose, action, diff, gripper_action):
         """
         cam, cam_ext: (H, W, 3) uint8
+        pc_w, pc_ext, pc_front: (N, 3) float32
         poses: (D,)
         action: (A,)
         diff: (A,)
@@ -69,6 +100,12 @@ class HDF5EpisodeWriter:
                 cam.shape,
                 cam_ext.shape,
                 cam_front.shape,
+                cam_p.shape,
+                cam_ext_p.shape,
+                cam_front_p.shape,
+                pc_w.shape,
+                pc_ext.shape,
+                pc_front.shape,
                 target_pose.shape[0],
                 action.shape[0],
                 gripper_action
@@ -79,6 +116,12 @@ class HDF5EpisodeWriter:
         self.cam_ds[idx] = cam
         self.cam_ext_ds[idx] = cam_ext
         self.cam_front_ds[idx] = cam_front
+        self.cam_p_ds[idx] = cam_p
+        self.cam_ext_p_ds[idx] = cam_ext_p
+        self.cam_front_p_ds[idx] = cam_front_p
+        self.pc_ds[idx] = pc_w
+        self.pc_ext_ds[idx] = pc_ext
+        self.pc_front_ds[idx] = pc_front
         self.target_pose_ds[idx] = target_pose
         self.gripper_pose_ds[idx] = gripper_pose
         self.action_ds[idx] = action
@@ -178,6 +221,14 @@ class HDF5LfDDataset(Dataset):
         cam_ext = f["/images/cam_ext"][t]
         cam_front = f["/images/cam_front"][t]
 
+        cam_p = f["/images/cam_p"][t]
+        cam_ext_p = f["/images/cam_ext_p"][t]
+        cam_front_p = f["/images/cam_front_p"][t]
+
+        pc = f["/pc/pc"][t]
+        pc_ext = f["/pc/pc_ext"][t]
+        pc_front = f["/pc/pc_front"][t]
+
         target_pose = f["/states/target_pose"][t]
         gripper_pose = f["/states/gripper_pose"][t] 
 
@@ -188,17 +239,20 @@ class HDF5LfDDataset(Dataset):
 
         
         return {
-            "cam": cam[:-1],
-            "cam_D": np.repeat((cam[-1][None] / 255.0), 3, axis=0),
-            "cam_ext": cam_ext[:-1],
-            "cam_ext_D": np.repeat((cam_ext[-1][None] / 255.0), 3, axis=0),
-            "cam_front": cam_front[:-1],
-            "cam_front_D": np.repeat((cam_front[-1][None] / 255.0), 3, axis=0),
-            "target_pose": target_pose,
+            # "cam": cam[:-1] / 255.0,
+            "cam_D": cam_p / 255.0, # np.repeat(cam[-1][None], 3, axis=0) / 255.0,
+            # "cam_ext": cam_ext[:-1] / 255.0,
+            "cam_ext_D": cam_ext_p / 255.0, # np.repeat(cam_ext[-1][None], 3, axis=0) / 255.0,
+            # "cam_front": cam_front[:-1] / 255.0,
+            "cam_front_D": cam_front_p / 255.0, # np.repeat(cam_front[-1][None], 3, axis=0) / 255.0,
+            # "pc": pc / 100.0,
+            # "pc_ext": pc_ext / 100.0,
+            # "pc_front": pc_front / 100.0,
+            # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": np.concatenate([action, gripper_action], axis=-1),
-            "diff": np.concatenate([action, gripper_action], axis=-1),
-            "prev_action": prev_action
+            # "diff": np.concatenate([action, gripper_action], axis=-1),
+            # "prev_action": prev_action
         }
 
     # =====================================================
@@ -210,6 +264,10 @@ class HDF5LfDDataset(Dataset):
         idx,
         cam=None,
         cam_ext=None,
+        cam_front=None,
+        cam_p=None,
+        cam_ext_p=None,
+        cam_front_p=None,
         target_pose=None,
         gripper_pose=None,
         action=None,
@@ -223,7 +281,6 @@ class HDF5LfDDataset(Dataset):
         # -------------------------------------------------
         # CAM
         # -------------------------------------------------
-
         if cam is not None:
 
             if torch.is_tensor(cam):
@@ -232,12 +289,14 @@ class HDF5LfDDataset(Dataset):
             # HWC -> CWH
             if cam.ndim == 3 and cam.shape[-1] == 3:
                 cam = np.transpose(cam, (2, 0, 1))
+            elif cam.ndim == 3 and cam.shape[-1] == 1:
+                f["/images/cam"][t][-1] = cam
 
             # float -> uint8
             if cam.dtype != np.uint8:
                 cam = (cam * 255).astype(np.uint8)
 
-            f["cam"][t] = cam
+            # f["/images/cam"][t] = cam
 
         # -------------------------------------------------
         # CAM EXT
@@ -251,55 +310,78 @@ class HDF5LfDDataset(Dataset):
             # HWC -> CWH
             if cam_ext.ndim == 3 and cam_ext.shape[-1] == 3:
                 cam_ext = np.transpose(cam_ext, (2, 0, 1))
+            elif cam_ext.ndim == 3 and cam_ext.shape[-1] == 1:
+                f["/images/cam_ext"][t][-1] = cam_ext
 
             if cam_ext.dtype != np.uint8:
                 cam_ext = (cam_ext * 255).astype(np.uint8)
 
-            f["cam_ext"][t] = cam_ext
+            # f["cam_ext"][t] = cam_ext
 
-        # -------------------------------------------------
-        # TARGET POSE
-        # -------------------------------------------------
+        if cam_front is not None:
 
-        if target_pose is not None:
+            if torch.is_tensor(cam_front):
+                cam_front = cam_front.cpu().numpy()
 
-            if torch.is_tensor(target_pose):
-                target_pose = target_pose.cpu().numpy()
+            # HWC -> CWH
+            if cam_front.ndim == 3 and cam_front.shape[-1] == 3:
+                cam_front = np.transpose(cam_front, (2, 0, 1))
+            elif cam_front.ndim == 3 and cam_front.shape[-1] == 1:
+                f["/images/cam_front"][t][-1] = cam_front
 
-            f["target_pose"][t] = target_pose
+            if cam_front.dtype != np.uint8:
+                cam_front = (cam_front * 255).astype(np.uint8)
 
-        # -------------------------------------------------
-        # GRIPPER POSE
-        # -------------------------------------------------
+            # f["cam_front"][t] = cam_front
 
-        if gripper_pose is not None:
+        
+        if cam_p is not None:
 
-            if torch.is_tensor(gripper_pose):
-                gripper_pose = gripper_pose.cpu().numpy()
+            if torch.is_tensor(cam_p):
+                cam_p = cam_p.cpu().numpy()
 
-            f["gripper_pose"][t] = gripper_pose
+            # HWC -> CWH
+            if cam_p.ndim == 3 and cam_p.shape[0] == 3:
+                f["/images/cam_p"][t] = cam_p
+                
 
-        # -------------------------------------------------
-        # ACTION
-        # -------------------------------------------------
+            # float -> uint8
+            if cam_p.dtype != np.uint8:
+                cam_p = (cam_p * 255).astype(np.uint8)
 
-        if action is not None:
+        
+        if cam_ext_p is not None:
 
-            if torch.is_tensor(action):
-                action = action.cpu().numpy()
+            if torch.is_tensor(cam_ext_p):
+                cam_ext_p = cam_ext_p.cpu().numpy()
 
-            f["actions"][t] = action
+            # HWC -> CWH
+            if cam_ext_p.ndim == 3 and cam_ext_p.shape[0] == 3:
+                f["/images/cam_ext_p"][t] = cam_ext_p
+                
 
-        # -------------------------------------------------
-        # GRIPPER ACTION
-        # -------------------------------------------------
+            # float -> uint8
+            if cam_ext_p.dtype != np.uint8:
+                cam_ext_p = (cam_ext_p * 255).astype(np.uint8)
 
-        if gripper_action is not None:
 
-            if torch.is_tensor(gripper_action):
-                gripper_action = gripper_action.cpu().numpy()
+        if cam_front_p is not None:
 
-            f["gripper_action"][t] = gripper_action
+            if torch.is_tensor(cam_front_p):
+                cam_front_p = cam_front_p.cpu().numpy()
+
+            # HWC -> CWH
+            if cam_front_p.ndim == 3 and cam_front_p.shape[0] == 3:
+                f["/images/cam_front_p"][t] = cam_front_p
+                
+
+            # float -> uint8
+            if cam_front_p.dtype != np.uint8:
+                cam_front_p = (cam_front_p * 255).astype(np.uint8)
+
+
+        
+
 
         f.flush()
 
