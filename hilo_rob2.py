@@ -186,15 +186,13 @@ ref_lab = torch.tensor([[-0.6800, -0.3700, 0.25400+0.5, -3.0582, 0.9217, 2.6561]
 
 
 
-ellipsoid_r = [0.43, 
-               0.2, 
-               0.435 ]
+ellipsoid_r = []
 
 obst_list = torch.tensor(obst_list)
 
-model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list=obst_list, 
+model, nmpc, ellipsoid_r_torch = drop_NMPC_setup(obst_list=np.array([]), 
                               ellipsoid_r=ellipsoid_r, 
-                              ini = torch.tensor(x0), 
+                              ini = np.array(x0), 
                               ref = ref_lab[0])
 
 

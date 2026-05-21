@@ -25,7 +25,7 @@ import pickle
 
 
 
-def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
+def drop_MPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
                                                 0,0,0,0,0,0], ref = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0], 
                                                 dt = 0.01,
                                                 lie = False,):
@@ -142,7 +142,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     # ======================================================
     # NMPC
     # ======================================================
-    nmpc = NMPC(model)
+    mpc = NMPC(model)
 
     # Target
     X_ref =  ref[0].item()
@@ -162,7 +162,7 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     weights = [[50, 70, 60, 50, 50, 50,     2, 2, 2, 2, 2, 2], 
                [3, 3, 3, 3, 3, 3,     3, 3, 3, 3, 3, 3]]
 
-    nmpc.quad_stage_cost.add_states(
+    mpc.quad_stage_cost.add_states(
         names=['X', 'Y', 'Z', 'X_', 'Y_', 'Z_', 
                 'Vx', 'Vy', 'Vz', 'Wx', 'Wy', 'Wz'],
 
@@ -171,16 +171,16 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
         weights=weights[lie]
     )
 
-    nmpc.quad_stage_cost.add_inputs(
+    mpc.quad_stage_cost.add_inputs(
         names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
         weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     )
 
     # Horizon
-    nmpc.horizon = 15
+    mpc.horizon = 15
 
     # Box constraints
-    nmpc.set_box_constraints(
+    mpc.set_box_constraints(
         x_lb=[-10, -10, -10, -10, -10, -10, 
             -10, -10, -10, -10, -10, -10],
         x_ub=[10, 10, 10, 10, 10, 10,
@@ -195,14 +195,16 @@ def drop_NMPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
     x0 = ini
     # z0 = [1.0]*len(obst_list)   # start feasible
     u0 = [0]*6
-
+    
     model.set_initial_conditions(x0=x0, z0 = None)
-    nmpc.set_initial_guess(x_guess=x0, u_guess=u0)
+    mpc.set_initial_guess(x_guess=x0, u_guess=u0)
 
-    nmpc.setup(options={'print_level': 0})
+    mpc.setup(options={'print_level': 0})
 
 
-    return model, nmpc, ellipsoid_r_torch
+    return model, mpc, ellipsoid_r_torch
+
+
 
 def save_traj(traj, lie, saving_dir):
     dict_save = {"lie": lie,
@@ -210,3 +212,297 @@ def save_traj(traj, lie, saving_dir):
     
     with open(saving_dir, 'wb') as f:
         pickle.dump(dict_save, f)
+
+
+
+
+# ============================================================
+# UR5e DH parameters
+# ============================================================
+
+d1 = 0.1625
+a2 = -0.425
+a3 = -0.3922
+d4 = 0.1333
+d5 = 0.0997
+d6 = 0.0996
+
+
+# ============================================================
+# DH transform
+# ============================================================
+
+def dh(a, alpha, d, theta):
+
+    ct = ca.cos(theta)
+    st = ca.sin(theta)
+
+    ca_ = ca.cos(alpha)
+    sa_ = ca.sin(alpha)
+
+    T = ca.vertcat(
+        ca.horzcat(ct, -st*ca_,  st*sa_, a*ct),
+        ca.horzcat(st,  ct*ca_, -ct*sa_, a*st),
+        ca.horzcat(0,      sa_,      ca_,    d),
+        ca.horzcat(0,         0,         0,    1)
+    )
+
+    return T
+
+
+# ============================================================
+# Forward kinematics UR5e
+# ============================================================
+
+def ur5e_fk(q):
+
+    q1 = q[0]
+    q2 = q[1]
+    q3 = q[2]
+    q4 = q[3]
+    q5 = q[4]
+    q6 = q[5]
+
+    T1 = dh(0,      np.pi/2, d1, q1)
+    T2 = dh(a2,     0,       0,  q2)
+    T3 = dh(a3,     0,       0,  q3)
+    T4 = dh(0,      np.pi/2, d4, q4)
+    T5 = dh(0,     -np.pi/2, d5, q5)
+    T6 = dh(0,      0,       d6, q6)
+
+    T = T1 @ T2 @ T3 @ T4 @ T5 @ T6
+
+    p = T[0:3, 3]
+    R = T[0:3, 0:3]
+
+    return p, R
+
+
+# ============================================================
+# Orientation error
+# ============================================================
+
+def rotation_error(R, Rd):
+
+    Re = Rd.T @ R
+
+    e = 0.5 * ca.vertcat(
+        Re[2,1] - Re[1,2],
+        Re[0,2] - Re[2,0],
+        Re[1,0] - Re[0,1]
+    )
+
+    return e
+
+
+# ============================================================
+# NMPC setup
+# ============================================================
+
+def ur5e_NMPC_setup(
+    goal_position,
+    goal_rotation,
+    dt=0.05,
+    horizon=20,
+    q0=None
+):
+
+    # ========================================================
+    # Create model
+    # ========================================================
+
+    model = Model(plot_backend='bokeh')
+
+    # ========================================================
+    # States (joint angles)
+    # ========================================================
+
+    q = model.set_dynamical_states([
+        'q1', 'q2', 'q3',
+        'q4', 'q5', 'q6'
+    ])
+
+    # ========================================================
+    # Inputs (joint velocities)
+    # ========================================================
+
+    dq = model.set_inputs([
+        'dq1', 'dq2', 'dq3',
+        'dq4', 'dq5', 'dq6'
+    ])
+
+    # ========================================================
+    # Dynamics
+    # ========================================================
+
+    dx = ca.vertcat(
+        dq[0],
+        dq[1],
+        dq[2],
+        dq[3],
+        dq[4],
+        dq[5]
+    )
+
+    model.set_dynamical_equations(dx)
+
+    # ========================================================
+    # Measurements
+    # ========================================================
+
+    model.set_measurements([
+        'yq1', 'yq2', 'yq3',
+        'yq4', 'yq5', 'yq6'
+    ])
+
+    model.set_measurement_equations(q)
+
+    # ========================================================
+    # Setup model
+    # ========================================================
+
+    model.setup(dt=dt)
+
+    # ========================================================
+    # NMPC
+    # ========================================================
+
+    nmpc = NMPC(model)
+
+    # ========================================================
+    # Forward kinematics
+    # ========================================================
+
+    p_ee, R_ee = ur5e_fk(q)
+
+    px = p_ee[0]
+    py = p_ee[1]
+    pz = p_ee[2]
+
+    # ========================================================
+    # Goal
+    # ========================================================
+
+    p_ref = ca.DM(goal_position)
+
+    R_ref = ca.DM(goal_rotation)
+
+    # ========================================================
+    # Position error
+    # ========================================================
+
+    pos_error = ca.vertcat(
+        px - p_ref[0],
+        py - p_ref[1],
+        pz - p_ref[2]
+    )
+
+    # ========================================================
+    # Orientation error
+    # ========================================================
+
+    ori_error = rotation_error(R_ee, R_ref)
+
+    # ========================================================
+    # Cost function
+    # ========================================================
+
+    stage_cost = (
+        200 * ca.sumsqr(pos_error) +
+        50  * ca.sumsqr(ori_error) +
+        0.01 * ca.sumsqr(dq)
+    )
+
+    nmpc.set_stage_cost(stage_cost)
+
+    # ========================================================
+    # Horizon
+    # ========================================================
+
+    nmpc.horizon = horizon
+
+    # ========================================================
+    # Joint limits UR5e
+    # ========================================================
+
+    q_lb = [
+        -2*np.pi,
+        -2*np.pi,
+        -2*np.pi,
+        -2*np.pi,
+        -2*np.pi,
+        -2*np.pi
+    ]
+
+    q_ub = [
+        2*np.pi,
+        2*np.pi,
+        2*np.pi,
+        2*np.pi,
+        2*np.pi,
+        2*np.pi
+    ]
+
+    # ========================================================
+    # Joint velocity limits
+    # ========================================================
+
+    dq_lb = [
+        -1.5,
+        -1.5,
+        -1.5,
+        -1.5,
+        -1.5,
+        -1.5
+    ]
+
+    dq_ub = [
+        1.5,
+        1.5,
+        1.5,
+        1.5,
+        1.5,
+        1.5
+    ]
+
+    # ========================================================
+    # Constraints
+    # ========================================================
+
+    nmpc.set_box_constraints(
+        x_lb=q_lb,
+        x_ub=q_ub,
+        u_lb=dq_lb,
+        u_ub=dq_ub
+    )
+
+    # ========================================================
+    # Initial condition
+    # ========================================================
+
+    if q0 is None:
+        q0 = [0]*6
+
+    u0 = [0]*6
+
+    model.set_initial_conditions(
+        x0=q0,
+        z0=None
+    )
+
+    nmpc.set_initial_guess(
+        x_guess=q0,
+        u_guess=u0
+    )
+
+    # ========================================================
+    # Setup solver
+    # ========================================================
+
+    nmpc.setup(
+        options={
+            'print_level': 0
+        }
+    )
+
+    return model, nmpc
