@@ -113,9 +113,9 @@ def train():
 
                 elif MODE == "sam": 
                     
-                    f1 = backbone.image_encoder(f1)
-                    f2 = backbone.image_encoder(f2)
-                    f3 = backbone.image_encoder(f3)
+                    f1 = backbone.image_encoder(f1).mean(dim = 1).view(f1.size(0), -1)
+                    f2 = backbone.image_encoder(f2).mean(dim = 1).view(f1.size(0), -1)
+                    f3 = backbone.image_encoder(f3).mean(dim = 1).view(f1.size(0), -1)
 
                     print(f1.shape)
 
