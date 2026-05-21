@@ -132,12 +132,24 @@ class CnnPolicy(nn.Module):
         #     # Remove AutoShape
         #     backbone = model.model.model#.model          # DetectMultiBackend
 
-        #     # Extract backbone (layers 0–9)
-        #     self.cnn = nn.Sequential(*backbone[:10], 
-        #                              nn.AdaptiveAvgPool2d((1,1)), 
-        #                              nn.Flatten(), 
-        #                              nn.Linear(512, hidden_dim))
-        #     self.cnn.eval()
+            self.f1_net = nn.Sequential(
+                nn.Linear(4096, 1024),
+                nn.GELU(),
+                nn.Linear(1024, 128),
+                nn.Tanh()
+            )
+            self.f2_net = nn.Sequential(
+                nn.Linear(4096, 1024),
+                nn.GELU(),
+                nn.Linear(1024, 128),
+                nn.Tanh()
+            )
+            self.f3_net = nn.Sequential(
+                nn.Linear(4096, 1024),
+                nn.GELU(),
+                nn.Linear(1024, 128),
+                nn.Tanh()
+            )
 
             self.forward = self.forward_pre
 
@@ -192,6 +204,10 @@ class CnnPolicy(nn.Module):
     
 
     def forward_pre(self, f1, f2, f3, pose):
+
+        f1 = self.f1_net(f1)
+        f2 = self.f1_net(f2)
+        f3 = self.f1_net(f3)
 
         f_pose = self.pose_mlp(pose)
 

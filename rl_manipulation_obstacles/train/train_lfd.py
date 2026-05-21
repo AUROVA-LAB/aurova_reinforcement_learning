@@ -117,10 +117,6 @@ def train():
                     f2 = backbone.image_encoder(f2).mean(dim = 1).view(f1.size(0), -1)
                     f3 = backbone.image_encoder(f3).mean(dim = 1).view(f1.size(0), -1)
 
-                    print(f1.shape)
-
-
-
             pred = model(
                 f1, f2, f3,
                 b["gripper_pose"],
