@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from einops import rearrange
 import copy
-
+# from ultralytics import YOLO
 
 # =========================================================
 # MODEL Transformers
@@ -123,22 +123,26 @@ class CnnPolicy(nn.Module):
     def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True):
         super().__init__()
 
-        if pretrained:
+        # if pretrained:
             
-            # Load model
-            model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # -> si uso esto tengo que meter un .model mas
+        #     # Load model
+        #     # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # -> si uso esto tengo que meter un .model mas
+        #     model = YOLO("yolov5su.pt")
 
-            # Remove AutoShape
-            backbone = model.model.model.model          # DetectMultiBackend
+        #     # Remove AutoShape
+        #     backbone = model.model.model#.model          # DetectMultiBackend
 
-            # Extract backbone (layers 0–9)
-            self.cnn = nn.Sequential(*backbone[:10], nn.AdaptiveAvgPool2d((1,1)), nn.Flatten(), nn.Linear(512, hidden_dim))
-            self.cnn.eval()
+        #     # Extract backbone (layers 0–9)
+        #     self.cnn = nn.Sequential(*backbone[:10], 
+        #                              nn.AdaptiveAvgPool2d((1,1)), 
+        #                              nn.Flatten(), 
+        #                              nn.Linear(512, hidden_dim))
+        #     self.cnn.eval()
 
-            self.forward = self.forward_pre
+        #     self.forward = self.forward_pre
 
 
-        else:
+        if not pretrained:
             self.cnn1 = SimpleCNN(in_channels=in_channels, 
                                 out_dim=hidden_dim)
             self.cnn2 = SimpleCNN(in_channels=in_channels, 
@@ -187,12 +191,8 @@ class CnnPolicy(nn.Module):
         return self.head(fused)
     
 
-    def forward_pre(self, cam, cam_ext, cam_front, pose):
-        with torch.no_grad():
-            f1 = self.cnn(cam)
-            f2 = self.cnn(cam_ext)
-            f3 = self.cnn(cam_front)
-        
+    def forward_pre(self, f1, f2, f3, pose):
+
         f_pose = self.pose_mlp(pose)
 
         fused_raw = torch.cat([f1, f2, f3, f_pose], dim=-1)

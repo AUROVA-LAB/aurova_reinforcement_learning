@@ -6,14 +6,14 @@ from torch.utils.data import DataLoader, random_split
 
 from data import *
 from networks_lfd import *
-from train_utils import collate_fn
+from train_utils import collate_fn, preprocess_img_sam
 
 import matplotlib.pyplot as plt
 import cv2 as cv
 
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
-
-
+import time
 # =========================================================
 # TRAINING
 # =========================================================
@@ -32,9 +32,9 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=64, shuffle = True, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=16, shuffle = True, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=16, shuffle = True, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -56,19 +56,71 @@ def train():
 
     print("\n ------ Start training \n")
 
+    MODE = "sam"
+
+    YOLO_MODEL = "yolov8n.pt"
+
+    SAM_CHECKPOINT = "./sam_vit_h_4b8939.pth"
+    SAM_TYPE = "vit_h"
+
+    if MODE == "yolo":
+        model = YOLO(YOLO_MODEL)
+
+        backbone = model.model.model#.model          # DetectMultiBackend
+
+        # Extract backbone (layers 0–9)
+        backbone = nn.Sequential(*backbone[:10], 
+                                nn.AdaptiveAvgPool2d((1,1)), 
+                                nn.Flatten(), 
+                                nn.Linear(512, 128))
+        backbone.eval()
+
+    
+    elif MODE == "sam":
+        dataset = preprocess_img_sam(dataset)
+
+        sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_CHECKPOINT)
+
+        sam.to("cuda")
+        sam.eval()
+
+        backbone = sam
+
+
+
+        
+
+
     for epoch in range(50):
 
         # ================= TRAIN =================
         model.train()
         train_loss = 0
 
-        for b in train_loader:            
+        for b in train_loader:    
+              
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
+            f1 = b["cam_D"]
+            f2 = b["cam_ext_D"]
+            f3 = b["cam_front_D"]
+
+            with torch.no_grad():
+                if MODE == "yolo":
+                    f1 = backbone(f1)
+                    f2 = backbone(f2)
+                    f3 = backbone(f3)
+
+                elif MODE == "sam": 
+                    
+                    f1 = backbone.image_encoder(f1)
+                    f2 = backbone.image_encoder(f2)
+                    f3 = backbone.image_encoder(f3)
+
+
+
             pred = model(
-                b["cam_D"],
-                b["cam_ext_D"],
-                b["cam_front_D"],
+                f1, f2, f3,
                 b["gripper_pose"],
             )
 
