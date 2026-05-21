@@ -17,6 +17,7 @@ from .py_dq.src.matrix_lie import *
 from .py_dq.src.euler import *
 
 from .train.networks_lfd import *
+from .train.train_utils import *
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, RigidObject
@@ -39,12 +40,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append('../../../')
 
-from hilo_mpc import NMPC, Model
-import casadi as ca
-from .mpc_controller import drop_NMPC_setup, save_traj
-import pickle
-from math import atan, pi
-from scipy.spatial.transform import Rotation
+from .mpc_controller import drop_MPC_setup, save_traj
 
 
 
@@ -406,6 +402,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.camera_w = None
         self.camera_front = None
 
+        self.pc_w = None
+        self.pc_ext = None
+        self.pc_front = None
+
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
         self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
         self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
@@ -603,6 +603,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if not self.cfg.test:
             if self.count < self.subs_limit:
                 self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+            else:
+                self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
             
@@ -621,11 +623,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
         
         else:
-
             
-            cmd = self.test_model(self.camera_w[-1].unsqueeze(0).unsqueeze(0) / 255.0, 
-                                  self.camera_ext[-1].unsqueeze(0).unsqueeze(0) / 255.0,
-                                  self.camera_front[-1].unsqueeze(0).unsqueeze(0) / 255.0,
+            cmd = self.test_model(self.camera_w[-1].repeat(3,1,1).unsqueeze(0) / 255.0, 
+                                  self.camera_ext[-1].repeat(3,1,1).unsqueeze(0) / 255.0,
+                                  self.camera_front[-1].repeat(3,1,1).unsqueeze(0) / 255.0,
                                   self.gripper_pose_r_lie)
             
             # actions = self._preprocess_actions(cmd)
@@ -863,24 +864,24 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         cam_ext_D = self.scene.sensors["camera_ext"].data.output["depth"][0, ..., 0].unsqueeze(0)
         cam_front_D = self.scene.sensors["camera_front"].data.output["depth"][0, ..., 0].unsqueeze(0)
 
-        cam_ext_D = torch.clip(cam_ext_D, 0.8, 1.5)
-        cam_ext_D = (cam_ext_D - 0.8) / 1.5
+        # cam_ext_D = torch.clip(cam_ext_D, 0.8, 1.0)
+        # cam_ext_D = (cam_ext_D - 0.0) / 1.0
 
-        # cam_front_D = torch.clip(cam_front_D, 0.8, 1.5)
-        # cam_front_D = (cam_front_D - 0.8) / 1.5
+        # cam_front_D = torch.clip(cam_front_D, 0.8, 1.0)
+        # cam_front_D = (cam_front_D - 0.0) / 1.0
 
 
-        cam = cam * 100
-        cam_ext = cam_ext * 100
-        cam_front = cam_front * 100
+        cam = cam
+        cam_ext = cam_ext
+        cam_front = cam_front
 
-        cam_D = cam_D * 255
-        cam_ext_D = cam_ext_D * 255
-        cam_front_D = cam_front_D * 255
+        cam_D = cam_D
+        cam_ext_D = cam_ext_D
+        cam_front_D = cam_front_D
 
-        self.camera_w = torch.cat((cam, cam_D), dim = 0)
-        self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
-        self.camera_front = torch.cat((cam_front, cam_front_D), dim = 0)
+        self.camera_w = torch.cat((cam, cam_D), dim = 0)*255
+        self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)*255
+        self.camera_front = torch.cat((cam_front, cam_front_D), dim = 0)*255
 
 
         # Render images every certain amount of steps
@@ -907,10 +908,51 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
+        pc_w = self.pc_w.float().cpu().numpy()*100
+        pc_ext = self.pc_ext.float().cpu().numpy()*100
+        pc_front = self.pc_front.float().cpu().numpy()*100
+
+        cam_p = torch.rand((3, 1024, 1024)).float().cpu().numpy()
+
         # ---- Save step ----
-        self.writer.add_step(cam, cam_ext, cam_front,target_pose, gripper_pose, action, diff, self.gripper_action)
+        self.writer.add_step(cam, cam_ext, cam_front, 
+                             cam_p, cam_p, cam_p,
+                             pc_w, pc_ext, pc_front, 
+                             target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
+
+
+
+
+    def _get_PC(self):
+        intrinsics = self.scene.sensors["camera"].data.intrinsic_matrices[0]
+        intrinsics_ext = self.scene.sensors["camera_ext"].data.intrinsic_matrices[0]
+        intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
+
+        pc_w = depth_to_pointcloud(self.camera_w[-1], intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
+        pc_ext = depth_to_pointcloud(self.camera_ext[-1], intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
+        pc_front = depth_to_pointcloud(self.camera_front[-1], intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
+
+
+        camera_w_pos = self.scene.sensors["camera"].data.pos_w
+        camera_w_quat = self.scene.sensors["camera"].data.quat_w_world
+        self.pc_w = transform_points(pc_w, camera_w_pos.squeeze(0), camera_w_quat.squeeze(0))
+
+        camera_ext_pos = self.scene.sensors["camera_ext"].data.pos_w
+        camera_ext_quat = self.scene.sensors["camera_ext"].data.quat_w_world
+        self.pc_ext = transform_points(pc_ext, camera_ext_pos.squeeze(0), camera_ext_quat.squeeze(0))
+
+        camera_front_pos = self.scene.sensors["camera_front"].data.pos_w
+        camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
+        self.pc_front = transform_points(pc_front, camera_front_pos.squeeze(0), camera_front_quat.squeeze(0))
+
+
+
+
+
+
+
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -928,8 +970,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.filter_collisions()
         
         self._get_images()
-        # image[image == float('inf')] = 255.0
-        # image /= 255.0
+        self._get_PC()
+        
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
@@ -1264,7 +1306,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
             
                 
-            self.model, self.nmpc, ellipsoid_r_torch = drop_NMPC_setup(self.cfg.obst_list, 
+            self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
                                                     self.cfg.ellipsoid_r, 
                                                     ini = x0, 
                                                     ref = ref[0],
@@ -1366,9 +1408,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
             # Load checkpoint
             checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
-
+            
             # If you saved only state_dict
-            self.test_model.load_state_dict(checkpoint)
+            self.test_model.load_state_dict(checkpoint, strict = False)
 
             # OR if checkpoint is wrapped
             # self.test_model.load_state_dict(checkpoint["self.model_state_dict"])
