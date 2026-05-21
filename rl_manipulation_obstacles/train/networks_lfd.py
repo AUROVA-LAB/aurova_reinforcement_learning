@@ -123,7 +123,7 @@ class CnnPolicy(nn.Module):
     def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True):
         super().__init__()
 
-        # if pretrained:
+        if pretrained:
             
         #     # Load model
         #     # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # -> si uso esto tengo que meter un .model mas
@@ -139,7 +139,7 @@ class CnnPolicy(nn.Module):
         #                              nn.Linear(512, hidden_dim))
         #     self.cnn.eval()
 
-        #     self.forward = self.forward_pre
+            self.forward = self.forward_pre
 
 
         if not pretrained:
