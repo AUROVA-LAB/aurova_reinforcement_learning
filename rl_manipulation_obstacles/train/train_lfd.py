@@ -32,9 +32,9 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=16, shuffle=True, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=16, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=16, shuffle = True, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=4, shuffle = True, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=4, shuffle = True, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
