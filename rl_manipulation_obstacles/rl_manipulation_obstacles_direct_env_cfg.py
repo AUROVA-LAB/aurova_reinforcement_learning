@@ -80,7 +80,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5*2
 
-    img_width, img_height = 640, 480
+    img_width, img_height = 128, 128# 640, 480
 
 
     # --- Action / observation space ---
@@ -407,12 +407,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses for obstacles ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
-    target_poses_incs = [[-0.2,  0.2],
+    target_poses_incs = [[-0.2,  0.1],
                          [-0.2,   0.2],
-                         [-0.35,   0.225],
-                         [-3*pi/5,  3*pi/5],
-                         [-3*pi/5,  3*pi/5],
-                         [-pi/2,  pi/2]]
+                         [-0.225,   0.225],
+                         [-pi/4,  pi/4],
+                         [-pi/4,  pi/4],
+                         [-pi/4,  pi/4]]
 
     apply_range_tgt = True
 
