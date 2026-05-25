@@ -109,9 +109,9 @@ class HDF5EpisodeWriter:
                 cam_p.shape,
                 cam_ext_p.shape,
                 cam_front_p.shape,
-                pc_w.shape,
-                pc_ext.shape,
-                pc_front.shape,
+                None,
+                None,
+                None,
                 target_pose.shape[0],
                 action.shape[0],
                 gripper_action
@@ -125,9 +125,9 @@ class HDF5EpisodeWriter:
         self.cam_p_ds[idx] = cam_p
         self.cam_ext_p_ds[idx] = cam_ext_p
         self.cam_front_p_ds[idx] = cam_front_p
-        self.pc_ds[idx] = pc_w
-        self.pc_ext_ds[idx] = pc_ext
-        self.pc_front_ds[idx] = pc_front
+        # self.pc_ds[idx] = pc_w
+        # self.pc_ext_ds[idx] = pc_ext
+        # self.pc_front_ds[idx] = pc_front
         self.target_pose_ds[idx] = target_pose
         self.gripper_pose_ds[idx] = gripper_pose
         self.action_ds[idx] = action
