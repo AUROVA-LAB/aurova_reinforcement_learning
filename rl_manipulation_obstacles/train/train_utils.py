@@ -157,7 +157,7 @@ def preprocess_img(img, backbone):
 
     tensor = (tensor - pixel_mean) / pixel_std
 
-    sam = sam_model_registry["yolov8n.pt"](checkpoint="./sam_vit_h_4b8939.pth")
+    sam = sam_model_registry["vit_h"](checkpoint="./sam_vit_h_4b8939.pth")
 
     sam.to("cuda")
     sam.eval()
