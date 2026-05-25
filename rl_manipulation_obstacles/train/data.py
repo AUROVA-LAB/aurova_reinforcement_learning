@@ -231,29 +231,29 @@ class HDF5LfDDataset(Dataset):
         cam_ext_p = f["/images/cam_ext_p"][t]
         cam_front_p = f["/images/cam_front_p"][t]
 
-        pc = f["/pc/pc"][t]
-        pc_ext = f["/pc/pc_ext"][t]
-        pc_front = f["/pc/pc_front"][t]
+        # pc = f["/pc/pc"][t]
+        # pc_ext = f["/pc/pc_ext"][t]
+        # pc_front = f["/pc/pc_front"][t]
 
-        target_pose = f["/states/target_pose"][t]
+        # target_pose = f["/states/target_pose"][t]
         gripper_pose = f["/states/gripper_pose"][t] 
 
         action = f["actions"][t] 
-        prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
-        diff = f["diff"][t] 
+        # prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
+        # diff = f["diff"][t] 
         gripper_action = f["gripper_action"][t]
 
         
         return {
-            "cam": cam[:-1] / 255.0,
+            # "cam": cam[:-1] / 255.0,
             "cam_D": np.repeat(cam[-1][None], 3, axis=0) / 255.0,
             "cam_p": cam_p,
 
-            "cam_ext": cam_ext[:-1] / 255.0,
+            # "cam_ext": cam_ext[:-1] / 255.0,
             "cam_ext_D": np.repeat(cam_ext[-1][None], 3, axis=0) / 255.0,
             "cam_ext_p": cam_ext_p,
 
-            "cam_front": cam_front[:-1] / 255.0,
+            # "cam_front": cam_front[:-1] / 255.0,
             "cam_front_D": np.repeat(cam_front[-1][None], 3, axis=0) / 255.0,
             "cam_front_p": cam_front_p,
             
