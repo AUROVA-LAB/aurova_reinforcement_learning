@@ -157,6 +157,13 @@ def preprocess_img(img, backbone):
 
     tensor = (tensor - pixel_mean) / pixel_std
 
+    sam = sam_model_registry["yolov8n.pt"](checkpoint="./sam_vit_h_4b8939.pth")
+
+    sam.to("cuda")
+    sam.eval()
+
+    backbone = sam
+
     f = backbone.image_encoder(tensor).mean(dim = 1).view(tensor.size(0), -1)
    
 
@@ -164,21 +171,16 @@ def preprocess_img(img, backbone):
 
 def preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE):
 
-    sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_CHECKPOINT)
-
-    sam.to("cuda")
-    sam.eval()
-
-    backbone = sam
+    
 
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
         print("------ Wrist")
-        f1 = preprocess_img(dataset[i]["cam_D"], backbone)
+        f1 = preprocess_img(dataset[i]["cam_D"], None)
         print("------ External")
-        f2 = preprocess_img(dataset[i]["cam_ext_D"], backbone)
+        f2 = preprocess_img(dataset[i]["cam_ext_D"], None)
         print("------ Frontal")
-        f3 = preprocess_img(dataset[i]["cam_front_D"], backbone)
+        f3 = preprocess_img(dataset[i]["cam_front_D"], None)
 
         dataset.set_item(i, cam_p = f1,
                             cam_ext_p = f2,
