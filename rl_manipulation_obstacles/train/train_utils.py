@@ -160,7 +160,7 @@ def preprocess_img(img, backbone):
     f = backbone.image_encoder(tensor).mean(dim = 1).view(tensor.size(0), -1)
    
 
-    return f
+    return f.cpu()
 
 def preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE):
 
