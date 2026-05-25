@@ -239,12 +239,18 @@ class HDF5LfDDataset(Dataset):
 
         
         return {
-            # "cam": cam[:-1] / 255.0,
-            "cam_D": cam_p / 255.0, # np.repeat(cam[-1][None], 3, axis=0) / 255.0,
-            # "cam_ext": cam_ext[:-1] / 255.0,
-            "cam_ext_D": cam_ext_p / 255.0, # np.repeat(cam_ext[-1][None], 3, axis=0) / 255.0,
-            # "cam_front": cam_front[:-1] / 255.0,
-            "cam_front_D": cam_front_p / 255.0, # np.repeat(cam_front[-1][None], 3, axis=0) / 255.0,
+            "cam": cam[:-1] / 255.0,
+            "cam_D": np.repeat(cam[-1][None], 3, axis=0) / 255.0,
+            "cam_p": cam_p,
+
+            "cam_ext": cam_ext[:-1] / 255.0,
+            "cam_ext_D": np.repeat(cam_ext[-1][None], 3, axis=0) / 255.0,
+            "cam_ext_p": cam_ext_p,
+
+            "cam_front": cam_front[:-1] / 255.0,
+            "cam_front_D": np.repeat(cam_front[-1][None], 3, axis=0) / 255.0,
+            "cam_front_p": cam_front_p,
+            
             # "pc": pc / 100.0,
             # "pc_ext": pc_ext / 100.0,
             # "pc_front": pc_front / 100.0,

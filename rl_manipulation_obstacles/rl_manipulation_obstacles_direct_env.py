@@ -896,7 +896,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
     def save_step(self):
         
-
         cam = self.camera_w.cpu().numpy().astype(np.uint8)
         cam_ext = self.camera_ext.cpu().numpy().astype(np.uint8)
         cam_front = self.camera_front.cpu().numpy().astype(np.uint8)
@@ -912,7 +911,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_ext = self.pc_ext.float().cpu().numpy()*100
         pc_front = self.pc_front.float().cpu().numpy()*100
 
-        cam_p = torch.rand((3, 1024, 1024)).float().cpu().numpy()
+        cam_p = torch.rand((64*64)).float().cpu().numpy()
 
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, cam_front, 
@@ -921,8 +920,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                              target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
-
-
 
 
     def _get_PC(self):
@@ -946,13 +943,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         camera_front_pos = self.scene.sensors["camera_front"].data.pos_w
         camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
         self.pc_front = transform_points(pc_front, camera_front_pos.squeeze(0), camera_front_quat.squeeze(0))
-
-
-
-
-
-
-
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
