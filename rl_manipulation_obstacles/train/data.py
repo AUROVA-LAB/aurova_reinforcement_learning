@@ -21,10 +21,10 @@ class HDF5EpisodeWriter:
         # Lazy init (we don’t know shapes yet)
         self.initialized = False
 
-    def _init_datasets(self, cam_shape, cam_ext_shape, cam_front_shape, 
-                       cam_p_shape, cam_ext_p_shape, cam_front_p_shape, 
-                       pc_shape, pc_ext_shape, pc_front_shape, 
-                       pose_dim, action_dim, gripper_action_dim):
+    def _init_datasets(self, cam_shape = None, cam_ext_shape = None, cam_front_shape = None, 
+                       cam_p_shape = None, cam_ext_p_shape = None, cam_front_p_shape = None, 
+                       pc_shape = None, pc_ext_shape = None, pc_front_shape = None, 
+                       pose_dim = None, action_dim = None, gripper_action_dim = None):
         T = self.max_steps
 
         self.cam_ds = self.file.create_dataset(
@@ -50,16 +50,22 @@ class HDF5EpisodeWriter:
         )
 
 
+        if pc_shape is not None:
+            self.pc_ds = self.file.create_dataset(
+                "pc/pc", (T, *pc_shape), dtype="uint8"
+            )
 
-        self.pc_ds = self.file.create_dataset(
-            "pc/pc", (T, *pc_shape), dtype="uint8"
-        )
-        self.pc_ext_ds = self.file.create_dataset(
-            "pc/pc_ext", (T, *pc_ext_shape), dtype="uint8"
-        )
-        self.pc_front_ds = self.file.create_dataset(
-            "pc/pc_front", (T, *pc_front_shape), dtype="uint8"
-        )
+        if pc_ext_shape is not None:
+            self.pc_ext_ds = self.file.create_dataset(
+                "pc/pc_ext", (T, *pc_ext_shape), dtype="uint8"
+            )
+
+        if pc_front_shape is not None:
+            self.pc_front_ds = self.file.create_dataset(
+                "pc/pc_front", (T, *pc_front_shape), dtype="uint8"
+            )
+
+
 
         self.target_pose_ds = self.file.create_dataset(
             "states/target_pose", (T, pose_dim), dtype="float32"

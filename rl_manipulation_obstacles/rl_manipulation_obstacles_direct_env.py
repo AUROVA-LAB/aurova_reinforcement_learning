@@ -916,7 +916,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, cam_front, 
                              cam_p, cam_p, cam_p,
-                             pc_w, pc_ext, pc_front, 
+                             # pc_w, pc_ext, pc_front, 
                              target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
