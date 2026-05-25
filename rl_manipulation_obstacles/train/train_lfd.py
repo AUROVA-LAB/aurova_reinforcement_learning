@@ -53,7 +53,6 @@ def train():
 
     best_val = float("inf")
 
-    print("\n ------ Start training \n")
 
     MODE = "sam"
 
@@ -80,6 +79,7 @@ def train():
 
         
 
+    print("\n ------ Start training \n")
 
 
         
