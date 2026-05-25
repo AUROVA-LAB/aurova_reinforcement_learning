@@ -11,6 +11,8 @@ from isaaclab.utils.math import matrix_from_quat
 
 import cv2 as cv
 
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+
 
 
 
@@ -121,10 +123,11 @@ def transform_points(points, translation, quaternion):
 
     return points_world
 
-def preprocess_img(img):
+def preprocess_img(img, backbone):
     '''
     In:
         - img: list of images
+        - backbone: SAM image encoder
     '''
 
     img = np.transpose(img, (1, 2, 0))
@@ -154,17 +157,30 @@ def preprocess_img(img):
 
     tensor = (tensor - pixel_mean) / pixel_std
 
-    return tensor
+    f = backbone.image_encoder(tensor).mean(dim = 1).view(f1.size(0), -1)
+   
 
-def preprocess_img_sam(dataset):
+    return f
+
+def preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE):
+
+    sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_CHECKPOINT)
+
+    sam.to("cuda")
+    sam.eval()
+
+    backbone = sam
 
     for i in range(len(dataset)):
+        print("--- Image ", i / len(dataset))
+        print("------ Wrist")
+        f1 = preprocess_img(dataset[i]["cam_D"], backbone)
+        print("------ External")
+        f2 = preprocess_img(dataset[i]["cam_ext_D"], backbone)
+        print("------ Frontal")
+        f3 = preprocess_img(dataset[i]["cam_front_D"], backbone)
 
-        cam_D = preprocess_img(dataset[i]["cam_D"])
-        cam_ext_D = preprocess_img(dataset[i]["cam_ext_D"])
-        cam_front_D = preprocess_img(dataset[i]["cam_front_D"])
-
-        dataset.set_item(i, cam_p = cam_D,
-                            cam_ext_p = cam_ext_D,
-                            cam_front_p = cam_front_D)
+        dataset.set_item(i, cam_p = f1,
+                            cam_ext_p = f2,
+                            cam_front_p = f3)
 

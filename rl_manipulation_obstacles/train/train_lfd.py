@@ -11,7 +11,6 @@ from train_utils import collate_fn, preprocess_img_sam
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
 import time
 # =========================================================
@@ -77,14 +76,9 @@ def train():
 
     
     elif MODE == "sam":
-        dataset = preprocess_img_sam(dataset)
+        dataset = preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE)
 
-        sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_CHECKPOINT)
-
-        sam.to("cuda")
-        sam.eval()
-
-        backbone = sam
+        
 
 
 
@@ -101,21 +95,10 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            f1 = b["cam_D"]
-            f2 = b["cam_ext_D"]
-            f3 = b["cam_front_D"]
+            f1 = b["cam_p"]
+            f2 = b["cam_ext_p"]
+            f3 = b["cam_front_p"]
 
-            with torch.no_grad():
-                if MODE == "yolo":
-                    f1 = backbone(f1)
-                    f2 = backbone(f2)
-                    f3 = backbone(f3)
-
-                elif MODE == "sam": 
-                    
-                    f1 = backbone.image_encoder(f1).mean(dim = 1).view(f1.size(0), -1)
-                    f2 = backbone.image_encoder(f2).mean(dim = 1).view(f1.size(0), -1)
-                    f3 = backbone.image_encoder(f3).mean(dim = 1).view(f1.size(0), -1)
 
             pred = model(
                 f1, f2, f3,
