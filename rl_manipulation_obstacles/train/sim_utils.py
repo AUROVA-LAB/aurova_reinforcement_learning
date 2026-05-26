@@ -6,13 +6,13 @@ from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms as T
 
 from isaaclab.utils.math import matrix_from_quat
 
 import cv2 as cv
 
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-
 
 
 
@@ -122,67 +122,3 @@ def transform_points(points, translation, quaternion):
     points_world = (R @ points.T).T + translation
 
     return points_world
-
-def preprocess_img(img, backbone):
-    '''
-    In:
-        - img: list of images
-        - backbone: SAM image encoder
-    '''
-
-    img = np.transpose(img, (1, 2, 0))
-
-    resized = cv.resize(img, (1024, 1024))
-
-    tensor = torch.from_numpy(resized).float().cuda()
-
-    # HWC -> BCHW
-    tensor = tensor.permute(2, 0, 1).unsqueeze(0)
-
-    # normalize to SAM expected range
-    # tensor = tensor / 255.0
-
-    # SAM normalization
-    pixel_mean = torch.tensor(
-        [123.675, 116.28, 103.53],
-        device=tensor.device
-    ).view(1, 3, 1, 1)
-
-    pixel_std = torch.tensor(
-        [58.395, 57.12, 57.375],
-        device=tensor.device
-    ).view(1, 3, 1, 1)
-
-    tensor = tensor * 255.0
-
-    tensor = (tensor - pixel_mean) / pixel_std
-
-    sam = sam_model_registry["vit_h"](checkpoint="./sam_vit_h_4b8939.pth")
-
-    sam.to("cuda")
-    sam.eval()
-
-    backbone = sam
-
-    f = backbone.image_encoder(tensor).mean(dim = 1).view(tensor.size(0), -1)
-   
-
-    return f.cpu()
-
-def preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE):
-
-    
-
-    for i in range(len(dataset)):
-        print("--- Image ", i / len(dataset))
-        print("------ Wrist")
-        f1 = preprocess_img(dataset[i]["cam_D"], None)
-        print("------ External")
-        f2 = preprocess_img(dataset[i]["cam_ext_D"], None)
-        print("------ Frontal")
-        f3 = preprocess_img(dataset[i]["cam_front_D"], None)
-
-        dataset.set_item(i, cam_p = f1,
-                            cam_ext_p = f2,
-                            cam_front_p = f3)
-

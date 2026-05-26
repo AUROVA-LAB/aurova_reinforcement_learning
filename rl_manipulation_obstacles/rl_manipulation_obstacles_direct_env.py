@@ -16,8 +16,8 @@ from .py_dq.src.quat_trans_lie import *
 from .py_dq.src.matrix_lie import *
 from .py_dq.src.euler import *
 
-from .train.networks_lfd import *
-from .train.train_utils import *
+from .train.sam2.networks_lfd import *
+from .train.sim_utils import *
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, RigidObject
@@ -30,7 +30,7 @@ from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sensors import TiledCamera, ContactSensor
 
-from .train.data import *
+from .train.sam2.data import *
 
 import numpy as np
 import matplotlib.pyplot as plt
