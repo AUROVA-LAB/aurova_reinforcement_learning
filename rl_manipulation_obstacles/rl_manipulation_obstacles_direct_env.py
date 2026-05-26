@@ -907,9 +907,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
-        pc_w = self.pc_w.float().cpu().numpy()*100
-        pc_ext = self.pc_ext.float().cpu().numpy()*100
-        pc_front = self.pc_front.float().cpu().numpy()*100
+        pc_w = self.pc_w.float().cpu().numpy() # * 100
+        pc_ext = self.pc_ext.float().cpu().numpy() # * 100
+        pc_front = self.pc_front.float().cpu().numpy() # * 100
 
         cam_p = torch.rand((64*64)).float().cpu().numpy()
 
