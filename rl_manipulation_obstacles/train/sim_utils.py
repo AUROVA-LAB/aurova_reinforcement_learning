@@ -94,20 +94,33 @@ def depth_to_pointcloud(depth, fx, fy, cx, cy):
 
     H, W = depth.shape
 
-    y, x = torch.meshgrid(
-        torch.arange(H, device=device),
-        torch.arange(W, device=device),
-        indexing='ij'
-    )
+    u = torch.arange(W, device=device)
+    v = torch.arange(H, device=device)
+
+    uu, vv = torch.meshgrid(u, v, indexing='xy')
 
     z = depth
-    x = (x - cx) * z / fx
-    y = (y - cy) * z / fy
+    x = (uu - cx) * z / fx
+    y = (vv - cy) * z / fy
 
-    points = torch.stack((x, y, z), dim=-1)
+    points = torch.stack((x, y, z), dim=-1) / 1000.0
 
     return points.reshape(-1, 3)
 
+
+def quat_to_rotmat(q):
+    """
+    q = (w, x, y, z)
+    """
+    w, x, y, z = q
+
+    R = torch.tensor([
+        [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
+        [2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w],
+        [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y]
+    ], device=q.device)
+
+    return R
 
 
 def transform_points(points, translation, quaternion):
@@ -117,8 +130,14 @@ def transform_points(points, translation, quaternion):
     quaternion: (4,)  [x,y,z,w]
     """
 
-    R = matrix_from_quat(quaternion)
+    # R = matrix_from_quat(quaternion)
+
+
+
+    R = quat_to_rotmat(quaternion)
 
     points_world = (R @ points.T).T + translation
+    # points_world = (R.T @ (points + translation).T).T
+    # points_world = (points - translation)@R.T  
 
     return points_world

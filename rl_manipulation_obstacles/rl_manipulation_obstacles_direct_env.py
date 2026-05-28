@@ -35,6 +35,9 @@ from .train.sam2.data import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+from .train.sam2.sam2.build_sam import build_sam2
+
 # from pynput import keyboard
 
 import sys
@@ -398,6 +401,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.sensors["camera_ext"].set_world_poses(positions = self.cfg.camera_ext_trans, orientations = self.cfg.camera_ext_rot)
         self.scene.sensors["camera_front"].set_world_poses(positions = self.cfg.camera_ext_trans_front, orientations = self.cfg.camera_ext_rot_front)
 
+
+        self.new_camera_trans = torch.zeros((self.num_envs, 3)).to(self.device)
+        self.new_camera_rot = torch.tensor([[1.0, 0.0, 0.0, 0.0]]).to(self.device)
+
+
         self.camera_ext = None
         self.camera_w = None
         self.camera_front = None
@@ -705,12 +713,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
-                                                                         self.gripper_pose_r[:, :3],
-                                                                         self.interm_pose_r[:, :3])), 
+                                                                         self.cfg.camera_ext_trans_front,
+                                                                         self.cfg.camera_ext_trans)), 
                                                                          
                                                 orientations = torch.cat((self.target_pose_r[:, 3:], 
-                                                                          self.gripper_pose_r[:,3:],
-                                                                          self.interm_pose_r[:, 3:])), 
+                                                                          self.cfg.camera_ext_rot_front,
+                                                                          self.cfg.camera_ext_rot)), 
 
                                                 marker_indices=marker_indices)
 
@@ -850,11 +858,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         camera_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.camera_idx, 0:7]
         
-        new_camera_trans, new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
+        self.new_camera_trans, self.new_camera_rot = combine_frame_transforms(t01 = camera_pose[:, :3],     q01 = camera_pose[:, 3:7],
                                                                     t12 = self.cfg.camera_trans,  q12 = self.cfg.camera_rot)
         
-        self.scene.sensors[camera_key].set_world_poses(positions = new_camera_trans, orientations = new_camera_rot)
-        
+        self.scene.sensors[camera_key].set_world_poses(positions = self.new_camera_trans, orientations = self.new_camera_rot)
+
         # ---- Get data ----
         cam = self.scene.sensors["camera"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
         cam_ext = self.scene.sensors["camera_ext"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
@@ -894,6 +902,37 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
                     
 
+    def _get_PC(self):
+        intrinsics = self.scene.sensors["camera"].data.intrinsic_matrices[0]
+        intrinsics_ext = self.scene.sensors["camera_ext"].data.intrinsic_matrices[0]
+        intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
+
+
+        pc_w = depth_to_pointcloud(self.camera_w[-1], intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
+        pc_ext = depth_to_pointcloud(self.camera_ext[-1], intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
+        pc_front = depth_to_pointcloud(self.camera_front[-1], intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
+
+
+        # camera_w_pos = self.scene.sensors["camera"].data.pos_w
+        # camera_w_quat = self.scene.sensors["camera"].data.quat_w_world
+
+        iden = torch.tensor([1.0, 0.0, 0.0, 0.0]).to(self.device)
+
+        self.pc_w = transform_points(pc_w, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
+
+
+        # camera_ext_pos = self.scene.sensors["camera_ext"].data.pos_w
+        # camera_ext_quat = self.scene.sensors["camera_ext"].data.quat_w_world
+
+        self.pc_ext = transform_points(pc_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
+
+
+        # camera_front_pos = self.scene.sensors["camera_front"].data.pos_w
+        # camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
+
+        self.pc_front = transform_points(pc_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+
+
     def save_step(self):
         
         cam = self.camera_w.cpu().numpy().astype(np.uint8)
@@ -920,29 +959,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                              target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
-
-
-    def _get_PC(self):
-        intrinsics = self.scene.sensors["camera"].data.intrinsic_matrices[0]
-        intrinsics_ext = self.scene.sensors["camera_ext"].data.intrinsic_matrices[0]
-        intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
-
-        pc_w = depth_to_pointcloud(self.camera_w[-1], intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
-        pc_ext = depth_to_pointcloud(self.camera_ext[-1], intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
-        pc_front = depth_to_pointcloud(self.camera_front[-1], intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
-
-
-        camera_w_pos = self.scene.sensors["camera"].data.pos_w
-        camera_w_quat = self.scene.sensors["camera"].data.quat_w_world
-        self.pc_w = transform_points(pc_w, camera_w_pos.squeeze(0), camera_w_quat.squeeze(0))
-
-        camera_ext_pos = self.scene.sensors["camera_ext"].data.pos_w
-        camera_ext_quat = self.scene.sensors["camera_ext"].data.quat_w_world
-        self.pc_ext = transform_points(pc_ext, camera_ext_pos.squeeze(0), camera_ext_quat.squeeze(0))
-
-        camera_front_pos = self.scene.sensors["camera_front"].data.pos_w
-        camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
-        self.pc_front = transform_points(pc_front, camera_front_pos.squeeze(0), camera_front_quat.squeeze(0))
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -1217,6 +1233,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_pose_r[env_ids] = target_pose_r[env_ids]
         self.target_pose_r_group[env_ids] = target_pose_r_group[env_ids]
         self.target_pose_r_lie[env_ids] = target_pose_r_lie[env_ids]
+
+
+        self.new_camera_trans[env_ids] = torch.zeros((self.num_envs, 3)).to(self.device)[env_ids]
+        self.new_camera_rot[env_ids] = torch.tensor([[1.0, 0.0, 0.0, 0.0]]).to(self.device)[env_ids]
+
 
 
         # --- Reset previous values ---

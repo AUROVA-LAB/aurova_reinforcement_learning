@@ -21,6 +21,42 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 
+import open3d as o3d
+
+
+def visualize_o3d(pc, title="Point Cloud"):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc)
+
+    o3d.visualization.draw_geometries(
+        [pcd],
+        window_name=title
+    )
+
+
+def colored_pcd(points, color):
+    # Convert safely
+    points = np.asarray(points)
+
+    print("shape:", points.shape)
+    print("dtype:", points.dtype)
+
+    # Ensure correct shape
+    points = points.reshape(-1, 3)
+
+    # Convert dtype
+    points = points.astype(np.float64)
+
+    # Make contiguous
+    points = np.ascontiguousarray(points)
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    pcd.paint_uniform_color(color)
+    return pcd
+
+
 
 
 
@@ -118,6 +154,7 @@ def vis():
     # -------------------------
     # Main loop
     # -------------------------
+    acc = [0.0, 0.0, 0.0]
     for i in range(len(dataset)):
 
         if MODE != "pointcloud":
@@ -360,11 +397,58 @@ def vis():
                 break
 
         else:
-            pc = dataset[i]["pc"]
+            pc = dataset[i]["pc"].astype(np.float32)
+            pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+            pc_front = dataset[i]["pc_front"].astype(np.float32)
 
-            for k in pc:
-                print(k)
-            raise
+            pc_ext[:, 0] += -0.4475
+            pc_ext[:, 1] += -0.425
+            pc_ext[:, 2] += -0.057
+
+            pc[:, 0] += -0.375 + acc[0]
+            pc[:, 1] += -0.1185 + acc[1]
+            pc[:, 2] += 0.148 + acc[2]
+
+            if i != 0:
+                acc[0] += dataset[i]["diff"][3]
+                acc[1] += dataset[i]["diff"][4]
+                acc[2] += dataset[i]["diff"][5]
+
+            
+
+            # m0 = np.mean(pc[:,0])
+            # m1 = np.mean(pc[:,0])
+            # m2 = np.mean(pc[:,0])
+
+            # pc[:,0] -= m0
+            # pc[:,1] -= m1
+            # pc[:,2] -= m2
+
+            # pc_ext[:,0] -= m0
+            # pc_ext[:,1] -= m1
+            # pc_ext[:,2] -= m2
+
+            # pc_front[:,0] -= m0
+            # pc_front[:,1] -= m1
+            # pc_front[:,2] -= m2
+
+
+
+
+
+
+            pcd1 = colored_pcd(pc, [1, 0, 0])       # red
+            pcd2 = colored_pcd(pc_ext, [0, 1, 0])   # green
+            pcd3 = colored_pcd(pc_front, [0, 0, 1]) # blue
+
+            o3d.visualization.draw_geometries([pcd1, pcd2, pcd3])
+
+
+            # visualize_o3d(pc, "pc")
+            # visualize_o3d(pc_ext, "pc_ext")
+            # visualize_o3d(pc_front, "pc_front")
+
+            
 
 
 
