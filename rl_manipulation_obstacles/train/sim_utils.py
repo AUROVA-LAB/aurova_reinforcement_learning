@@ -103,7 +103,7 @@ def depth_to_pointcloud(depth, fx, fy, cx, cy):
     x = (uu - cx) * z / fx
     y = (vv - cy) * z / fy
 
-    points = torch.stack((x, y, z), dim=-1) / 1000.0
+    points = torch.stack((x, y, z), dim=-1)
 
     return points.reshape(-1, 3)
 
@@ -127,7 +127,7 @@ def transform_points(points, translation, quaternion):
     """
     points: (N, 3)
     translation: (3,)
-    quaternion: (4,)  [x,y,z,w]
+    quaternion: (4,)  [w,x,y,z]
     """
 
     # R = matrix_from_quat(quaternion)

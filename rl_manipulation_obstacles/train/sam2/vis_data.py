@@ -401,42 +401,6 @@ def vis():
             pc_ext = dataset[i]["pc_ext"].astype(np.float32)
             pc_front = dataset[i]["pc_front"].astype(np.float32)
 
-            pc_ext[:, 0] += -0.4475
-            pc_ext[:, 1] += -0.425
-            pc_ext[:, 2] += -0.057
-
-            pc[:, 0] += -0.375 + acc[0]
-            pc[:, 1] += -0.1185 + acc[1]
-            pc[:, 2] += 0.148 + acc[2]
-
-            if i != 0:
-                acc[0] += dataset[i]["diff"][3]
-                acc[1] += dataset[i]["diff"][4]
-                acc[2] += dataset[i]["diff"][5]
-
-            
-
-            # m0 = np.mean(pc[:,0])
-            # m1 = np.mean(pc[:,0])
-            # m2 = np.mean(pc[:,0])
-
-            # pc[:,0] -= m0
-            # pc[:,1] -= m1
-            # pc[:,2] -= m2
-
-            # pc_ext[:,0] -= m0
-            # pc_ext[:,1] -= m1
-            # pc_ext[:,2] -= m2
-
-            # pc_front[:,0] -= m0
-            # pc_front[:,1] -= m1
-            # pc_front[:,2] -= m2
-
-
-
-
-
-
             pcd1 = colored_pcd(pc, [1, 0, 0])       # red
             pcd2 = colored_pcd(pc_ext, [0, 1, 0])   # green
             pcd3 = colored_pcd(pc_front, [0, 0, 1]) # blue
