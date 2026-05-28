@@ -22,6 +22,8 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 
 import open3d as o3d
+from sklearn.cluster import DBSCAN
+import matplotlib.pyplot as plt
 
 
 def visualize_o3d(pc, title="Point Cloud"):
@@ -154,7 +156,6 @@ def vis():
     # -------------------------
     # Main loop
     # -------------------------
-    acc = [0.0, 0.0, 0.0]
     for i in range(len(dataset)):
 
         if MODE != "pointcloud":
@@ -401,19 +402,30 @@ def vis():
             pc_ext = dataset[i]["pc_ext"].astype(np.float32)
             pc_front = dataset[i]["pc_front"].astype(np.float32)
 
+            pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+
+            cloud = o3d.geometry.PointCloud()
+            cloud.points = o3d.utility.Vector3dVector(pc_all)
+
+            voxel_size = 0.05
+            cloud_down = cloud.voxel_down_sample(voxel_size)
+
+            labels = np.array(cloud_down.cluster_dbscan(eps=0.075, min_points=10))
+
+            # assign colors per cluster
+            max_label = labels.max()
+            colors = plt.get_cmap("tab20")(labels / (max_label + 1 if max_label >= 0 else 1))
+            colors[labels < 0] = [0, 0, 0, 1]  # noise = black
+
+            cloud_down.colors = o3d.utility.Vector3dVector(colors[:, :3])
+
+            o3d.visualization.draw_geometries([cloud_down])
+
             pcd1 = colored_pcd(pc, [1, 0, 0])       # red
             pcd2 = colored_pcd(pc_ext, [0, 1, 0])   # green
             pcd3 = colored_pcd(pc_front, [0, 0, 1]) # blue
 
             o3d.visualization.draw_geometries([pcd1, pcd2, pcd3])
-
-
-            # visualize_o3d(pc, "pc")
-            # visualize_o3d(pc_ext, "pc_ext")
-            # visualize_o3d(pc_front, "pc_front")
-
-            
-
 
 
     cv.destroyAllWindows()
