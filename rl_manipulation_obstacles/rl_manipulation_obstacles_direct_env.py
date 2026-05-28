@@ -1311,12 +1311,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.update_new_poses() 
 
+        print("--- Episode: ", self.episode_id)
 
         
         self.trajectory = []
         self.trajectory_save = []
 
-        references = [self.interm_pose_r_lie.clone(), self.target_pose_r_lie.clone(), self.end_target_pose_r_lie.clone()]
+        references = [self.interm_pose_r_lie.clone(), self.target_pose_r_lie.clone()]#, self.end_target_pose_r_lie.clone()]
 
         # NMPC model creation
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
@@ -1413,7 +1414,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.gripper_action = False
 
 
-        print("--- Episode: ", self.episode_id)
         self.episode_id += 1
 
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
