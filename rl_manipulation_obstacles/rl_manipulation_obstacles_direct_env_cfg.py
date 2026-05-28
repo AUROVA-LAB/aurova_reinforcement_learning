@@ -234,7 +234,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
             horizontal_aperture=20.955,     # ← assumed
-            clipping_range=(0.1, 20.0),
+            clipping_range=(0.1, 1.5),
         ),
 
         width=img_width,
@@ -257,7 +257,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
             horizontal_aperture=20.955,     # ← assumed
-            clipping_range=(0.1, 20.0),
+            clipping_range=(0.1, 1.5),
         ),
 
         width=img_width,
@@ -280,7 +280,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
             horizontal_aperture=20.955,     # ← assumed
-            clipping_range=(0.1, 20.0),
+            clipping_range=(0.1, 1.5),
         ),
 
         width=img_width,
@@ -393,9 +393,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
                     [-0.3,  0.3],
-                    [-0.7,  0.7],
-                    [-0.7,  0.7],
-                    [-0.7,  0.7]]
+                    [-0.7 / 3 ,  0.7 / 3 ],
+                    [-0.7 / 3 ,  0.7 / 3 ],
+                    [-0.7 / 3 ,  0.7 / 3 ]]
     
     # Which robot apply the sampling poses
     apply_range = [False, False, True, False]
@@ -467,7 +467,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.01
 
-    test = True
+    test = False
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
     
     save_interval = 3
