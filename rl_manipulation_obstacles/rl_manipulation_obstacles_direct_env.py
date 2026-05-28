@@ -631,18 +631,34 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
         
         else:
+
+            f1 = self.camera_w[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
+            f2 = self.camera_ext[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
+            f3 = self.camera_front[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
             
-            cmd = self.test_model(self.camera_w[-1].repeat(3,1,1).unsqueeze(0) / 255.0, 
-                                  self.camera_ext[-1].repeat(3,1,1).unsqueeze(0) / 255.0,
-                                  self.camera_front[-1].repeat(3,1,1).unsqueeze(0) / 255.0,
+
+            f1 = self.transform(f1.cpu().numpy()).to(self.device).unsqueeze(0)
+            f2 = self.transform(f2.cpu().numpy()).to(self.device).unsqueeze(0)
+            f3 = self.transform(f3.cpu().numpy()).to(self.device).unsqueeze(0)
+
+            f = torch.cat((f1, f2, f3), dim = 0)
+
+            f = self.backbone(f)['backbone_fpn'][-1].mean(dim = 1).view(f.shape[0], -1)
+
+            
+            cmd = self.test_model(f[0].unsqueeze(0),
+                                  f[1].unsqueeze(0),
+                                  f[2].unsqueeze(0),
                                   self.gripper_pose_r_lie)
             
             # actions = self._preprocess_actions(cmd)
+            # cmd[:,:3] = self.target_pose_r_lie[:, :3]
 
             grip_action = cmd[:, -1].clone()
             cmd_lie = cmd[:, :-1].clone()
 
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
+            print(cmd)
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
                                            t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
@@ -908,9 +924,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
 
 
-        pc_w = depth_to_pointcloud(self.camera_w[-1], intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
-        pc_ext = depth_to_pointcloud(self.camera_ext[-1], intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
-        pc_front = depth_to_pointcloud(self.camera_front[-1], intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
+        pc_w = depth_to_pointcloud(self.camera_w[-1] / 255.0, intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
+        pc_ext = depth_to_pointcloud(self.camera_ext[-1] / 255.0, intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
+        pc_front = depth_to_pointcloud(self.camera_front[-1] / 255.0, intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
 
 
         # camera_w_pos = self.scene.sensors["camera"].data.pos_w
@@ -946,9 +962,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
 
-        pc_w = self.pc_w.float().cpu().numpy() # * 100
-        pc_ext = self.pc_ext.float().cpu().numpy() # * 100
-        pc_front = self.pc_front.float().cpu().numpy() # * 100
+        pc_w = self.pc_w.float().cpu().numpy()
+        pc_ext = self.pc_ext.float().cpu().numpy()
+        pc_front = self.pc_front.float().cpu().numpy()
 
         cam_p = torch.rand((64*64)).float().cpu().numpy()
 
@@ -1431,4 +1447,22 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
             # Inference mode
             self.test_model.eval()
+
+            
+            checkpoint = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/checkpoints/sam2.1_hiera_tiny.pt"
+            model_cfg = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/sam2/configs/sam2.1/sam2.1_hiera_t.yaml"
+            sam2 = build_sam2(model_cfg, checkpoint)
+
+            
+            self.backbone = sam2.image_encoder
+
+            self.transform = T.Compose([
+                    T.ToPILImage(),
+                    T.Resize((1024, 1024)),   # depends on model config
+                    T.ToTensor(),
+                    T.Normalize(
+                        mean=[0.485, 0.456, 0.406],
+                        std=[0.229, 0.224, 0.225]
+                    )
+                ])
 

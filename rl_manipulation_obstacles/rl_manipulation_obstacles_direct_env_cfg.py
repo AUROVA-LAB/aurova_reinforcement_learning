@@ -53,8 +53,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 600             # Maximum steps in an episode
+    episode_length_s = 2.0      # Length of the episode in seconds
+    max_steps = 400             # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
@@ -467,7 +467,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.01
 
-    test = False
+    test = True
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/best_model.pth"
     
     save_interval = 3
