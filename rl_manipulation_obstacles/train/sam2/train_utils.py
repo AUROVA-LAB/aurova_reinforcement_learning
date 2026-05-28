@@ -192,8 +192,8 @@ def preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE):
 
 def preprocess_img_sam2(dataset):
 
-    checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
-    model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+    checkpoint = "./checkpoints/sam2.1_hiera_tiny.pt"
+    model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
     sam2 = build_sam2(model_cfg, checkpoint)
     
     backbone = sam2.image_encoder
