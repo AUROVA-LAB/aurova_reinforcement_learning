@@ -903,16 +903,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         cam_ext_D = cam_ext_D
         cam_front_D = cam_front_D
 
-        self.camera_w = torch.cat((cam, cam_D), dim = 0)*255
-        self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)*255
-        self.camera_front = torch.cat((cam_front, cam_front_D), dim = 0)*255
+        self.camera_w = torch.cat((cam, cam_D), dim = 0)
+        self.camera_ext = torch.cat((cam_ext, cam_ext_D), dim = 0)
+        self.camera_front = torch.cat((cam_front, cam_front_D), dim = 0)
 
 
         # Render images every certain amount of steps
         if self.cfg.save_imgs:
             if self.count % 5 == 0:
             # Function to save images (in utils)
-                save_images_grid(images = [self.camera_front[-1]],
+                save_images_grid(images = [self.camera_front[:-1].permute(1,2,0) / 255.0],
                                  subtitles = ["Camera"],
                                  title = "RGB Image: Cam0",
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
@@ -924,9 +924,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
 
 
-        pc_w = depth_to_pointcloud(self.camera_w[-1] / 255.0, intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
-        pc_ext = depth_to_pointcloud(self.camera_ext[-1] / 255.0, intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
-        pc_front = depth_to_pointcloud(self.camera_front[-1] / 255.0, intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
+        pc_w = depth_to_pointcloud(self.camera_w, intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
+        pc_ext = depth_to_pointcloud(self.camera_ext, intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
+        pc_front = depth_to_pointcloud(self.camera_front, intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
 
 
         # camera_w_pos = self.scene.sensors["camera"].data.pos_w
