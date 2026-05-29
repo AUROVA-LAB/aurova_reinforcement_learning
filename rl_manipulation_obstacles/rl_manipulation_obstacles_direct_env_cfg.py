@@ -92,7 +92,6 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     debug_markers = False       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
-    render_imgs = False         # Activate image rendering
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
