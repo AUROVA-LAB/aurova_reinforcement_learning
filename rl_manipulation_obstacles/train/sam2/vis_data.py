@@ -25,6 +25,8 @@ import open3d as o3d
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 
+from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+
 
 def visualize_o3d(pc, title="Point Cloud"):
     pcd = o3d.geometry.PointCloud()
@@ -40,9 +42,6 @@ def colored_pcd(points, color):
     # Convert safely
     points = np.asarray(points)
 
-    print("shape:", points.shape)
-    print("dtype:", points.dtype)
-
     # Ensure correct shape
     points = points.reshape(-1, 3)
 
@@ -56,7 +55,9 @@ def colored_pcd(points, color):
     pcd.points = o3d.utility.Vector3dVector(points)
 
     pcd.paint_uniform_color(color)
+
     return pcd
+     
 
 
 
@@ -86,7 +87,7 @@ def show_anns(anns, borders=True):
 # -------------------------
 # CONFIG
 # -------------------------
-MODE = "pointcloud"      # "yolo" or "sam"
+MODE = "pc"      # "yolo" or "sam"
 
 YOLO_MODEL = "yolov8n.pt"
 
@@ -150,7 +151,7 @@ def vis():
             )
         ])
         
-    elif MODE == "pointcloud":
+    elif MODE == "pc":
         pass
 
     # -------------------------
@@ -158,7 +159,7 @@ def vis():
     # -------------------------
     for i in range(len(dataset)):
 
-        if MODE != "pointcloud":
+        if MODE != "pc":
             img = dataset[i]["cam_front_D"]
 
             # CHW -> HWC
@@ -404,28 +405,129 @@ def vis():
 
             pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
+
+            voxel_size = 0.025
+            print(pc_all.shape)
+
+            
+            
+
+
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+            pcd.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
+            pcd = pcd.voxel_down_sample(voxel_size)
+
+            pc_all = np.concatenate((np.asarray(pcd.points), np.asarray(pcd.colors)), axis=-1)
+
+            # remove ground
+            ground_threshold = 0.025  # adjust for your dataset
+            pc_all = pc_all[pc_all[:, 2] > ground_threshold]
+            # pc_ext = pc_ext[pc_ext[:, 2] > ground_threshold]
+            # pc_front = pc_front[pc_front[:, 2] > ground_threshold]
+
+            x_threshold = -0.8  # adjust for your dataset
+            pc_all = pc_all[pc_all[:, 0] > x_threshold]
+            # pc_ext = pc_ext[pc_ext[:, 0] > x_threshold]
+            # pc_front = pc_front[pc_front[:, 0] > x_threshold]
+
+            x_threshold = 0.1  # adjust for your dataset
+            pc_all = pc_all[pc_all[:, 0] < x_threshold]
+            # pc_ext = pc_ext[pc_ext[:, 0] < x_threshold]
+            # pc_front = pc_front[pc_front[:, 0] < x_threshold]
+
+            y_threshold = -0.5  # adjust for your dataset
+            pc_all = pc_all[pc_all[:, 1] > y_threshold]
+            # pc_ext = pc_ext[pc_ext[:, 1] > y_threshold]
+            # pc_front = pc_front[pc_front[:, 1] > y_threshold]
+
+
             cloud = o3d.geometry.PointCloud()
-            cloud.points = o3d.utility.Vector3dVector(pc_all)
+            cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+        
+            aux = copy.deepcopy(pc_all[:, 3])
 
-            voxel_size = 0.05
-            cloud_down = cloud.voxel_down_sample(voxel_size)
+            pc_all[:, 3] = pc_all[:, -1]
+            pc_all[:, -1] = aux
 
-            labels = np.array(cloud_down.cluster_dbscan(eps=0.075, min_points=10))
+            or_colors = copy.deepcopy(pc_all[:, 3:])
+
+
+            cloud.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
+
+
+
+
+            # Con clustering
+            labels = np.array(cloud.cluster_dbscan(eps=0.075, min_points=10))
 
             # assign colors per cluster
             max_label = labels.max()
             colors = plt.get_cmap("tab20")(labels / (max_label + 1 if max_label >= 0 else 1))
             colors[labels < 0] = [0, 0, 0, 1]  # noise = black
 
-            cloud_down.colors = o3d.utility.Vector3dVector(colors[:, :3])
+            cloud.colors = o3d.utility.Vector3dVector(colors[:, :3])
 
-            o3d.visualization.draw_geometries([cloud_down])
+            # o3d.visualization.draw_geometries([cloud])
 
-            pcd1 = colored_pcd(pc, [1, 0, 0])       # red
-            pcd2 = colored_pcd(pc_ext, [0, 1, 0])   # green
-            pcd3 = colored_pcd(pc_front, [0, 0, 1]) # blue
 
-            o3d.visualization.draw_geometries([pcd1, pcd2, pcd3])
+
+
+            # Con PointNet
+            pc_all = pc_all[:, :3]
+
+            # normalize cloud
+            pc_all = pc_all - np.mean(pc_all, axis=0)
+            pc_all = pc_all / np.max(np.linalg.norm(pc_all, axis=1))
+            pc_all = np.concatenate((pc_all, or_colors), axis = -1)
+
+            NUM_POINTS = 4096
+            idx = np.random.choice(len(pc_all), NUM_POINTS, replace=len(pc_all) < NUM_POINTS)
+            pc_sample = pc_all[idx]
+
+            xyz = pc_sample[:, :3].copy()
+
+            xyz_norm = xyz / np.max(np.abs(xyz), axis=0, keepdims=True)
+            fake_rgb = pc_sample[:, 3:]
+
+            features = np.concatenate([xyz, xyz_norm, fake_rgb], axis=1)
+
+            points = torch.tensor(features.T, dtype=torch.float32).unsqueeze(0)
+
+            # model
+            num_classes = 13  # S3DIS classes
+            model = get_model(num_classes=num_classes)
+
+            checkpoint = torch.load("best_model_PN.pth", map_location="cuda:0", weights_only = False)
+            model.load_state_dict(checkpoint["model_state_dict"])
+            model.eval()
+            
+            with torch.no_grad():
+                seg_pred, _ = model(points)
+                seg_pred = seg_pred.squeeze(0).cpu().numpy()  # (N, num_classes)
+                labels = np.argmax(seg_pred, axis=1)
+
+
+            colors = plt.cm.tab20(labels / (num_classes - 1))[:, :3]
+
+            cloud = o3d.geometry.PointCloud()
+            cloud.points = o3d.utility.Vector3dVector(pc_sample[:, :3])
+            cloud.colors = o3d.utility.Vector3dVector(colors)
+
+            o3d.visualization.draw_geometries([cloud])
+
+
+
+
+
+
+
+            # # pcd1 = colored_pcd(pc, [1, 0, 0])       # red
+            # # pcd2 = colored_pcd(pc_ext, [0, 1, 0])   # green
+            # # pcd3 = colored_pcd(pc_front, [0, 0, 1]) # blue
+            # pc_all = colored_pcd(pc_all, [0, 0, 1]) # blue
+
+            # o3d.visualization.draw_geometries([pc_all])
 
 
     cv.destroyAllWindows()
