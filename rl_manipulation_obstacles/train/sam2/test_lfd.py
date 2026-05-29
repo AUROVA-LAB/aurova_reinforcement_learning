@@ -102,8 +102,8 @@ def test():
                 b["gripper_pose"],
             )
 
-            test_loss += criterion(pred, b["action"]).item()
-            mae += torch.abs(pred - b["action"]).mean().item()
+            test_loss += criterion(pred, b["diff"]).item()
+            mae += torch.abs(pred - b["diff"]).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)

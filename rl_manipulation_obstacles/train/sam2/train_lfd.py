@@ -115,7 +115,7 @@ def train():
                 b["gripper_pose"],
             )
 
-            loss = criterion(pred, b["action"])
+            loss = criterion(pred, b["diff"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -147,7 +147,7 @@ def train():
                     b["gripper_pose"],
                 )
 
-                val_loss = criterion(pred, b["action"]).item()
+                val_loss = criterion(pred, b["diff"]).item()
 
         val_loss /= len(val_loader)
 
