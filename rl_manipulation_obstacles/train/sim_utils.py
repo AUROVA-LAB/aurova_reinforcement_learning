@@ -84,11 +84,14 @@ class Critic(DeterministicMixin, Model):
         return self.linear_layer_3(x), {}
     
 
-def depth_to_pointcloud(depth, fx, fy, cx, cy):
+def depth_to_pointcloud(rgbd, fx, fy, cx, cy):
     """
     depth: (H, W)
     returns: (N, 3) points in camera frame
     """
+
+    depth = rgbd[-1]
+    rgb = rgbd[:-1]
 
     device = depth.device
 
@@ -105,7 +108,16 @@ def depth_to_pointcloud(depth, fx, fy, cx, cy):
 
     points = torch.stack((x, y, z), dim=-1)
 
-    return points.reshape(-1, 3)
+    # Flatten
+    points = points.reshape(-1, 3)
+    colors = rgb.reshape(-1, 3)
+
+    # Optional: normalize RGB to [0,1]
+    colors = colors.float() / 255.0
+
+    points_rgb = torch.cat([points, colors], dim=-1)
+
+    return points_rgb
 
 
 def quat_to_rotmat(q):
@@ -136,8 +148,10 @@ def transform_points(points, translation, quaternion):
 
     R = quat_to_rotmat(quaternion)
 
-    points_world = (R @ points.T).T + translation
+    points_world = (R @ points[:,:3].T).T + translation
     # points_world = (R.T @ (points + translation).T).T
     # points_world = (points - translation)@R.T  
+
+    points_world = torch.cat((points_world, points[:, 3:]), dim = -1)
 
     return points_world
