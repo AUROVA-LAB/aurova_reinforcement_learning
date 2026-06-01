@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, random_split
 
 from data import *
 from networks_lfd import *
-from train_utils import collate_fn, preprocess_img_sam, preprocess_img_sam2
+from train_utils import collate_fn, preprocess_img_sam, preprocess_img_sam2, preprocess_pcd
 
 import matplotlib.pyplot as plt
 import cv2 as cv
@@ -31,7 +31,7 @@ def train():
 
 
 
-    MODE = "sam2"
+    MODE = "pcd"
 
     YOLO_MODEL = "yolov8n.pt"
 
@@ -51,7 +51,6 @@ def train():
                                 nn.Linear(512, 128))
         backbone.eval()
 
-    
     elif MODE == "sam":
         dataset = preprocess_img_sam(dataset, SAM_CHECKPOINT, SAM_TYPE)
 
@@ -61,6 +60,8 @@ def train():
     elif MODE == "sam2":
         dataset = preprocess_img_sam2(dataset)
 
+    elif MODE == "pcd":
+        dataset = preprocess_pcd(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -105,14 +106,17 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            f1 = b["cam_p"]
-            f2 = b["cam_ext_p"]
-            f3 = b["cam_front_p"]
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
 
-
+            # pred = model(
+            #     f1, f2, f3,
+            #     b["gripper_pose"],
+            # )
             pred = model(
-                f1, f2, f3,
-                b["gripper_pose"],
+                b["pcd_p"],
+                b["gripper_pose"]
             )
 
             loss = criterion(pred, b["diff"])
@@ -138,13 +142,17 @@ def train():
                     for k, v in b.items()
                 }
             
-                f1 = b["cam_p"]
-                f2 = b["cam_ext_p"]
-                f3 = b["cam_front_p"]
+                # f1 = b["cam_p"]
+                # f2 = b["cam_ext_p"]
+                # f3 = b["cam_front_p"]
 
+                # pred = model(
+                #     f1, f2, f3,
+                #     b["gripper_pose"],
+                # )
                 pred = model(
-                    f1, f2, f3,
-                    b["gripper_pose"],
+                    b["pcd_p"],
+                    b["gripper_pose"]
                 )
 
                 val_loss = criterion(pred, b["diff"]).item()

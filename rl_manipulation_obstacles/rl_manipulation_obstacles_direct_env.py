@@ -967,10 +967,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_front = self.pc_front.float().cpu().numpy()
 
         cam_p = torch.rand((64*64)).float().cpu().numpy()
+        pcd_p = torch.zeros((128)).float().cpu().numpy()
 
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, cam_front, 
                              cam_p, cam_p, cam_p,
+                             pcd_p,
                              pc_w, pc_ext, pc_front, 
                              target_pose, gripper_pose, action, diff, self.gripper_action)
 

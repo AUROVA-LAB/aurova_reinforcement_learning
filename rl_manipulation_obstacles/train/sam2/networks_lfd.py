@@ -120,38 +120,38 @@ class SimpleCNN(nn.Module):
 
 
 class CnnPolicy(nn.Module):
-    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True):
+    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True, pc = True):
         super().__init__()
 
         if pretrained:
             
-        #     # Load model
-        #     # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # -> si uso esto tengo que meter un .model mas
-        #     model = YOLO("yolov5su.pt")
+            if not pc:
 
-        #     # Remove AutoShape
-        #     backbone = model.model.model#.model          # DetectMultiBackend
+                self.f1_net = nn.Sequential(
+                    nn.Linear(4096, 1024),
+                    nn.GELU(),
+                    nn.Linear(1024, 128),
+                    nn.Tanh()
+                )
+                self.f2_net = nn.Sequential(
+                    nn.Linear(4096, 1024),
+                    nn.GELU(),
+                    nn.Linear(1024, 128),
+                    nn.Tanh()
+                )
+                self.f3_net = nn.Sequential(
+                    nn.Linear(4096, 1024),
+                    nn.GELU(),
+                    nn.Linear(1024, 128),
+                    nn.Tanh()
+                )
 
-            self.f1_net = nn.Sequential(
-                nn.Linear(4096, 1024),
-                nn.GELU(),
-                nn.Linear(1024, 128),
-                nn.Tanh()
-            )
-            self.f2_net = nn.Sequential(
-                nn.Linear(4096, 1024),
-                nn.GELU(),
-                nn.Linear(1024, 128),
-                nn.Tanh()
-            )
-            self.f3_net = nn.Sequential(
-                nn.Linear(4096, 1024),
-                nn.GELU(),
-                nn.Linear(1024, 128),
-                nn.Tanh()
-            )
+                self.forward = self.forward_pre
+            else:
+                
 
-            self.forward = self.forward_pre
+                self.forward = self.forward_pc
+
 
 
         if not pretrained:
@@ -175,13 +175,13 @@ class CnnPolicy(nn.Module):
 
         # 🔥 Proper fusion layer (fixed)
         self.fusion = nn.Sequential(
-            nn.Linear(4 * hidden_dim, hidden_dim),
+            nn.Linear(2 * hidden_dim, hidden_dim),
             nn.Tanh(),
             nn.LayerNorm(hidden_dim)
         )
 
         # Optional novelty: gating
-        self.gate = nn.Linear(4 * hidden_dim, hidden_dim)
+        self.gate = nn.Linear(2 * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
@@ -212,6 +212,17 @@ class CnnPolicy(nn.Module):
         f_pose = self.pose_mlp(pose)
 
         fused_raw = torch.cat([f1, f2, f3, f_pose], dim=-1)
+
+        gate = torch.sigmoid(self.gate(fused_raw))
+        fused = self.fusion(fused_raw) * gate
+
+        return self.head(fused)
+    
+    def forward_pc(self, pc, pose):
+
+        f_pose = self.pose_mlp(pose)
+
+        fused_raw = torch.cat([pc, f_pose], dim=-1)
 
         gate = torch.sigmoid(self.gate(fused_raw))
         fused = self.fusion(fused_raw) * gate

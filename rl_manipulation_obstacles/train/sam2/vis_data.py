@@ -8,11 +8,9 @@ from networks_lfd import *
 from train_utils import collate_fn
 import os
 import cv2 as cv
-import numpy as np
 from ultralytics import YOLO
 import os
 import cv2 as cv
-import numpy as np
 
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from torchvision import models, transforms
@@ -25,7 +23,12 @@ import open3d as o3d
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 
+import hdbscan
+from sklearn.preprocessing import StandardScaler
+
+
 from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+
 
 
 def visualize_o3d(pc, title="Point Cloud"):
@@ -36,7 +39,6 @@ def visualize_o3d(pc, title="Point Cloud"):
         [pcd],
         window_name=title
     )
-
 
 def colored_pcd(points, color):
     # Convert safely
@@ -58,11 +60,6 @@ def colored_pcd(points, color):
 
     return pcd
      
-
-
-
-
-
 def show_anns(anns, borders=True):
     if len(anns) == 0:
         return
@@ -87,7 +84,7 @@ def show_anns(anns, borders=True):
 # -------------------------
 # CONFIG
 # -------------------------
-MODE = "pc"      # "yolo" or "sam"
+MODE = "pc_net"      
 
 YOLO_MODEL = "yolov8n.pt"
 
@@ -159,7 +156,7 @@ def vis():
     # -------------------------
     for i in range(len(dataset)):
 
-        if MODE != "pc":
+        if not ("pc" in MODE):
             img = dataset[i]["cam_front_D"]
 
             # CHW -> HWC
@@ -399,26 +396,19 @@ def vis():
                 break
 
         else:
+
             pc = dataset[i]["pc"].astype(np.float32)
             pc_ext = dataset[i]["pc_ext"].astype(np.float32)
             pc_front = dataset[i]["pc_front"].astype(np.float32)
 
             pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-
-            voxel_size = 0.025
-            print(pc_all.shape)
-
-            
-            
-
-
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
             pcd.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
-            pcd = pcd.voxel_down_sample(voxel_size)
+            pcd = pcd.voxel_down_sample(0.025)
 
-            pc_all = np.concatenate((np.asarray(pcd.points), np.asarray(pcd.colors)), axis=-1)
+            pc_all = np.asarray(pcd.points)
 
             # remove ground
             ground_threshold = 0.025  # adjust for your dataset
@@ -442,79 +432,425 @@ def vis():
             # pc_front = pc_front[pc_front[:, 1] > y_threshold]
 
 
-            cloud = o3d.geometry.PointCloud()
-            cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-        
-            aux = copy.deepcopy(pc_all[:, 3])
-
-            pc_all[:, 3] = pc_all[:, -1]
-            pc_all[:, -1] = aux
-
-            or_colors = copy.deepcopy(pc_all[:, 3:])
 
 
-            cloud.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
+            # ============================================================
+            # PREPROCESS
+            # ============================================================
 
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(pc_all)
 
+            # downsample
+            pcd = pcd.voxel_down_sample(voxel_size=0.02)
 
+            # remove isolated noise
+            pcd, _ = pcd.remove_statistical_outlier(
+                nb_neighbors=20,
+                std_ratio=2.0
+            )
 
-            # Con clustering
-            labels = np.array(cloud.cluster_dbscan(eps=0.075, min_points=10))
-
-            # assign colors per cluster
-            max_label = labels.max()
-            colors = plt.get_cmap("tab20")(labels / (max_label + 1 if max_label >= 0 else 1))
-            colors[labels < 0] = [0, 0, 0, 1]  # noise = black
-
-            cloud.colors = o3d.utility.Vector3dVector(colors[:, :3])
-
-            # o3d.visualization.draw_geometries([cloud])
+            points = np.asarray(pcd.points)
 
 
 
 
-            # Con PointNet
-            pc_all = pc_all[:, :3]
 
-            # normalize cloud
-            pc_all = pc_all - np.mean(pc_all, axis=0)
-            pc_all = pc_all / np.max(np.linalg.norm(pc_all, axis=1))
-            pc_all = np.concatenate((pc_all, or_colors), axis = -1)
+            if MODE == "pc_geo":
+                
 
-            NUM_POINTS = 4096
-            idx = np.random.choice(len(pc_all), NUM_POINTS, replace=len(pc_all) < NUM_POINTS)
-            pc_sample = pc_all[idx]
+                # ============================================================
+                # NORMALS
+                # ============================================================
 
-            xyz = pc_sample[:, :3].copy()
+                pcd.estimate_normals(
+                    search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                        radius=0.08,
+                        max_nn=30
+                    )
+                )
 
-            xyz_norm = xyz / np.max(np.abs(xyz), axis=0, keepdims=True)
-            fake_rgb = pc_sample[:, 3:]
+                normals = np.asarray(pcd.normals)
 
-            features = np.concatenate([xyz, xyz_norm, fake_rgb], axis=1)
+                # ============================================================
+                # LOCAL DENSITY FEATURE
+                # ============================================================
 
-            points = torch.tensor(features.T, dtype=torch.float32).unsqueeze(0)
+                tree = o3d.geometry.KDTreeFlann(pcd)
 
-            # model
-            num_classes = 13  # S3DIS classes
-            model = get_model(num_classes=num_classes)
+                density = np.zeros((len(points), 1))
 
-            checkpoint = torch.load("best_model_PN.pth", map_location="cuda:0", weights_only = False)
-            model.load_state_dict(checkpoint["model_state_dict"])
-            model.eval()
-            
-            with torch.no_grad():
-                seg_pred, _ = model(points)
-                seg_pred = seg_pred.squeeze(0).cpu().numpy()  # (N, num_classes)
-                labels = np.argmax(seg_pred, axis=1)
+                for i in range(len(points)):
+                    _, idx, _ = tree.search_radius_vector_3d(
+                        points[i],
+                        0.08
+                    )
+                    density[i] = len(idx)
+
+                density = density / density.max()
+
+                # ============================================================
+                # FEATURE VECTOR
+                # ============================================================
+
+                features = np.concatenate(
+                    [
+                        points,      # xyz
+                        normals,     # nx ny nz
+                        density      # local density
+                    ],
+                    axis=1
+                )
+
+                features = StandardScaler().fit_transform(features)
+
+                # ============================================================
+                # HDBSCAN
+                # ============================================================
+
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=80,
+                    min_samples=20
+                )
+
+                labels = clusterer.fit_predict(features)
+
+                print("Clusters:", len(np.unique(labels[labels >= 0])))
+
+                # ============================================================
+                # VISUALIZATION
+                # ============================================================
+
+                max_label = labels.max()
+
+                if max_label >= 0:
+                    colors = plt.get_cmap("tab20")(
+                        labels / max(max_label, 1)
+                    )[:, :3]
+                else:
+                    colors = np.zeros((len(labels), 3))
+
+                # noise -> black
+                colors[labels < 0] = [0, 0, 0]
+
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+
+                o3d.visualization.draw_geometries([pcd])
 
 
-            colors = plt.cm.tab20(labels / (num_classes - 1))[:, :3]
+            if MODE == "pc_net":
+                pc = dataset[i]["pc"].astype(np.float32)
+                pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+                pc_front = dataset[i]["pc_front"].astype(np.float32)
 
-            cloud = o3d.geometry.PointCloud()
-            cloud.points = o3d.utility.Vector3dVector(pc_sample[:, :3])
-            cloud.colors = o3d.utility.Vector3dVector(colors)
+                pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-            o3d.visualization.draw_geometries([cloud])
+                print("Initial:", pc_all.shape)
+
+
+                # ============================================================
+                # 2. VOXEL DOWNSAMPLE
+                # ============================================================
+
+                voxel_size = 0.025
+
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+                pcd = pcd.voxel_down_sample(voxel_size)
+
+                pc_all = np.asarray(pcd.points)
+
+                # keep RGB if exists
+                if pc.shape[1] > 3:
+                    colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
+                else:
+                    colors = np.zeros_like(pc_all)
+
+                pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+                # ============================================================
+                # 3. FILTERING (your original logic cleaned)
+                # ============================================================
+
+                pc_all = pc_all[pc_all[:, 2] > 0.025]
+                pc_all = pc_all[pc_all[:, 0] > -0.8]
+                pc_all = pc_all[pc_all[:, 0] < 0.1]
+                pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+
+                print("After filtering:", pc_all.shape)
+
+
+                # ============================================================
+                # 4. OPEN3D POINT CLOUD + NORMALS
+                # ============================================================
+
+                cloud = o3d.geometry.PointCloud()
+                cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+                cloud.estimate_normals(
+                    search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                        radius=0.08,
+                        max_nn=30
+                    )
+                )
+
+                normals = np.asarray(cloud.normals)
+
+
+                # ============================================================
+                # 5. POINTNET FEATURES (conv1 output)
+                # ============================================================
+
+                pc_xyz = pc_all[:, :3]
+                pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+                # normalize
+                pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+                pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+
+
+                # sample for PointNet
+                NUM_POINTS = 4096
+                idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+
+                xyz_sample = pc_xyz[idx]
+                rgb_sample = pc_rgb[idx]
+                normals_sample = normals[idx]
+
+
+                # ============================================================
+                # 6. BUILD POINTNET INPUT
+                # ============================================================
+
+                xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+
+                features_in = np.concatenate(
+                    [
+                        xyz_sample,      # xyz
+                        xyz_norm,        # normalized xyz
+                        rgb_sample       # optional color
+                    ],
+                    axis=1
+                )
+
+                points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+
+
+                # ============================================================
+                # 7. LOAD MODEL
+                # ============================================================
+
+                num_classes = 13
+                model = get_model(num_classes=num_classes).cuda()
+
+                checkpoint = torch.load(
+                    "best_model_sem.pth",
+                    map_location="cuda:0",
+                    weights_only=False
+                )
+
+                model.load_state_dict(checkpoint["model_state_dict"])
+                model.eval()
+
+
+                # ============================================================
+                # 8. EXTRACT FEATURES (IMPORTANT PART)
+                # ============================================================
+
+                with torch.no_grad():
+                    seg_pred, _, point_features = model(points)
+                    seg_pred = seg_pred.squeeze(0).cpu().numpy()  # (N, num_classes)
+                    labels = np.argmax(seg_pred, axis=1)
+
+
+                colors = plt.cm.tab20(labels / (num_classes - 1))[:, :3]
+
+                cloud = o3d.geometry.PointCloud()
+                cloud.points = o3d.utility.Vector3dVector(xyz_sample[:, :3])
+                cloud.colors = o3d.utility.Vector3dVector(colors)
+
+                o3d.visualization.draw_geometries([cloud])
+
+
+
+            elif MODE == "pc_net_geo":
+                pc = dataset[i]["pc"].astype(np.float32)
+                pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+                pc_front = dataset[i]["pc_front"].astype(np.float32)
+
+                pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+
+                print("Initial:", pc_all.shape)
+
+
+                # ============================================================
+                # 2. VOXEL DOWNSAMPLE
+                # ============================================================
+
+                voxel_size = 0.025
+
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+                pcd = pcd.voxel_down_sample(voxel_size)
+
+                pc_all = np.asarray(pcd.points)
+
+                # keep RGB if exists
+                if pc.shape[1] > 3:
+                    colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
+                else:
+                    colors = np.zeros_like(pc_all)
+
+                pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+                # ============================================================
+                # 3. FILTERING (your original logic cleaned)
+                # ============================================================
+
+                pc_all = pc_all[pc_all[:, 2] > 0.025]
+                pc_all = pc_all[pc_all[:, 0] > -0.8]
+                pc_all = pc_all[pc_all[:, 0] < 0.1]
+                pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+
+                print("After filtering:", pc_all.shape)
+
+
+                # ============================================================
+                # 4. OPEN3D POINT CLOUD + NORMALS
+                # ============================================================
+
+                cloud = o3d.geometry.PointCloud()
+                cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+                cloud.estimate_normals(
+                    search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                        radius=0.08,
+                        max_nn=30
+                    )
+                )
+
+                normals = np.asarray(cloud.normals)
+
+
+                # ============================================================
+                # 5. POINTNET FEATURES (conv1 output)
+                # ============================================================
+
+                pc_xyz = pc_all[:, :3]
+                pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+                # normalize
+                pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+                pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+
+
+                # sample for PointNet
+                NUM_POINTS = 4096
+                idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+
+                xyz_sample = pc_xyz[idx]
+                rgb_sample = pc_rgb[idx]
+                normals_sample = normals[idx]
+
+
+                # ============================================================
+                # 6. BUILD POINTNET INPUT
+                # ============================================================
+
+                xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+
+                features_in = np.concatenate(
+                    [
+                        xyz_sample,      # xyz
+                        xyz_norm,        # normalized xyz
+                        rgb_sample       # optional color
+                    ],
+                    axis=1
+                )
+
+                points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+
+
+                # ============================================================
+                # 7. LOAD MODEL
+                # ============================================================
+
+                num_classes = 13
+                model = get_model(num_classes=num_classes).cuda()
+
+                checkpoint = torch.load(
+                    "best_model_sem.pth",
+                    map_location="cuda:0",
+                    weights_only=False
+                )
+
+                model.load_state_dict(checkpoint["model_state_dict"])
+                model.eval()
+
+
+                # ============================================================
+                # 8. EXTRACT FEATURES (IMPORTANT PART)
+                # ============================================================
+
+                with torch.no_grad():
+                    seg_pred, _, point_features = model(points)
+
+                # (1, 128, N)
+                point_features = point_features.squeeze(0).cpu().numpy().T
+                xyz = xyz_sample
+
+
+                # ============================================================
+                # 9. BUILD FINAL CLUSTER FEATURES
+                # ============================================================
+
+                features_cluster = np.concatenate(
+                    [
+                        point_features,   # PointNet learned embedding
+                        xyz,              # geometry
+                        normals_sample    # surface structure
+                    ],
+                    axis=1
+                )
+
+                features_cluster = StandardScaler().fit_transform(features_cluster)
+
+
+                # ============================================================
+                # 10. HDBSCAN CLUSTERING
+                # ============================================================
+
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size=80,
+                    min_samples=10
+                )
+
+                labels = clusterer.fit_predict(features_cluster)
+
+                print("clusters:", len(np.unique(labels[labels >= 0])))
+
+
+                # ============================================================
+                # 11. VISUALIZATION
+                # ============================================================
+
+                colors = plt.get_cmap("tab20")(
+                    labels / (labels.max() + 1 if labels.max() >= 0 else 1)
+                )[:, :3]
+
+                colors[labels < 0] = [0, 0, 0]
+
+                cloud_vis = o3d.geometry.PointCloud()
+                cloud_vis.points = o3d.utility.Vector3dVector(xyz)
+                cloud_vis.colors = o3d.utility.Vector3dVector(colors)
+
+                o3d.visualization.draw_geometries([cloud_vis])
 
 
 
@@ -529,8 +865,6 @@ def vis():
 
             # o3d.visualization.draw_geometries([pc_all])
 
-
-    cv.destroyAllWindows()
 
 
 if __name__ == "__main__":

@@ -12,12 +12,14 @@ from isaaclab.utils.math import matrix_from_quat
 
 import cv2 as cv
 
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+from segment_anything import sam_model_registry
 
 
 from sam2.build_sam import build_sam2
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
+
+from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+import open3d as o3d
+
 
 
 
@@ -232,3 +234,118 @@ def preprocess_img_sam2(dataset):
                             cam_front_p = f[2])
         
     return dataset
+
+
+def preprocess_pcd(dataset):
+    num_classes = 13
+    model = get_model(num_classes=num_classes).cuda()
+
+    checkpoint = torch.load(
+        "best_model_sem.pth",
+        map_location="cuda:0",
+        weights_only=False
+    )
+
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval()
+
+
+
+    for i in range(len(dataset)):
+        print("--- Image ", i / len(dataset))
+
+        pc = dataset[i]["pc"].astype(np.float32)
+        pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+        pc_front = dataset[i]["pc_front"].astype(np.float32)
+
+        pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+
+        # ============================================================
+        # 2. VOXEL DOWNSAMPLE
+        # ============================================================
+
+        voxel_size = 0.025
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+        pcd = pcd.voxel_down_sample(voxel_size)
+
+        pc_all = np.asarray(pcd.points)
+
+        # keep RGB if exists
+        if pc.shape[1] > 3:
+            colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
+        else:
+            colors = np.zeros_like(pc_all)
+
+        pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+        # ============================================================
+        # 3. FILTERING (your original logic cleaned)
+        # ============================================================
+
+        pc_all = pc_all[pc_all[:, 2] > 0.025]
+        pc_all = pc_all[pc_all[:, 0] > -0.8]
+        pc_all = pc_all[pc_all[:, 0] < 0.1]
+        pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+        # ============================================================
+        # 4. OPEN3D POINT CLOUD + NORMALS
+        # ============================================================
+
+        cloud = o3d.geometry.PointCloud()
+        cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+
+        # ============================================================
+        # 5. POINTNET FEATURES (conv1 output)
+        # ============================================================
+
+        pc_xyz = pc_all[:, :3]
+        pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+        # normalize
+        pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+        # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+
+
+        # sample for PointNet
+        NUM_POINTS = 4096
+        if len(pc_xyz) == 0.0:
+            continue
+        idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+
+        xyz_sample = pc_xyz[idx]
+        rgb_sample = pc_rgb[idx]
+
+
+        # ============================================================
+        # 6. BUILD POINTNET INPUT
+        # ============================================================
+
+        xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+
+        features_in = np.concatenate(
+            [
+                xyz_sample,      # xyz
+                xyz_norm,        # normalized xyz
+                rgb_sample       # optional color
+            ],
+            axis=1
+        )
+
+        points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+
+
+
+        with torch.no_grad():
+            _, _, point_features = model(points)
+
+        point_features = point_features.mean(-1)[0].cpu().numpy()
+
+        dataset.set_item(i, pcd_p = point_features)
+
+    return dataset
+        

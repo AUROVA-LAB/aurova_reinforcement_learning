@@ -23,6 +23,7 @@ class HDF5EpisodeWriter:
 
     def _init_datasets(self, cam_shape = None, cam_ext_shape = None, cam_front_shape = None, 
                        cam_p_shape = None, cam_ext_p_shape = None, cam_front_p_shape = None, 
+                       pcd_p_shape = None,
                        pc_shape = None, pc_ext_shape = None, pc_front_shape = None, 
                        pose_dim = None, action_dim = None, gripper_action_dim = None):
         T = self.max_steps
@@ -48,6 +49,11 @@ class HDF5EpisodeWriter:
         self.cam_front_p_ds = self.file.create_dataset(
             "images/cam_front_p", (T, *cam_front_p_shape), dtype="float32"
         )
+
+        if pcd_p_shape is not None:
+            self.pcd_p_ds = self.file.create_dataset(
+                "pc/pcd_p", (T, *pcd_p_shape), dtype="float32"
+            )
 
 
         if pc_shape is not None:
@@ -90,6 +96,7 @@ class HDF5EpisodeWriter:
 
     def add_step(self, cam, cam_ext, cam_front, 
                  cam_p, cam_ext_p, cam_front_p,
+                 pcd_p,
                  pc_w, pc_ext, pc_front, 
                  target_pose, gripper_pose, action, diff, gripper_action):
         """
@@ -109,6 +116,7 @@ class HDF5EpisodeWriter:
                 cam_p.shape,
                 cam_ext_p.shape,
                 cam_front_p.shape,
+                pcd_p.shape,
                 pc_w.shape,
                 pc_ext.shape,
                 pc_front.shape,
@@ -125,6 +133,7 @@ class HDF5EpisodeWriter:
         self.cam_p_ds[idx] = cam_p
         self.cam_ext_p_ds[idx] = cam_ext_p
         self.cam_front_p_ds[idx] = cam_front_p
+        self.pcd_p_ds[idx] = pcd_p
         self.pc_ds[idx] = pc_w
         self.pc_ext_ds[idx] = pc_ext
         self.pc_front_ds[idx] = pc_front
@@ -237,6 +246,8 @@ class HDF5LfDDataset(Dataset):
         pc_ext = f["/pc/pc_ext"][t]
         pc_front = f["/pc/pc_front"][t]
 
+        pcd_p = f["/pc/pcd_p"][t]
+
         # target_pose = f["/states/target_pose"][t]
         gripper_pose = f["/states/gripper_pose"][t] 
 
@@ -262,6 +273,9 @@ class HDF5LfDDataset(Dataset):
             "pc": pc,
             "pc_ext": pc_ext,
             "pc_front": pc_front,
+
+            "pcd_p": pcd_p,
+
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": action, #np.concatenate([action, gripper_action], axis=-1),
@@ -282,6 +296,7 @@ class HDF5LfDDataset(Dataset):
         cam_p=None,
         cam_ext_p=None,
         cam_front_p=None,
+        pcd_p = None,
         target_pose=None,
         gripper_pose=None,
         action=None,
@@ -311,10 +326,6 @@ class HDF5LfDDataset(Dataset):
                 cam = (cam * 255).astype(np.uint8)
 
             # f["/images/cam"][t] = cam
-
-        # -------------------------------------------------
-        # CAM EXT
-        # -------------------------------------------------
 
         if cam_ext is not None:
 
@@ -392,6 +403,12 @@ class HDF5LfDDataset(Dataset):
             #     cam_front_p = (cam_front_p * 255).astype(np.uint8)
 
 
+        if pcd_p is not None:
+            if torch.is_tensor(pcd_p):
+                pcd_p = pcd_p.detach().cpu().numpy()
+
+            if pcd_p.ndim == 1 and pcd_p.shape[0] == 128:
+                f["/pc/pcd_p"][t] = pcd_p
         
 
 
