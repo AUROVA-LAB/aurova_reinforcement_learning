@@ -34,6 +34,9 @@ from .train.sam2.data import *
 
 import numpy as np
 import matplotlib.pyplot as plt
+import open3d as o3d
+from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+
 
 
 from .train.sam2.sam2.build_sam import build_sam2
@@ -631,37 +634,128 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
         
         else:
+            if self.cfg.mode == "img":
 
-            f1 = self.camera_w[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-            f2 = self.camera_ext[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-            f3 = self.camera_front[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-            
+                f1 = self.camera_w[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
+                f2 = self.camera_ext[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
+                f3 = self.camera_front[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
+                
 
-            f1 = self.transform(f1.cpu().numpy()).to(self.device).unsqueeze(0)
-            f2 = self.transform(f2.cpu().numpy()).to(self.device).unsqueeze(0)
-            f3 = self.transform(f3.cpu().numpy()).to(self.device).unsqueeze(0)
+                f1 = self.transform(f1.cpu().numpy()).to(self.device).unsqueeze(0)
+                f2 = self.transform(f2.cpu().numpy()).to(self.device).unsqueeze(0)
+                f3 = self.transform(f3.cpu().numpy()).to(self.device).unsqueeze(0)
 
-            f = torch.cat((f1, f2, f3), dim = 0)
+                f = torch.cat((f1, f2, f3), dim = 0)
 
-            f = self.backbone(f)['backbone_fpn'][-1].mean(dim = 1).view(f.shape[0], -1)
+                f = self.backbone(f)['backbone_fpn'][-1].mean(dim = 1).view(f.shape[0], -1)
 
-            
-            cmd = self.test_model(f[0].unsqueeze(0),
-                                  f[1].unsqueeze(0),
-                                  f[2].unsqueeze(0),
-                                  self.gripper_pose_r_lie)
-            
+                
+                cmd = self.test_model(f[0].unsqueeze(0),
+                                    f[1].unsqueeze(0),
+                                    f[2].unsqueeze(0),
+                                    self.gripper_pose_r_lie)
+
+            elif self.cfg.mode == "pcd":
+                 
+                pc_all = np.concatenate([self.pc_w.float().cpu().numpy(),
+                                         self.pc_ext.float().cpu().numpy(),
+                                         self.pc_front.float().cpu().numpy()], axis=0)
+
+                # ============================================================
+                # 2. VOXEL DOWNSAMPLE
+                # ============================================================
+
+                voxel_size = 0.025
+
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+                pcd = pcd.voxel_down_sample(voxel_size)
+
+                pc_all = np.asarray(pcd.points)
+
+                # keep RGB if exists
+                if self.pc_w.shape[1] > 3:
+                    colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
+                else:
+                    colors = np.zeros_like(pc_all)
+
+                pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+                # ============================================================
+                # 3. FILTERING (your original logic cleaned)
+                # ============================================================
+
+                pc_all = pc_all[pc_all[:, 2] > 0.025]
+                pc_all = pc_all[pc_all[:, 0] > -0.8]
+                pc_all = pc_all[pc_all[:, 0] < 0.1]
+                pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+                # ============================================================
+                # 4. OPEN3D POINT CLOUD + NORMALS
+                # ============================================================
+
+                cloud = o3d.geometry.PointCloud()
+                cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+
+                # ============================================================
+                # 5. POINTNET FEATURES (conv1 output)
+                # ============================================================
+
+                pc_xyz = pc_all[:, :3]
+                pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+                # normalize
+                pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+                # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+
+
+                # sample for PointNet
+                NUM_POINTS = 4096
+                # if len(pc_xyz) == 0.0:
+                #     continue
+                idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+
+                xyz_sample = pc_xyz[idx]
+                rgb_sample = pc_rgb[idx]
+
+
+                # ============================================================
+                # 6. BUILD POINTNET INPUT
+                # ============================================================
+
+                xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+
+                features_in = np.concatenate(
+                    [
+                        xyz_sample,      # xyz
+                        xyz_norm,        # normalized xyz
+                        rgb_sample       # optional color
+                    ],
+                    axis=1
+                )
+
+                points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+
+                with torch.no_grad():
+                    _, _, point_features = self.pcd_model(points)
+                
+                point_features = point_features.mean(-1)
+
+                cmd = self.test_model(point_features, self.gripper_pose_r_lie)
+
             # actions = self._preprocess_actions(cmd)
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
 
-            grip_action = cmd[:, -1].clone()
-            cmd_lie = cmd[:, :-1].clone()
+            grip_action = cmd[:, -1].clone()*0
+            cmd_lie = self.gripper_pose_r_lie + cmd.clone()
 
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
-            print(cmd)
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
-                                           t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
+                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
             
             self.count += 1
             
@@ -1430,7 +1524,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # Create model
             self.test_model = CnnPolicy(
                 pose_dim=6,
-                action_dim=7,
+                action_dim=6,
                 in_channels=1,
                 hidden_dim=128
             )
@@ -1467,4 +1561,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         std=[0.229, 0.224, 0.225]
                     )
                 ])
+            
+            num_classes = 13
+            self.pcd_model = get_model(num_classes=num_classes).cuda()
+
+            checkpoint = torch.load(
+                "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_sem.pth",
+                map_location="cuda:0",
+                weights_only=False
+            )
+
+            self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
+            self.pcd_model.eval()
 
