@@ -116,7 +116,7 @@ def train():
             # )
             pred = model(
                 b["pcd_p"],
-                b["gripper_pose"]
+                b["sym"]
             )
 
             loss = criterion(pred, b["diff"])
@@ -152,7 +152,7 @@ def train():
                 # )
                 pred = model(
                     b["pcd_p"],
-                    b["gripper_pose"]
+                    b["sym"]
                 )
 
                 val_loss = criterion(pred, b["diff"]).item()

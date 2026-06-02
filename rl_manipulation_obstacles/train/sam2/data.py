@@ -248,7 +248,7 @@ class HDF5LfDDataset(Dataset):
 
         pcd_p = f["/pc/pcd_p"][t]
 
-        # target_pose = f["/states/target_pose"][t]
+        target_pose = f["/states/target_pose"][t]
         gripper_pose = f["/states/gripper_pose"][t] 
 
         action = f["actions"][t] 
@@ -281,6 +281,7 @@ class HDF5LfDDataset(Dataset):
             "action": action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
             # "prev_action": prev_action
+            "sym": target_pose - gripper_pose
         }
 
     # =====================================================

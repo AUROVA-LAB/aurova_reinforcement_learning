@@ -27,7 +27,7 @@ def test():
 
 
 
-    MODE = "sam2"
+    MODE = "pcd"
 
     YOLO_MODEL = "yolov8n.pt"
 
@@ -56,6 +56,10 @@ def test():
 
     elif MODE == "sam2":
         dataset = preprocess_img_sam2(dataset)
+
+    elif MODE == "pcd":
+        dataset = preprocess_pcd(dataset)
+
 
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
@@ -92,14 +96,25 @@ def test():
                     for k, v in b.items()
                 }
 
-            f1 = b["cam_p"]
-            f2 = b["cam_ext_p"]
-            f3 = b["cam_front_p"]
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
+            # pred = model(
+            #     f1, f2, f3,
+            #     b["gripper_pose"],
+            # )
 
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
 
+            # pred = model(
+            #     f1, f2, f3,
+            #     b["gripper_pose"],
+            # )
             pred = model(
-                f1, f2, f3,
-                b["gripper_pose"],
+                b["pcd_p"],
+                b["sym"]
             )
 
             test_loss += criterion(pred, b["diff"]).item()
