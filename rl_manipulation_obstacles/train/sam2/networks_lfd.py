@@ -148,8 +148,6 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
-                
-
                 self.forward = self.forward_pc
 
 
@@ -202,7 +200,6 @@ class CnnPolicy(nn.Module):
 
         return self.head(fused)
     
-
     def forward_pre(self, f1, f2, f3, pose):
 
         f1 = self.f1_net(f1)
@@ -224,7 +221,7 @@ class CnnPolicy(nn.Module):
 
         fused_raw = torch.cat([pc, f_pose], dim=-1)
 
-        gate = torch.sigmoid(self.gate(fused_raw))
-        fused = self.fusion(fused_raw) * gate
+        # gate = torch.tanh(self.gate(fused_raw))
+        fused = self.fusion(fused_raw)# * gate
 
         return self.head(fused)
