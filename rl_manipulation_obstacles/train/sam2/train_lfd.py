@@ -155,7 +155,7 @@ def train():
                     b["sym"]
                 )
 
-                val_loss = criterion(pred, b["action"]).item()
+                val_loss += criterion(pred, b["action"]).item()
 
         val_loss /= len(val_loader)
 
