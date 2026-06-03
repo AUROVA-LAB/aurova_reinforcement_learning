@@ -119,7 +119,7 @@ def train():
                 b["sym"]
             )
 
-            loss = criterion(pred, b["diff"])
+            loss = criterion(pred, b["action"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -155,7 +155,7 @@ def train():
                     b["sym"]
                 )
 
-                val_loss = criterion(pred, b["diff"]).item()
+                val_loss = criterion(pred, b["action"]).item()
 
         val_loss /= len(val_loader)
 
