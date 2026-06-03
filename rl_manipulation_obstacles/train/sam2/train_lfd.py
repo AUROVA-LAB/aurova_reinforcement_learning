@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, random_split
 
 from data import *
 from networks_lfd import *
-from train_utils import collate_fn, preprocess_img_sam, preprocess_img_sam2, preprocess_pcd
+from train_utils import collate_fn, preprocess_img_sam, preprocess_img_sam2, preprocess_pcd, preprocess_pcd_raw
 
 import matplotlib.pyplot as plt
 import cv2 as cv
@@ -61,7 +61,7 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd(dataset)
+        dataset = preprocess_pcd_raw(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 

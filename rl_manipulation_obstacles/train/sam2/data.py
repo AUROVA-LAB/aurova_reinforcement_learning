@@ -298,6 +298,7 @@ class HDF5LfDDataset(Dataset):
         cam_ext_p=None,
         cam_front_p=None,
         pcd_p = None,
+        pc_raw = None,
         target_pose=None,
         gripper_pose=None,
         action=None,
@@ -408,8 +409,9 @@ class HDF5LfDDataset(Dataset):
             if torch.is_tensor(pcd_p):
                 pcd_p = pcd_p.detach().cpu().numpy()
 
-            if pcd_p.ndim == 1 and pcd_p.shape[0] == 128:
+            if pcd_p.ndim == 2 and pcd_p.shape[0] == 512:
                 f["/pc/pcd_p"][t] = pcd_p
+                print("Setting ...")
         
 
 

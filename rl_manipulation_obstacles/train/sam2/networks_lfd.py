@@ -148,6 +148,20 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
+                self.mlp = nn.Sequential(
+                    nn.Linear(3,64), # falta poner el tamaño
+                    nn.LayerNorm(64), # falta poner el tamaño
+                    nn.ReLU(),
+                    nn.Linear(64,128), # falta poner el tamaño
+                    nn.LayerNorm(128), # falta poner el tamaño
+                    nn.ReLU(),
+                    nn.Linear(128,256), # falta poner el tamaño
+                    nn.LayerNorm(256), # falta poner el tamaño
+                    nn.ReLU(),
+                    nn.Linear(256,128), # falta poner el tamaño
+                    nn.LayerNorm(128), # falta poner el tamaño
+                )
+
                 self.forward = self.forward_pc
 
 
@@ -217,9 +231,12 @@ class CnnPolicy(nn.Module):
     
     def forward_pc(self, pc, pose):
 
+        f_pc = self.mlp(pc)
+        f_pc = torch.max(f_pc, dim = 1)[0] # Max Pooling
+        
         f_pose = self.pose_mlp(pose)
 
-        fused_raw = torch.cat([pc, f_pose], dim=-1)
+        fused_raw = torch.cat([f_pc, f_pose], dim=-1)
 
         # gate = torch.tanh(self.gate(fused_raw))
         fused = self.fusion(fused_raw)# * gate

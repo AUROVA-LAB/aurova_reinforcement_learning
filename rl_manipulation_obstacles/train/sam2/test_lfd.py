@@ -58,7 +58,7 @@ def test():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd(dataset)
+        dataset = preprocess_pcd_raw(dataset)
 
 
 
@@ -117,8 +117,8 @@ def test():
                 b["sym"]
             )
 
-            test_loss += criterion(pred, b["diff"]).item()
-            mae += torch.abs(pred - b["diff"]).mean().item()
+            test_loss += criterion(pred, b["action"]).item()
+            mae += torch.abs(pred - b["action"]).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)

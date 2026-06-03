@@ -22,7 +22,6 @@ import open3d as o3d
 
 
 
-
 def collate_fn(batch):
 
     out = {}
@@ -349,3 +348,90 @@ def preprocess_pcd(dataset):
 
     return dataset
         
+
+
+def farthest_point_sampling(points, n_samples):
+    """
+    points: (N, D) numpy array
+    n_samples: number of points to sample
+
+    Returns:
+        sampled_points: (n_samples, D)
+        sampled_indices: (n_samples,)
+    """
+    N = points.shape[0]
+
+    sampled_indices = np.zeros(n_samples, dtype=np.int64)
+    distances = np.full(N, np.inf)
+
+    # Randomly choose the first point
+    farthest = np.random.randint(0, N)
+
+    for i in range(n_samples):
+        sampled_indices[i] = farthest
+
+        centroid = points[farthest]
+
+        # Compute squared distances to the newly selected point
+        dist = np.sum((points - centroid) ** 2, axis=1)
+
+        # Keep minimum distance to any selected point
+        distances = np.minimum(distances, dist)
+
+        # Next farthest point
+        farthest = np.argmax(distances)
+
+    return points[sampled_indices], sampled_indices
+
+
+
+def preprocess_pcd_raw(dataset):
+
+    for i in range(len(dataset)):
+        print("--- Image ", i / len(dataset))
+
+        pc = dataset[i]["pc"].astype(np.float32)
+        pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+        pc_front = dataset[i]["pc_front"].astype(np.float32)
+
+        pc_all = np.concatenate([pc[:, :3], pc_ext[:, :3], pc_front[:, :3]], axis=0)
+
+        # ============================================================
+        # 2. VOXEL DOWNSAMPLE
+        # ============================================================
+
+        voxel_size = 0.025
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+        pcd = pcd.voxel_down_sample(voxel_size)
+
+        pc_all = np.asarray(pcd.points)
+
+        # ============================================================
+        # 3. FILTERING (your original logic cleaned)
+        # ============================================================
+
+        pc_all = pc_all[pc_all[:, 2] > 0.025]
+        pc_all = pc_all[pc_all[:, 0] > -0.8]
+        pc_all = pc_all[pc_all[:, 0] < 0.1]
+        pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+        # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
+
+        if pc_all.shape[0] != 0:
+
+            sampled_pts, sampled_idx = farthest_point_sampling(
+                pc_all,
+                n_samples=512
+            )
+
+            # cloud = o3d.geometry.PointCloud()
+            # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
+
+            # o3d.visualization.draw_geometries([cloud])
+
+            dataset.set_item(i, pcd_p = sampled_pts)
+
+    return dataset

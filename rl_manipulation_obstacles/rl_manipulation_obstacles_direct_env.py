@@ -750,7 +750,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
 
             grip_action = cmd[:, -1].clone()*0
-            cmd_lie = self.gripper_pose_r_lie + cmd.clone()
+            cmd_lie = cmd.clone()
 
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
             
@@ -1061,7 +1061,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_front = self.pc_front.float().cpu().numpy()
 
         cam_p = torch.rand((64*64)).float().cpu().numpy()
-        pcd_p = torch.zeros((128)).float().cpu().numpy()
+        pcd_p = torch.zeros((512, 3)).float().cpu().numpy()
 
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, cam_front, 
