@@ -187,7 +187,7 @@ class CnnPolicy(nn.Module):
 
         # 🔥 Proper fusion layer (fixed)
         self.fusion = nn.Sequential(
-            nn.Linear(2 * hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
             nn.LayerNorm(hidden_dim)
         )
