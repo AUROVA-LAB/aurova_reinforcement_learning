@@ -206,7 +206,7 @@ class CnnPolicy(nn.Module):
             nn.LayerNorm(hidden_dim),
             nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim),
-            nn.LayerNorm(hidden_dim)
+            nn.LayerNorm(action_dim)
         )
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
