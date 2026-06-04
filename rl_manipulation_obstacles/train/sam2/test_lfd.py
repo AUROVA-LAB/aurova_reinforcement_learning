@@ -27,7 +27,7 @@ def test():
 
 
 
-    MODE = "pcd"
+    MODE = "sam2"
 
     YOLO_MODEL = "yolov8n.pt"
 
@@ -79,7 +79,8 @@ def test():
 
     
     model = CnnPolicy(pose_dim, action_dim, 
-                      in_channels = in_channels).to(device)
+                      in_channels = in_channels,
+                      pc=False).to(device)
     criterion = nn.MSELoss()
     
     model.load_state_dict(torch.load("best_model.pth"))
@@ -96,26 +97,26 @@ def test():
                     for k, v in b.items()
                 }
 
-            # f1 = b["cam_p"]
-            # f2 = b["cam_ext_p"]
-            # f3 = b["cam_front_p"]
-            # pred = model(
-            #     f1, f2, f3,
-            #     b["gripper_pose"],
-            # )
-
-            # f1 = b["cam_p"]
-            # f2 = b["cam_ext_p"]
-            # f3 = b["cam_front_p"]
-
-            # pred = model(
-            #     f1, f2, f3,
-            #     b["gripper_pose"],
-            # )
+            f1 = b["cam_p"]
+            f2 = b["cam_ext_p"]
+            f3 = b["cam_front_p"]
             pred = model(
-                b["pcd_p"],
-                b["sym"]
+                f1, f2, f3,
+                b["sym"],
             )
+
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
+
+            # pred = model(
+            #     f1, f2, f3,
+            #     b["gripper_pose"],
+            # )
+            # pred = model(
+            #     b["pcd_p"],
+            #     b["sym"]
+            # )
 
             test_loss += criterion(pred, b["action"]).item()
             mae += torch.abs(pred - b["action"]).mean().item()

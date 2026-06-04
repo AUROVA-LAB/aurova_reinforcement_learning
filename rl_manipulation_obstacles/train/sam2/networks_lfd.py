@@ -126,6 +126,7 @@ class CnnPolicy(nn.Module):
         if pretrained:
             
             if not pc:
+                inc = 4
 
                 self.f1_net = nn.Sequential(
                     nn.Linear(4096, 1024),
@@ -148,6 +149,8 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
+                inc = 2
+
                 self.mlp = nn.Sequential(
                     nn.Linear(3,64), # falta poner el tamaño
                     nn.LayerNorm(64), # falta poner el tamaño
@@ -164,9 +167,7 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pc
 
-
-
-        if not pretrained:
+        else:
             self.cnn1 = SimpleCNN(in_channels=in_channels, 
                                 out_dim=hidden_dim)
             self.cnn2 = SimpleCNN(in_channels=in_channels, 
@@ -187,13 +188,13 @@ class CnnPolicy(nn.Module):
 
         # 🔥 Proper fusion layer (fixed)
         self.fusion = nn.Sequential(
-            nn.Linear(2 * hidden_dim, hidden_dim),
+            nn.Linear(inc * hidden_dim, hidden_dim),
             nn.Tanh(),
             nn.LayerNorm(hidden_dim)
         )
 
         # Optional novelty: gating
-        self.gate = nn.Linear(2 * hidden_dim, hidden_dim)
+        self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
