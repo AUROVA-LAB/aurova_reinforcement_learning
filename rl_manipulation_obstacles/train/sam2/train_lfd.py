@@ -166,6 +166,7 @@ def train():
         if val_loss < best_val:
             best_val = val_loss
             torch.save(model.state_dict(), "best_model.pth")
+            print("SAVING BEST MODEL")
 
 
 if __name__ == "__main__":
