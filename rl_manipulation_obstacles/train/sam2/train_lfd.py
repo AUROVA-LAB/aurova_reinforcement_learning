@@ -31,7 +31,7 @@ def train():
 
 
 
-    MODE = "sam2"
+    MODE = "pcd"
 
     YOLO_MODEL = "yolov8n.pt"
 
@@ -81,7 +81,7 @@ def train():
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = in_channels,
-                      pc = False).to(device)
+                      pc = True).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     criterion = nn.MSELoss()
@@ -107,18 +107,18 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            f1 = b["cam_p"]
-            f2 = b["cam_ext_p"]
-            f3 = b["cam_front_p"]
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
 
-            pred = model(
-                f1, f2, f3,
-                b["sym"],
-            )
             # pred = model(
-            #     b["pcd_p"],
-            #     b["sym"]
+            #     f1, f2, f3,
+            #     b["sym"],
             # )
+            pred = model(
+                b["pcd_p"],
+                b["sym"]
+            )
 
             loss = criterion(pred, b["action"])
 
@@ -143,18 +143,18 @@ def train():
                     for k, v in b.items()
                 }
             
-                f1 = b["cam_p"]
-                f2 = b["cam_ext_p"]
-                f3 = b["cam_front_p"]
+                # f1 = b["cam_p"]
+                # f2 = b["cam_ext_p"]
+                # f3 = b["cam_front_p"]
 
-                pred = model(
-                    f1, f2, f3,
-                    b["sym"],
-                )
                 # pred = model(
-                #     b["pcd_p"],
-                #     b["sym"]
+                #     f1, f2, f3,
+                #     b["sym"],
                 # )
+                pred = model(
+                    b["pcd_p"],
+                    b["sym"]
+                )
 
                 val_loss += criterion(pred, b["action"]).item()
 

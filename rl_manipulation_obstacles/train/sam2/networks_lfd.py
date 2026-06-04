@@ -143,8 +143,11 @@ class CnnPolicy(nn.Module):
                 self.f3_net = nn.Sequential(
                     nn.Linear(4096, 1024),
                     nn.GELU(),
+                    nn.LayerNorm(hidden_dim),
+
                     nn.Linear(1024, 128),
-                    nn.Tanh()
+                    nn.Tanh(),
+                    nn.LayerNorm(hidden_dim),
                 )
 
                 self.forward = self.forward_pre
@@ -182,7 +185,8 @@ class CnnPolicy(nn.Module):
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
-            nn.Tanh()
+            nn.Tanh(),
+            nn.LayerNorm(hidden_dim)
         )
 
 
@@ -199,7 +203,10 @@ class CnnPolicy(nn.Module):
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
-            nn.Linear(hidden_dim, action_dim)
+            nn.LayerNorm(hidden_dim),
+            nn.Dropout(0.15),
+            nn.Linear(hidden_dim, action_dim),
+            nn.LayerNorm(hidden_dim)
         )
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):

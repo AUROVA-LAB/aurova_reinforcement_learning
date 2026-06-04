@@ -427,6 +427,28 @@ def preprocess_pcd_raw(dataset):
                 n_samples=512
             )
 
+            # rigid perturbation
+            t = np.random.normal(0, 0.005, (3,))
+            R = o3d.geometry.get_rotation_matrix_from_xyz(
+                np.random.normal(0, np.deg2rad(2), (3,))
+            )
+
+            sampled_pts = sampled_pts @ R.T + t
+
+            # jitter
+            sampled_pts += np.clip(
+                np.random.normal(0, 0.003, sampled_pts.shape),
+                -0.01,
+                0.01
+            )
+
+            # dropout
+            mask = np.random.rand(len(sampled_pts)) > 0.05
+            sampled_pts = sampled_pts[mask]
+
+            # restore fixed size
+            sampled_pts, _ = farthest_point_sampling(sampled_pts, 512)
+
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
 
