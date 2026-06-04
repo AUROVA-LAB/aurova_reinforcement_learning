@@ -61,7 +61,8 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd_raw(dataset)
+        pass
+        # dataset = preprocess_pcd_raw(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -115,7 +116,7 @@ def train():
             #     b["gripper_pose"],
             # )
             pred = model(
-                b["pcd_p"],
+                # b["pcd_p"],
                 b["sym"]
             )
 
@@ -151,7 +152,7 @@ def train():
                 #     b["gripper_pose"],
                 # )
                 pred = model(
-                    b["pcd_p"],
+                    # b["pcd_p"],
                     b["sym"]
                 )
 
