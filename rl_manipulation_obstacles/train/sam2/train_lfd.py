@@ -61,8 +61,7 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        pass
-        # dataset = preprocess_pcd_raw(dataset)
+        dataset = preprocess_pcd_raw(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -116,11 +115,11 @@ def train():
             #     b["gripper_pose"],
             # )
             pred = model(
-                # b["pcd_p"],
+                b["pcd_p"],
                 b["sym"]
             )
 
-            loss = criterion(pred, b["diff"])
+            loss = criterion(pred, b["action"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -152,11 +151,11 @@ def train():
                 #     b["gripper_pose"],
                 # )
                 pred = model(
-                    # b["pcd_p"],
+                    b["pcd_p"],
                     b["sym"]
                 )
 
-                val_loss += criterion(pred, b["diff"]).item()
+                val_loss += criterion(pred, b["action"]).item()
 
         val_loss /= len(val_loader)
 
