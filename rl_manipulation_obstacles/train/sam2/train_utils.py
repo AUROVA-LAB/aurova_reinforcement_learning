@@ -384,6 +384,38 @@ def farthest_point_sampling(points, n_samples):
     return points[sampled_indices], sampled_indices
 
 
+def add_noise_to_pcd(points, 
+                     t_std = [0, 0.005],
+                     angle_std = [0, np.deg2rad(2)],
+                     jitter_std = [0, 0.003], jitter_clip = 0.01,
+                     dropout_rate = 0.05):
+    
+    N = points.shape[0]
+
+    # rigid perturbation
+    t = np.random.normal(t_std[0], t_std[1], (3,))
+    R = o3d.geometry.get_rotation_matrix_from_xyz(
+        np.random.normal(angle_std[0], angle_std[1], (3,))
+    )
+
+    points = points @ R.T + t
+
+    # jitter
+    points += np.clip(
+        np.random.normal(jitter_std[0], jitter_std[1], points.shape),
+        -jitter_clip,
+        jitter_clip
+    )
+
+    # dropout
+    mask = np.random.rand(len(points)) > dropout_rate
+    points = points[mask]
+
+    # restore fixed size
+    points, _ = farthest_point_sampling(points, N)
+
+    return points
+
 
 def preprocess_pcd_raw(dataset):
 
@@ -427,27 +459,7 @@ def preprocess_pcd_raw(dataset):
                 n_samples=512
             )
 
-            # rigid perturbation
-            t = np.random.normal(0, 0.005, (3,))
-            R = o3d.geometry.get_rotation_matrix_from_xyz(
-                np.random.normal(0, np.deg2rad(2), (3,))
-            )
-
-            sampled_pts = sampled_pts @ R.T + t
-
-            # jitter
-            sampled_pts += np.clip(
-                np.random.normal(0, 0.003, sampled_pts.shape),
-                -0.01,
-                0.01
-            )
-
-            # dropout
-            mask = np.random.rand(len(sampled_pts)) > 0.05
-            sampled_pts = sampled_pts[mask]
-
-            # restore fixed size
-            sampled_pts, _ = farthest_point_sampling(sampled_pts, 512)
+            sampled_pts = add_noise_to_pcd(sampled_pts) / 2.0
 
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
