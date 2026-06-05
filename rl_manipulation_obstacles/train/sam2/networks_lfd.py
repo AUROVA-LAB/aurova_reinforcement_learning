@@ -213,7 +213,7 @@ class CnnPolicy(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
             nn.LayerNorm(hidden_dim),
-            nn.Dropout(0.15),
+            # nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim),
             nn.LayerNorm(action_dim)
         )
