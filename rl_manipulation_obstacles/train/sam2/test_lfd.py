@@ -21,13 +21,13 @@ def test():
     dataset = HDF5LfDDataset(os.path.join(os.getcwd(), "../../dataset"))
 
     # Split dataset
-    train_size = int(0.8 * len(dataset))
-    val_size = int(0.1 * len(dataset))
+    train_size = int(0.05 * len(dataset))
+    val_size = int(0.05 * len(dataset))
     test_size = len(dataset) - train_size - val_size
 
 
 
-    MODE = "sam2"
+    MODE = "pcd"
 
     YOLO_MODEL = "yolov8n.pt"
 
@@ -80,7 +80,7 @@ def test():
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = in_channels,
-                      pc=False).to(device)
+                      pc=True).to(device)
     criterion = nn.MSELoss()
     
     model.load_state_dict(torch.load("best_model.pth"))
@@ -97,13 +97,13 @@ def test():
                     for k, v in b.items()
                 }
 
-            f1 = b["cam_p"]
-            f2 = b["cam_ext_p"]
-            f3 = b["cam_front_p"]
-            pred = model(
-                f1, f2, f3,
-                b["sym"],
-            )
+            # f1 = b["cam_p"]
+            # f2 = b["cam_ext_p"]
+            # f3 = b["cam_front_p"]
+            # pred = model(
+            #     f1, f2, f3,
+            #     b["sym"],
+            # )
 
             # f1 = b["cam_p"]
             # f2 = b["cam_ext_p"]
@@ -113,10 +113,10 @@ def test():
             #     f1, f2, f3,
             #     b["gripper_pose"],
             # )
-            # pred = model(
-            #     b["pcd_p"],
-            #     b["sym"]
-            # )
+            pred = model(
+                b["pcd_p"],
+                b["sym"]
+            )
 
             test_loss += criterion(pred, b["action"]).item()
             mae += torch.abs(pred - b["action"]).mean().item()
