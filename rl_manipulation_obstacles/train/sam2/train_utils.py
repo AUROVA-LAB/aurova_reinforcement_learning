@@ -419,6 +419,9 @@ def add_noise_to_pcd(points,
 
 def preprocess_pcd_raw(dataset):
 
+    mean_diff = np.zeros(dataset[0]["diff"].shape)
+    mean_sym = np.zeros(dataset[0]["sym"].shape)
+
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
 
@@ -457,9 +460,11 @@ def preprocess_pcd_raw(dataset):
             sampled_pts, sampled_idx = farthest_point_sampling(
                 pc_all,
                 n_samples=512
-            )
+            )   
 
-            sampled_pts = add_noise_to_pcd(sampled_pts) / 2.0
+
+            # Add noise and center point cloud around gripper
+            sampled_pts = add_noise_to_pcd(sampled_pts) - dataset[i]["gripper_pose"][3:]*2
 
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
@@ -467,5 +472,31 @@ def preprocess_pcd_raw(dataset):
             # o3d.visualization.draw_geometries([cloud])
 
             dataset.set_item(i, pcd_p = sampled_pts)
+
+
+            mean_diff += dataset[i]["diff"]
+            mean_sym += dataset[i]["sym"]
+
+
+    mean_diff /= len(dataset)
+    std_diff = np.std(mean_diff, axis=0)
+
+    dataset.mean_diff = mean_diff
+    dataset.std_diff = std_diff
+
+    mean_sym /= len(dataset)
+    std_sym = np.std(mean_sym, axis=0)
+
+    dataset.mean_sym = mean_sym
+    dataset.std_sym = std_sym
+
+    print("\n\n ------ \n\n")
+    print("MEAN DIFF: ", mean_diff)
+    print("STD DIFF: ", std_diff)
+
+
+    print("MEAN sym: ", mean_sym)
+    print("STD sym: ", std_sym)
+    print("\n\n ------ \n\n")
 
     return dataset

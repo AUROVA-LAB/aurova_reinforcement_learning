@@ -171,40 +171,57 @@ from torchvision import transforms
 
 class HDF5LfDDataset(Dataset):
 
-    def __init__(self, dataset_dir):
+    def __init__(
+        self,
+        dataset_dir,
+        obs_horizon=5,
+        pred_horizon=5,
+        stride=1
+    ):
+        super().__init__()
 
+        self.obs_horizon = obs_horizon
+        self.pred_horizon = pred_horizon
+        self.stride = stride
+        
+        self.p_scale = 10
+        self.H = 5
+        self.mean_diff = 0.0
+        self.std_diff = 1.0
+        self.mean_sym = 0.0
+        self.std_sym = 1.0
+
+        # -------------------------------------------------
+        # Load files
+        # -------------------------------------------------
         self.files = sorted([
             os.path.join(dataset_dir, f)
             for f in os.listdir(dataset_dir)
             if f.endswith(".h5")
         ])
 
-        self.p_scale = 10
-
-        # -------------------------------------------------
-        # Persistent HDF5 handles
-        # -------------------------------------------------
-
         self.handles = [
             h5py.File(path, "r+")
             for path in self.files
         ]
-
         # -------------------------------------------------
-        # Global indexing
+        # Build index of valid windows
         # -------------------------------------------------
-
-        self.index = []  # (file_id, timestep)
+        self.index = []
 
         for file_id, f in enumerate(self.handles):
-            if list(f.keys()) == []:
+
+            if "actions" not in f:
                 continue
-            
-            length = f["actions"].shape[0]
 
-            for t in range(length):
+            T = f["actions"].shape[0]
 
+            max_start = T - (obs_horizon + pred_horizon)
+
+            for t in range(0, max_start, stride):
                 self.index.append((file_id, t))
+
+
 
     # =====================================================
     # CLEANUP
@@ -231,44 +248,76 @@ class HDF5LfDDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        file_id, t = self.index[idx]
+        file_id, t0 = self.index[idx]
         f = self.handles[file_id]
 
-        cam = f["/images/cam"][t]
-        cam_ext = f["/images/cam_ext"][t]
-        cam_front = f["/images/cam_front"][t]
+        # cam = f["/images/cam"][t0]
+        # cam_ext = f["/images/cam_ext"][t0]
+        # cam_front = f["/images/cam_front"][t0]
 
-        cam_p = f["/images/cam_p"][t]
-        cam_ext_p = f["/images/cam_ext_p"][t]
-        cam_front_p = f["/images/cam_front_p"][t]
+        # cam_p = f["/images/cam_p"][t0]
+        # cam_ext_p = f["/images/cam_ext_p"][t0]
+        # cam_front_p = f["/images/cam_front_p"][t0]
 
-        pc = f["/pc/pc"][t]
-        pc_ext = f["/pc/pc_ext"][t]
-        pc_front = f["/pc/pc_front"][t]
+        pc = f["/pc/pc"][t0]
+        pc_ext = f["/pc/pc_ext"][t0]
+        pc_front = f["/pc/pc_front"][t0]
 
-        pcd_p = f["/pc/pcd_p"][t]
+        pcd_p = f["/pc/pcd_p"][t0]
 
-        target_pose = f["/states/target_pose"][t]
-        gripper_pose = f["/states/gripper_pose"][t] 
+        target_pose = f["/states/target_pose"][t0]
+        gripper_pose = f["/states/gripper_pose"][t0] 
 
-        action = f["actions"][t] 
+        action = f["actions"][t0] 
         # prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
-        diff = f["diff"][t] 
-        gripper_action = f["gripper_action"][t]
+        diff = f["diff"][t0] 
+        gripper_action = f["gripper_action"][t0]
+
+
+
+
+        T_obs = self.obs_horizon
+        T_pred = self.pred_horizon
+
+        t1 = t0 + T_obs
+        t2 = t1 + T_pred
+
+        # -------------------------------------------------
+        # OBSERVATIONS (SEQUENCE)
+        # -------------------------------------------------
+
+        pc_seq = f["/pc/pcd_p"][t0:t1]            # [T_obs, 512, 3]
+        pose_seq = f["/states/gripper_pose"][t0:t1]
+        sym_seq = (f["/states/target_pose"][t0:t1]
+                   - f["/states/gripper_pose"][t0:t1])
+        
+
+        # -------------------------------------------------
+        # ACTION TRAJECTORY (TARGET)
+        # -------------------------------------------------
+
+        traj = f["actions"][t1:t2]                # [T_pred, 6]
+        diff_seq = f["diff"][t1:t2]
+
+        # optional: gripper
+        # if "gripper_action" in f:
+        #     gripper = f["gripper_action"][t1:t2]
+        #     traj = np.concatenate([traj, gripper], axis=-1)
+
 
         
         return {
             # "cam": cam[:-1],
-            "cam_D": np.repeat(cam[-1][None], 3, axis=0),
-            "cam_p": cam_p,
+            # "cam_D": np.repeat(cam[-1][None], 3, axis=0),
+            # "cam_p": cam_p,
 
             # "cam_ext": cam_ext[:-1],
-            "cam_ext_D": np.repeat(cam_ext[-1][None], 3, axis=0),
-            "cam_ext_p": cam_ext_p,
+            # "cam_ext_D": np.repeat(cam_ext[-1][None], 3, axis=0),
+            # "cam_ext_p": cam_ext_p,
 
             # "cam_front": cam_front[:-1],
-            "cam_front_D": np.repeat(cam_front[-1][None], 3, axis=0),
-            "cam_front_p": cam_front_p,
+            # "cam_front_D": np.repeat(cam_front[-1][None], 3, axis=0),
+            # "cam_front_p": cam_front_p,
             
             "pc": pc,
             "pc_ext": pc_ext,
@@ -281,7 +330,16 @@ class HDF5LfDDataset(Dataset):
             "action": action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
             # "prev_action": prev_action
-            "sym": target_pose - gripper_pose
+            "sym": (target_pose - gripper_pose - self.mean_sym) / (self.std_sym + 1e-8),
+
+            # --- Traj ---
+            # Observations
+            "pc_seq": torch.tensor(pc_seq, dtype=torch.float32),
+            "pose_seq": torch.tensor(pose_seq, dtype=torch.float32),
+            "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
+            # Actions
+            "traj": torch.tensor(traj, dtype=torch.float32),
+            "diff_seq": torch.tensor(traj, dtype=torch.float32)
         }
 
     # =====================================================
@@ -374,7 +432,6 @@ class HDF5LfDDataset(Dataset):
             # if cam_p.dtype != np.uint8:
             #     cam_p = (cam_p * 255).astype(np.uint8)
 
-        
         if cam_ext_p is not None:
 
             if torch.is_tensor(cam_ext_p):
@@ -388,7 +445,6 @@ class HDF5LfDDataset(Dataset):
             # # float -> uint8
             # if cam_ext_p.dtype != np.uint8:
             #     cam_ext_p = (cam_ext_p * 255).astype(np.uint8)
-
 
         if cam_front_p is not None:
 
@@ -418,115 +474,3 @@ class HDF5LfDDataset(Dataset):
         f.flush()
 
 
-
-
-# =========================================================
-# PROCESSED DATASET
-# =========================================================
-
-class ProcessedDataset(Dataset):
-
-    def __init__(
-        self,
-        base_dataset,
-        image_size=(128, 128),
-        use_relative_pose=False,
-        use_delta_actions=False,
-        normalize_images=False
-    ):
-
-        self.dataset = base_dataset
-
-        self.use_relative_pose = use_relative_pose
-        self.use_delta_actions = use_delta_actions
-
-        # -------------------------------------------------
-        # IMAGE TRANSFORMS
-        # -------------------------------------------------
-
-        transform_list = [
-            transforms.Resize(image_size)
-        ]
-
-        if normalize_images:
-
-            transform_list.append(
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225]
-                )
-            )
-
-        self.transform = transforms.Compose(transform_list)
-
-    # =====================================================
-    # LENGTH
-    # =====================================================
-
-    def __len__(self):
-        return len(self.dataset)
-
-    # =====================================================
-    # GET ITEM
-    # =====================================================
-
-    def __getitem__(self, idx):
-
-        sample = self.dataset[idx]
-
-        cam = sample["cam"]
-        cam_ext = sample["cam_ext"]
-
-        target_pose = sample["target_pose"]
-        gripper_pose = sample["gripper_pose"]
-
-        action = sample["action"]
-        gripper_action = sample["gripper_action"]
-
-        # -------------------------------------------------
-        # IMAGE PROCESSING
-        # -------------------------------------------------
-
-        cam = self.transform(cam)
-        cam_ext = self.transform(cam_ext)
-
-        # -------------------------------------------------
-        # RELATIVE POSE
-        # -------------------------------------------------
-
-        if self.use_relative_pose:
-
-            pose = target_pose - gripper_pose
-
-        else:
-
-            pose = torch.cat([
-                target_pose,
-                gripper_pose
-            ], dim=-1)
-
-        # -------------------------------------------------
-        # DELTA ACTIONS
-        # -------------------------------------------------
-
-        if self.use_delta_actions:
-
-            if idx < len(self.dataset) - 1:
-
-                next_sample = self.dataset[idx + 1]
-
-                next_action = next_sample["action"]
-
-                action = next_action - action
-
-            else:
-
-                action = torch.zeros_like(action)
-
-        return {
-            "cam": cam,
-            "cam_ext": cam_ext,
-            "pose": pose,
-            "action": action,
-            "gripper_action": gripper_action
-        }

@@ -120,8 +120,11 @@ class SimpleCNN(nn.Module):
 
 
 class CnnPolicy(nn.Module):
-    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pretrained = True, pc = True):
+    def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pred_horizon = 5, pretrained = True, pc = True):
         super().__init__()
+
+        self.action_dim = action_dim
+        self.pred_horizon = pred_horizon
 
         if pretrained:
             
@@ -153,6 +156,7 @@ class CnnPolicy(nn.Module):
                 self.forward = self.forward_pre
             else:
                 inc = 3
+                H = 5
 
                 self.mlp = nn.Sequential(
                     nn.Linear(3,64), # falta poner el tamaño
@@ -194,7 +198,7 @@ class CnnPolicy(nn.Module):
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.LayerNorm(hidden_dim)
         )
 
@@ -202,8 +206,15 @@ class CnnPolicy(nn.Module):
         # 🔥 Proper fusion layer (fixed)
         self.fusion = nn.Sequential(
             nn.Linear(inc * hidden_dim, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.LayerNorm(hidden_dim)
+        )
+
+        self.gru = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
         )
 
         # Optional novelty: gating
@@ -211,12 +222,14 @@ class CnnPolicy(nn.Module):
 
         self.head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.LayerNorm(hidden_dim),
             # nn.Dropout(0.15),
-            nn.Linear(hidden_dim, action_dim),
-            nn.LayerNorm(action_dim)
+            nn.Linear(hidden_dim, action_dim * H),
+            # nn.LayerNorm(action_dim * H)
         )
+
+        self.forward = self.forward_temporal
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -264,4 +277,90 @@ class CnnPolicy(nn.Module):
         # gate = torch.tanh(self.gate(fused_raw))
         fused = self.fusion(fused_raw)# * gate
 
-        return self.head(fused)
+        return self.head(fused).view(pc.shape[0], -1, self.action_dim)
+    
+    def forward_temporal(self, pc_seq, pose_seq):
+
+        """
+        pc_seq   : [B,T,512,3]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, T, N, _ = pc_seq.shape
+
+        # -----------------------------------------------------
+        # Flatten batch and time
+        # -----------------------------------------------------
+
+        pc = pc_seq.reshape(B * T, N, 3)
+        pose = pose_seq.reshape(B * T, -1)
+
+        # -----------------------------------------------------
+        # PointNet
+        # -----------------------------------------------------
+
+        f_pc = self.mlp(pc)
+
+        max_feat = torch.max(f_pc, dim=1)[0]
+        mean_feat = torch.mean(f_pc, dim=1)
+
+        max_feat = self.after_max(max_feat)
+        mean_feat = self.after_mean(mean_feat)
+
+        feat_pc = torch.cat(
+            [max_feat, mean_feat],
+            dim=-1
+        )
+
+        # -----------------------------------------------------
+        # Pose encoder
+        # -----------------------------------------------------
+
+        f_pose = self.pose_mlp(pose)
+
+        # -----------------------------------------------------
+        # Fusion
+        # -----------------------------------------------------
+
+        fused = torch.cat(
+            [feat_pc, f_pose],
+            dim=-1
+        )
+
+        fused = self.fusion(fused)
+
+        # -----------------------------------------------------
+        # Restore time dimension
+        # -----------------------------------------------------
+
+        fused = fused.reshape(
+            B,
+            T,
+            -1
+        )
+
+        # -----------------------------------------------------
+        # GRU
+        # -----------------------------------------------------
+
+        gru_out, h_n = self.gru(fused)
+
+        # last hidden state
+        temporal_feat = h_n[-1]
+
+        # alternatively:
+        # temporal_feat = gru_out[:, -1]
+
+        # -----------------------------------------------------
+        # Predict future trajectory
+        # -----------------------------------------------------
+
+        pred = self.head(temporal_feat)
+
+        pred = pred.reshape(
+            B,
+            self.pred_horizon,
+            self.action_dim
+        )
+
+        return pred

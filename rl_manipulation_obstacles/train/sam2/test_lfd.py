@@ -74,13 +74,14 @@ def test():
     action_dim = sample["action"].shape[0]
 
 
-    in_channels = dataset[0]["cam_D"].shape[0]
+    # in_channels = dataset[0]["cam_D"].shape[0]
 
 
     
     model = CnnPolicy(pose_dim, action_dim, 
-                      in_channels = in_channels,
-                      pc=True).to(device)
+                      in_channels = 3,
+                      pc=True,
+                      hidden_dim=256).to(device)
     criterion = nn.MSELoss()
     
     model.load_state_dict(torch.load("best_model.pth"))
@@ -97,35 +98,21 @@ def test():
                     for k, v in b.items()
                 }
 
-            # f1 = b["cam_p"]
-            # f2 = b["cam_ext_p"]
-            # f3 = b["cam_front_p"]
-            # pred = model(
-            #     f1, f2, f3,
-            #     b["sym"],
-            # )
+            pc = b["pc_seq"].to(device)
+            pose = b["pose_seq"].to(device)
+            traj = b["traj"].to(device)
 
-            # f1 = b["cam_p"]
-            # f2 = b["cam_ext_p"]
-            # f3 = b["cam_front_p"]
+            pred = model(pc, pose)
 
-            # pred = model(
-            #     f1, f2, f3,
-            #     b["gripper_pose"],
-            # )
-            pred = model(
-                b["pcd_p"],
-                b["sym"]
-            )
 
-            test_loss += criterion(pred, b["action"]).item()
-            mae += torch.abs(pred - b["action"]).mean().item()
+            test_loss = criterion(pred, traj)
+            # mae += torch.abs(pred - b["action"]).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)
 
     print(f"\nTest MSE: {test_loss:.4f}")
-    print(f"Test MAE: {mae:.4f}")
+    # print(f"Test MAE: {mae:.4f}")
 
 
 if __name__ == "__main__":

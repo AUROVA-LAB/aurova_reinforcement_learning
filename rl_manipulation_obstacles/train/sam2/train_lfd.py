@@ -65,9 +65,9 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=128, shuffle=False, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=128, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=128, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -75,16 +75,16 @@ def train():
     action_dim = sample["action"].shape[0]
 
 
-    in_channels = dataset[0]["cam_D"].shape[0]
+    # in_channels = dataset[0]["cam_D"].shape[0]
 
 
     
     model = CnnPolicy(pose_dim, action_dim, 
-                      in_channels = in_channels,
+                      in_channels = 3,
                       hidden_dim=256,
                       pc = True).to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-3)
     criterion = nn.MSELoss()
 
     best_val = float("inf")
@@ -108,20 +108,14 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            # f1 = b["cam_p"]
-            # f2 = b["cam_ext_p"]
-            # f3 = b["cam_front_p"]
+            pc = b["pc_seq"].to(device)
+            pose = b["pose_seq"].to(device)
+            traj = b["traj"].to(device)
 
-            # pred = model(
-            #     f1, f2, f3,
-            #     b["sym"],
-            # )
-            pred = model(
-                b["pcd_p"],
-                b["sym"]
-            )
+            pred = model(pc, pose)
 
-            loss = criterion(pred, b["diff"])
+
+            loss = criterion(pred, traj)
 
             optimizer.zero_grad()
             loss.backward()
@@ -152,12 +146,14 @@ def train():
                 #     f1, f2, f3,
                 #     b["sym"],
                 # )
-                pred = model(
-                    b["pcd_p"],
-                    b["sym"]
-                )
+                pc = b["pc_seq"].to(device)
+                pose = b["pose_seq"].to(device)
+                traj = b["traj"].to(device)
 
-                val_loss += criterion(pred, b["diff"]).item()
+                pred = model(pc, pose)
+
+
+                val_loss = criterion(pred, traj)
 
         val_loss /= len(val_loader)
 
