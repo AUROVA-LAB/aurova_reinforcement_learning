@@ -152,7 +152,7 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
-                inc = 2
+                inc = 3
 
                 self.mlp = nn.Sequential(
                     nn.Linear(3,64), # falta poner el tamaño
@@ -164,8 +164,17 @@ class CnnPolicy(nn.Module):
                     nn.Linear(128,256), # falta poner el tamaño
                     nn.LayerNorm(256), # falta poner el tamaño
                     nn.ReLU(),
-                    nn.Linear(256,128), # falta poner el tamaño
-                    nn.LayerNorm(128), # falta poner el tamaño
+                    nn.Linear(256,512), # falta poner el tamaño
+                    nn.LayerNorm(512), # falta poner el tamaño
+                    nn.ReLU(),
+                )
+                self.after_mean = nn.Sequential(
+                    nn.Linear(512,hidden_dim), # falta poner el tamaño
+                    nn.LayerNorm(hidden_dim), # falta poner el tamaño)
+                )
+                self.after_max = nn.Sequential(
+                    nn.Linear(512,hidden_dim), # falta poner el tamaño
+                    nn.LayerNorm(hidden_dim), # falta poner el tamaño)
                 )
 
                 self.forward = self.forward_pc
@@ -240,11 +249,17 @@ class CnnPolicy(nn.Module):
     def forward_pc(self, pc, pose):
 
         f_pc = self.mlp(pc)
-        f_pc = torch.max(f_pc, dim = 1)[0] # Max Pooling
+        max_feat = torch.max(f_pc, dim=1)[0]
+        mean_feat = torch.mean(f_pc, dim=1)
+
+        max_feat = self.after_max(max_feat)
+        mean_feat = self.after_mean(mean_feat)
+
+        feat = torch.cat([max_feat, mean_feat], dim=-1)
         
         f_pose = self.pose_mlp(pose)
 
-        fused_raw = torch.cat([f_pc, f_pose], dim=-1)
+        fused_raw = torch.cat([feat, f_pose], dim=-1)
 
         # gate = torch.tanh(self.gate(fused_raw))
         fused = self.fusion(fused_raw)# * gate
