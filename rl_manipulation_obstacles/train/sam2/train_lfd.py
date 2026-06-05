@@ -81,6 +81,7 @@ def train():
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = in_channels,
+                      hidden_dim=256,
                       pc = True).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
@@ -120,7 +121,7 @@ def train():
                 b["sym"]
             )
 
-            loss = criterion(pred, b["action"])
+            loss = criterion(pred, b["diff"])
 
             optimizer.zero_grad()
             loss.backward()
@@ -156,7 +157,7 @@ def train():
                     b["sym"]
                 )
 
-                val_loss += criterion(pred, b["action"]).item()
+                val_loss += criterion(pred, b["diff"]).item()
 
         val_loss /= len(val_loader)
 
