@@ -155,3 +155,27 @@ def transform_points(points, translation, quaternion):
     points_world = torch.cat((points_world, points[:, 3:]), dim = -1)
 
     return points_world
+
+
+# Class to implement sequence storage
+class TensorQueue:
+    def __init__(self, max_size, element_shape):
+
+        # Initialize the queue tensor with the max number of elements and given shape
+        self.queue = torch.zeros((max_size, *element_shape))
+        self.max_size = max_size
+        self.current_size = 0
+    
+    def enqueue(self, new_element):
+        # Shift elements to the left if the queue is full
+        if self.current_size >= self.max_size:
+            self.queue[:-1] = self.queue[1:].clone()
+            self.queue[-1] = new_element
+        else:
+            # Add to the current end if the queue is not full
+            self.queue[self.current_size] = new_element
+            self.current_size += 1
+    
+    def get_queue(self):
+        # Return only the filled part of the queue if not yet full
+        return self.queue[:self.current_size]
