@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
-from .train.sam2.train_utils import farthest_point_sampling
+from .train.sam2.train_utils import farthest_point_sampling, add_noise_to_pcd
 
 
 
@@ -418,6 +418,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.pc_w = None
         self.pc_ext = None
         self.pc_front = None
+        self.processed_pc = None
 
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
         self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
@@ -444,6 +445,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # else:
         #     new_quat = quat_from_euler_xyz(self.my_traj[:, 3], self.my_traj[:, 4], self.my_traj[:, 5])
         #     self.my_traj = torch.cat((self.my_traj[:, :3], new_quat), dim = -1).to(self.device)
+
+        self.pc_seq = TensorQueue(max_size=self.cfg.horizon, element_shape=self.cfg.pc_shape)
+        self.pose_seq = TensorQueue(max_size=self.cfg.horizon, element_shape=(self.cfg.size,))
+
+        
+        
+
 
 
     def on_press(self, key):
@@ -610,7 +618,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # # Convert to IsaacLab representation (translation, quaternion)
         # action_pose_lab = self.convert_to_Lab(action_pose)
-
+        
+        cmd = self.gripper_pose_r_lie.clone()
 
         
         if not self.cfg.test:
@@ -697,6 +706,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 sampled_pts = torch.tensor(sampled_pts).float().unsqueeze(0).to(self.device)
                 cmd = self.test_model(sampled_pts, self.target_pose_r_lie - self.gripper_pose_r_lie)
+
+            elif self.cfg.mode == "seq":
+                if self.count % self.cfg.save_interval == 0:
+                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0),
+                                        self.pose_seq.queue.to(self.device).unsqueeze(0))[:, -1]
 
 
             # actions = self._preprocess_actions(cmd)
@@ -994,6 +1008,53 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
 
         self.pc_front = transform_points(pc_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+
+        pc_all = np.concatenate([self.pc_w[:, :3].cpu().numpy(), self.pc_ext[:, :3].cpu().numpy(), self.pc_front[:, :3].cpu().numpy()], axis=0)
+
+        # ============================================================
+        # 2. VOXEL DOWNSAMPLE
+        # ============================================================
+
+        voxel_size = 0.025
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+        pcd = pcd.voxel_down_sample(voxel_size)
+
+        pc_all = np.asarray(pcd.points)
+
+        # ============================================================
+        # 3. FILTERING (your original logic cleaned)
+        # ============================================================
+
+        pc_all = pc_all[pc_all[:, 2] > 0.025]
+        pc_all = pc_all[pc_all[:, 0] > -0.8]
+        pc_all = pc_all[pc_all[:, 0] < 0.1]
+        pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+        # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
+
+
+        if pc_all.shape[0] != 0:
+
+            sampled_pts, sampled_idx = farthest_point_sampling(
+                pc_all,
+                n_samples=512
+            )   
+
+            # Add noise and center point cloud around gripper
+            sampled_pts = add_noise_to_pcd(sampled_pts) - self.gripper_pose_r_lie[:, 3:].cpu().numpy()*2
+            self.processed_pc = torch.tensor(sampled_pts).to(self.device)
+
+            if self.count == 0:
+                for _ in range(self.cfg.horizon):
+                    self.pose_seq.enqueue(self.gripper_pose_r_lie)
+                    self.pc_seq.enqueue(self.processed_pc)
+
+            else:
+                self.pose_seq.enqueue(self.gripper_pose_r_lie)
+                self.pc_seq.enqueue(self.processed_pc)        
 
 
     def save_step(self):
@@ -1316,39 +1377,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.contacts_weight[env_ids] = torch.zeros(self.num_envs, self.num_contacts).to(self.device)[env_ids]
         self.contacts_w[env_ids] = torch.empty(self.num_envs).fill_(False).to(self.device)[env_ids]
         self.is_contact[env_ids] = torch.empty(self.num_envs).fill_(False).bool().to(self.device)[env_ids]
-        
-        
-        """
-            Creo que puedo quitar esto porque ya las actualizo en el "self.update_new_poses()"
-        """
-        # obs_rel = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        # self.robot_rot_ee_pose_r_lie_rel[env_ids] = self.log(obs_rel)[env_ids]
-        
-
-        # Updates the poses 
-        # box_pos_x = (self.cfg.box_range_x[1] - self.cfg.box_range_x[0]) * torch.rand((self.num_envs)).to(self.device) + self.cfg.box_range_x[0]
-        # box_pos_y = (self.cfg.box_range_y[1] - self.cfg.box_range_y[0]) * torch.rand((self.num_envs)).to(self.device) + self.cfg.box_range_y[0]
-
-
-        # new_incs = self.cfg.object_increments.clone()
-        
-        # new_incs[:, 1] *= box_pos_x.int()
-        # new_incs[:, 2] *= box_pos_y.int()
-
-
-
-        # new_obj_pose_r = combine_frame_transforms(t01 = self.cfg.object_base_pose[:, :3], q01 = self.cfg.object_base_pose[:, 3:],
-        #                                         t12 = new_incs[:, :3], q12 = new_incs[:, 3:])
-        
-        
-        # new_obj_pose_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
-        #                                           t12 = new_obj_pose_r[0],           q12 = new_obj_pose_r[1])
-        
-        
-        
-        # self.scene.rigid_objects["object"].write_root_pose_to_sim(root_pose = torch.cat((new_obj_pose_w), dim = -1), env_ids = env_ids)
-        # self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros(self.num_envs, 6).to(self.device), env_ids = env_ids)
-
 
 
         # Writes the new object position to the simulation
@@ -1447,7 +1475,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 if idx == 1:
                     self.start_grip_idx = save_idx
 
-                if torch.norm(x0_tensor.to(self.device) - ref).item() < self.cfg.plan_chg_thres:
+
+                if torch.norm(x0_tensor[:, 3:].to(self.device) - ref[:, 3:]).item() < self.cfg.plan_chg_thres - 2.0*self.cfg.plan_chg_thres/3.0*(idx == len(references) - 1):
                     break
 
             if idx == 1:
@@ -1455,9 +1484,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             
 
 
-
         self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
-        self.prev_pose = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).to(self.device)
+        self.prev_pose = self.gripper_pose_r_lie.clone()
 
         self.increment_condition = False
         self.gripper_action = False
@@ -1475,12 +1503,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                             )
         else:
             # Create model
-            self.test_model = CnnPolicy(
-                pose_dim=6,
-                action_dim=6,
-                in_channels=1,
-                hidden_dim=128
-            )
+            self.test_model = CnnPolicy(6, 6, 
+                      in_channels = 3,
+                      pc=True,
+                      hidden_dim=256).to(self.device)
 
             # Load checkpoint
             checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
