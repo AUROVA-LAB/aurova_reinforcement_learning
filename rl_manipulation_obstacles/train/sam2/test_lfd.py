@@ -66,7 +66,7 @@ def test():
 
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, collate_fn = collate_fn)
     val_loader = DataLoader(val_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=1, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -84,7 +84,7 @@ def test():
                       hidden_dim=256).to(device)
     criterion = nn.MSELoss()
     
-    model.load_state_dict(torch.load("best_model.pth"))
+    model.load_state_dict(torch.load("best_model_PC_seq.pth"))
     model.eval()
 
     test_loss = 0
@@ -104,15 +104,18 @@ def test():
 
             pred = model(pc, pose)
 
+            # print(pred)
+            print(traj)
+            print("-----")
 
             test_loss = criterion(pred, traj)
-            # mae += torch.abs(pred - b["action"]).mean().item()
+            mae += torch.abs(pred - traj).mean().item()
 
     test_loss /= len(test_loader)
     mae /= len(test_loader)
 
     print(f"\nTest MSE: {test_loss:.4f}")
-    # print(f"Test MAE: {mae:.4f}")
+    print(f"Test MAE: {mae:.4f}")
 
 
 if __name__ == "__main__":
