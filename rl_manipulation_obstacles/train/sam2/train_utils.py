@@ -17,7 +17,7 @@ from segment_anything import sam_model_registry
 
 from sam2.build_sam import build_sam2
 
-from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+from .Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 
@@ -490,13 +490,13 @@ def preprocess_pcd_raw(dataset):
     dataset.mean_sym = mean_sym
     dataset.std_sym = std_sym
 
-    print("\n\n ------ \n\n")
-    print("MEAN DIFF: ", mean_diff)
-    print("STD DIFF: ", std_diff)
+    # print("\n\n ------ \n\n")
+    # print("MEAN DIFF: ", mean_diff)
+    # print("STD DIFF: ", std_diff)
 
 
-    print("MEAN sym: ", mean_sym)
-    print("STD sym: ", std_sym)
-    print("\n\n ------ \n\n")
+    # print("MEAN sym: ", mean_sym)
+    # print("STD sym: ", std_sym)
+    # print("\n\n ------ \n\n")
 
     return dataset
