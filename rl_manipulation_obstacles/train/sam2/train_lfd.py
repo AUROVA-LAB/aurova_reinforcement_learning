@@ -98,7 +98,7 @@ def train():
         
 
 
-    for epoch in range(100):
+    for epoch in range(300):
 
         # ================= TRAIN =================
         model.train()
@@ -110,7 +110,7 @@ def train():
 
             pc = b["pc_seq"].to(device)
             pose = b["pose_seq"].to(device)
-            traj = b["traj"].to(device)
+            traj = b["diff_seq"].to(device)
 
             pred = model(pc, pose)
 
@@ -148,7 +148,8 @@ def train():
                 # )
                 pc = b["pc_seq"].to(device)
                 pose = b["pose_seq"].to(device)
-                traj = b["traj"].to(device)
+                traj = b["diff_seq"].to(device)
+                
 
                 pred = model(pc, pose)
 
