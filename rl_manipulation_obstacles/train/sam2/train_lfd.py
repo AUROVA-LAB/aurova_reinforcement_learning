@@ -81,7 +81,7 @@ def train():
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = 3,
-                      hidden_dim=256,
+                      hidden_dim=128,
                       pc = True).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-3)
