@@ -391,10 +391,10 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Increments in the original poses for sampling random values on each axis
     ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
-                    [-0.3,  0.3],
-                    [-0.7 / 3 ,  0.7 / 3 ],
-                    [-0.7 / 3 ,  0.7 / 3 ],
-                    [-0.7 / 3 ,  0.7 / 3 ]]
+                    [-0.05,  0.05],
+                    [0*-0.7 / 3 ,  0*0.7 / 3 ],
+                    [0*-0.7 / 3 ,  0*0.7 / 3 ],
+                    [0*-0.7 / 3 ,  0*0.7 / 3 ]]
     
     # Which robot apply the sampling poses
     apply_range = [False, False, True, False]
@@ -464,14 +464,15 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     get_img_mpc = False
     get_rot = True
 
-    plan_chg_thres = 0.01
+    plan_chg_thres = 0.05
 
     test = False
-    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_PC_seq.pth"
     
-    save_interval = 3
-
-    mode = "pcd"
+    save_interval = 2
+    mode = "seq" # "pcd", "img", "seq"
+    horizon = 5
+    pc_shape = (512, 3)
 
 
 
