@@ -339,7 +339,7 @@ class HDF5LfDDataset(Dataset):
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions
             "traj": torch.tensor(traj, dtype=torch.float32),
-            "diff_seq": torch.tensor(traj, dtype=torch.float32)
+            "diff_seq": torch.tensor(diff_seq, dtype=torch.float32)
         }
 
     # =====================================================
