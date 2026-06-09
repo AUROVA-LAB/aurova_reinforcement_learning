@@ -81,10 +81,10 @@ def test():
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = 3,
                       pc=True,
-                      hidden_dim=256).to(device)
+                      hidden_dim=128).to(device)
     criterion = nn.MSELoss()
     
-    model.load_state_dict(torch.load("best_model_PC_seq.pth"))
+    model.load_state_dict(torch.load("best_model_PC_seq_rel.pth"))
     model.eval()
 
     test_loss = 0
@@ -104,7 +104,7 @@ def test():
 
             pred = model(pc, pose)
 
-            # print(pred)
+            print(pred)
             print(traj)
             print("-----")
 

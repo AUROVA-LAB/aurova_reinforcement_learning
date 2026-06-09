@@ -119,6 +119,68 @@ class SimpleCNN(nn.Module):
         return self.net(x)
 
 
+
+# =========================================================
+# DCT FEATIRE REDUCER
+# =========================================================
+
+class FastDCTFeatureReducer:
+    """
+    Fast deterministic DCT-based feature reducer.
+
+    Ensures fixed output size K < D by truncating frequency components.
+    """
+
+    def __init__(self, input_dim: int, output_dim: int):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        x: (B, D) -> z: (B, K)
+        """
+
+        if x.dim() != 2:
+            raise ValueError(f"Expected (B, D), got {x.shape}")
+
+        B, D = x.shape
+        K = self.output_dim
+
+        # Even extension for DCT-II via FFT trick
+        x_ext = torch.cat([x, x.flip(-1)], dim=-1)  # (B, 2D)
+
+        # FFT
+        X = torch.fft.fft(x_ext, dim=-1)
+
+        # Take only first D real components (DCT equivalent region)
+        dct_coeffs = X[..., :D].real
+
+        # 🔥 FIXED OUTPUT SIZE: keep only K features         
+        return torch.tanh(dct_coeffs[:, :K] / (1 + dct_coeffs[:, :K].abs()))
+
+
+    def decode(self, z: torch.Tensor, original_dim: int = None) -> torch.Tensor:
+        """
+        Approximate reconstruction (optional).
+        """
+        K = z.shape[-1]
+        D = self.input_dim
+
+        if original_dim is None:
+            original_dim = D
+
+        # Reconstruct only from K components (zero-pad)
+        z_padded = torch.zeros(z.shape[0], D, device=z.device, dtype=z.dtype)
+        z_padded[:, :K] = z
+
+        # inverse FFT approximation
+        z_ext = torch.cat([z_padded, z_padded.flip(-1)], dim=-1)
+        x_rec = torch.fft.ifft(z_ext, dim=-1).real
+
+        return x_rec[:, :original_dim]
+
+
+
 class CnnPolicy(nn.Module):
     def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pred_horizon = 5, pretrained = True, pc = True):
         super().__init__()
@@ -155,7 +217,7 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
-                inc = 3
+                inc = 2
                 H = 5
 
                 self.mlp = nn.Sequential(
@@ -181,7 +243,7 @@ class CnnPolicy(nn.Module):
                     nn.LayerNorm(hidden_dim), # falta poner el tamaño)
                 )
 
-                self.forward = self.forward_pc
+                # self.forward = self.forward_pc
 
         else:
             self.cnn1 = SimpleCNN(in_channels=in_channels, 
@@ -194,6 +256,7 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
+        self.dct = FastDCTFeatureReducer(input_dim=512*512, output_dim=hidden_dim)
 
 
         self.pose_mlp = nn.Sequential(
@@ -229,7 +292,8 @@ class CnnPolicy(nn.Module):
             # nn.LayerNorm(action_dim * H)
         )
 
-        self.forward = self.forward_temporal
+        self.forward = self.forward_temporal_DCT
+        # self.forward = self.forward_temporal
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -312,6 +376,8 @@ class CnnPolicy(nn.Module):
             dim=-1
         )
 
+        print("MMMMMMM")
+
         # -----------------------------------------------------
         # Pose encoder
         # -----------------------------------------------------
@@ -324,6 +390,98 @@ class CnnPolicy(nn.Module):
 
         fused = torch.cat(
             [feat_pc, f_pose],
+            dim=-1
+        )
+
+        fused = self.fusion(fused)
+
+        # -----------------------------------------------------
+        # Restore time dimension
+        # -----------------------------------------------------
+
+        fused = fused.reshape(
+            B,
+            T,
+            -1
+        )
+
+        # -----------------------------------------------------
+        # GRU
+        # -----------------------------------------------------
+
+        gru_out, h_n = self.gru(fused)
+
+        # last hidden state
+        temporal_feat = h_n[-1]
+
+        # alternatively:
+        # temporal_feat = gru_out[:, -1]
+
+        # -----------------------------------------------------
+        # Predict future trajectory
+        # -----------------------------------------------------
+
+        pred = self.head(temporal_feat)
+
+        pred = pred.reshape(
+            B,
+            self.pred_horizon,
+            self.action_dim
+        )
+
+        return pred
+    
+
+    def forward_temporal_DCT(self, pc_seq, pose_seq):
+
+        """
+        pc_seq   : [B,T,512,3]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, T, N, _ = pc_seq.shape
+
+        # -----------------------------------------------------
+        # Flatten batch and time
+        # -----------------------------------------------------
+
+        pc = pc_seq.reshape(B * T, N, 3)
+        pose = pose_seq.reshape(B * T, -1)
+
+        # -----------------------------------------------------
+        # PointNet
+        # -----------------------------------------------------
+
+        f_pc = self.mlp(pc)
+
+        # max_feat = torch.max(f_pc, dim=1)[0]
+        # mean_feat = torch.mean(f_pc, dim=1)
+
+        # max_feat = self.after_max(max_feat)
+        # mean_feat = self.after_mean(mean_feat)
+
+        # feat_pc = torch.cat(
+        #     [max_feat, mean_feat],
+        #     dim=-1
+        # )
+
+
+        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))
+        print(f_pc_dct.shape)
+        
+
+        # -----------------------------------------------------
+        # Pose encoder
+        # -----------------------------------------------------
+
+        f_pose = self.pose_mlp(pose)
+
+        # -----------------------------------------------------
+        # Fusion
+        # -----------------------------------------------------
+
+        fused = torch.cat(
+            [f_pc_dct, f_pose],
             dim=-1
         )
 
