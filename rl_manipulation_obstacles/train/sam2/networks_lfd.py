@@ -376,8 +376,6 @@ class CnnPolicy(nn.Module):
             dim=-1
         )
 
-        print("MMMMMMM")
-
         # -----------------------------------------------------
         # Pose encoder
         # -----------------------------------------------------
@@ -466,9 +464,7 @@ class CnnPolicy(nn.Module):
         # )
 
 
-        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))
-        print(f_pc_dct.shape)
-        
+        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))        
 
         # -----------------------------------------------------
         # Pose encoder
