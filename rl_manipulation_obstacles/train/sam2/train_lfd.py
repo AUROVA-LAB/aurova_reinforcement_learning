@@ -154,7 +154,7 @@ def train():
                 pred = model(pc, pose)
 
 
-                val_loss = criterion(pred, traj)
+                val_loss += criterion(pred, traj)
 
         val_loss /= len(val_loader)
 
