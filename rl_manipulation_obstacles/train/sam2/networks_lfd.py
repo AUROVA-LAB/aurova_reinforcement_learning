@@ -217,7 +217,7 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
-                inc = 2
+                inc = 3
                 H = 5
 
                 self.mlp = nn.Sequential(
@@ -292,8 +292,8 @@ class CnnPolicy(nn.Module):
             # nn.LayerNorm(action_dim * H)
         )
 
-        self.forward = self.forward_temporal_DCT
-        # self.forward = self.forward_temporal
+        # self.forward = self.forward_temporal_DCT
+        self.forward = self.forward_temporal
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -429,7 +429,6 @@ class CnnPolicy(nn.Module):
 
         return pred
     
-
     def forward_temporal_DCT(self, pc_seq, pose_seq):
 
         """
