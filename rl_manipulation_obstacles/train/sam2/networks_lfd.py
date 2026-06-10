@@ -217,22 +217,20 @@ class CnnPolicy(nn.Module):
 
                 self.forward = self.forward_pre
             else:
-                inc = 3
+                inc = 2
                 H = 5
 
                 self.mlp = nn.Sequential(
-                    nn.Linear(3,64), # falta poner el tamaño
-                    nn.LayerNorm(64), # falta poner el tamaño
-                    nn.ReLU(),
-                    nn.Linear(64,128), # falta poner el tamaño
-                    nn.LayerNorm(128), # falta poner el tamaño
-                    nn.ReLU(),
                     nn.Linear(128,256), # falta poner el tamaño
                     nn.LayerNorm(256), # falta poner el tamaño
                     nn.ReLU(),
                     nn.Linear(256,512), # falta poner el tamaño
                     nn.LayerNorm(512), # falta poner el tamaño
                     nn.ReLU(),
+                    nn.Linear(512,1024), # falta poner el tamaño
+                    nn.LayerNorm(1024), # falta poner el tamaño
+                    nn.ReLU(),
+                    
                 )
                 self.after_mean = nn.Sequential(
                     nn.Linear(512,hidden_dim), # falta poner el tamaño
@@ -256,7 +254,7 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
-        self.dct = FastDCTFeatureReducer(input_dim=512*512, output_dim=hidden_dim)
+        self.dct = FastDCTFeatureReducer(input_dim=1024, output_dim=hidden_dim)
 
 
         self.pose_mlp = nn.Sequential(
@@ -292,8 +290,8 @@ class CnnPolicy(nn.Module):
             # nn.LayerNorm(action_dim * H)
         )
 
-        # self.forward = self.forward_temporal_DCT
-        self.forward = self.forward_temporal
+        self.forward = self.forward_temporal_DCT
+        # self.forward = self.forward_temporal
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -429,7 +427,7 @@ class CnnPolicy(nn.Module):
 
         return pred
     
-    def forward_temporal_DCT(self, pc_seq, pose_seq):
+    def forward_temporal_DCT_raw(self, pc_seq, pose_seq):
 
         """
         pc_seq   : [B,T,512,3]
@@ -517,3 +515,97 @@ class CnnPolicy(nn.Module):
         )
 
         return pred
+    
+
+    def forward_temporal_DCT(self, pc_seq, pose_seq):
+
+        """
+        pc_seq   : [B,T,128]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, T, _ = pc_seq.shape
+
+        # -----------------------------------------------------
+        # Flatten batch and time
+        # -----------------------------------------------------
+
+        pc = pc_seq.reshape(B * T, -1)
+        pose = pose_seq.reshape(B * T, -1)
+
+        # -----------------------------------------------------
+        # PointNet
+        # -----------------------------------------------------
+
+        f_pc = self.mlp(pc)
+
+        # max_feat = torch.max(f_pc, dim=1)[0]
+        # mean_feat = torch.mean(f_pc, dim=1)
+
+        # max_feat = self.after_max(max_feat)
+        # mean_feat = self.after_mean(mean_feat)
+
+        # feat_pc = torch.cat(
+        #     [max_feat, mean_feat],
+        #     dim=-1
+        # )
+
+
+        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))        
+
+        # -----------------------------------------------------
+        # Pose encoder
+        # -----------------------------------------------------
+
+        f_pose = self.pose_mlp(pose)
+
+        # -----------------------------------------------------
+        # Fusion
+        # -----------------------------------------------------
+
+        fused = torch.cat(
+            [f_pc_dct, f_pose],
+            dim=-1
+        )
+
+        fused = self.fusion(fused)
+
+        # -----------------------------------------------------
+        # Restore time dimension
+        # -----------------------------------------------------
+
+        fused = fused.reshape(
+            B,
+            T,
+            -1
+        )
+
+        # -----------------------------------------------------
+        # GRU
+        # -----------------------------------------------------
+
+        gru_out, h_n = self.gru(fused)
+
+        # last hidden state
+        temporal_feat = h_n[-1]
+
+        # alternatively:
+        # temporal_feat = gru_out[:, -1]
+
+        # -----------------------------------------------------
+        # Predict future trajectory
+        # -----------------------------------------------------
+
+        pred = self.head(temporal_feat)
+
+        pred = pred.reshape(
+            B,
+            self.pred_horizon,
+            self.action_dim
+        )
+
+        return pred
+    
+
+
+

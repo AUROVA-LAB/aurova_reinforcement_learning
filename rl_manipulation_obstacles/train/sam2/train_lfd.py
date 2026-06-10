@@ -61,7 +61,7 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd_raw(dataset)
+        dataset = preprocess_pcd(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -81,7 +81,7 @@ def train():
     
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = 3,
-                      hidden_dim=128,
+                      hidden_dim=64,
                       pc = True).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-3)
@@ -108,7 +108,7 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            pc = b["pc_seq"].to(device)
+            pc =  b["pc_net_seq"].to(device)
             pose = b["pose_seq"].to(device)
             traj = b["traj"].to(device)
 
@@ -146,7 +146,7 @@ def train():
                 #     f1, f2, f3,
                 #     b["sym"],
                 # )
-                pc = b["pc_seq"].to(device)
+                pc = b["pc_net_seq"].to(device)
                 pose = b["pose_seq"].to(device)
                 traj = b["traj"].to(device)
                 
