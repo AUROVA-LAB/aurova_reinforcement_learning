@@ -84,8 +84,8 @@ def train():
                       hidden_dim=64,
                       pc = True).to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-3)
-    criterion = nn.MSELoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    criterion = nn.L1Loss()
 
     best_val = float("inf")
 
