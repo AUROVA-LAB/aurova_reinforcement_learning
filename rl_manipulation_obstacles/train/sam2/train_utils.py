@@ -17,7 +17,7 @@ from segment_anything import sam_model_registry
 
 from sam2.build_sam import build_sam2
 
-from .Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 
