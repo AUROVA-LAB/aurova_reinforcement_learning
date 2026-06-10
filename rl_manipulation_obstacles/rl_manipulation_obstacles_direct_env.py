@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
-from .train.sam2.train_utils import farthest_point_sampling, add_noise_to_pcd
+from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single, preprocess_single_pcd_raw
 
 
 
@@ -707,7 +707,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 sampled_pts = torch.tensor(sampled_pts).float().unsqueeze(0).to(self.device)
                 cmd = self.test_model(sampled_pts, self.target_pose_r_lie - self.gripper_pose_r_lie)
 
-            elif self.cfg.mode == "seq":
+            elif "seq" in self.cfg.mode:
                 if self.count % self.cfg.save_interval == 0:
                     cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0),
                                         self.pose_seq.queue.to(self.device).unsqueeze(0))[:, -1]
@@ -1010,51 +1010,24 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.pc_front = transform_points(pc_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
 
         pc_all = np.concatenate([self.pc_w[:, :3].cpu().numpy(), self.pc_ext[:, :3].cpu().numpy(), self.pc_front[:, :3].cpu().numpy()], axis=0)
+        pc_all_color = np.concatenate([self.pc_w.cpu().numpy(), self.pc_ext.cpu().numpy(), self.pc_front.cpu().numpy()], axis=0)
 
-        # ============================================================
-        # 2. VOXEL DOWNSAMPLE
-        # ============================================================
+        
+        if self.cfg.mode == "seq":
+            self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
+        elif self.cfg.mode == "seq_raw":
+            self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
-        voxel_size = 0.025
+        self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
 
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-        pcd = pcd.voxel_down_sample(voxel_size)
-
-        pc_all = np.asarray(pcd.points)
-
-        # ============================================================
-        # 3. FILTERING (your original logic cleaned)
-        # ============================================================
-
-        pc_all = pc_all[pc_all[:, 2] > 0.025]
-        pc_all = pc_all[pc_all[:, 0] > -0.8]
-        pc_all = pc_all[pc_all[:, 0] < 0.1]
-        pc_all = pc_all[pc_all[:, 1] > -0.5]
-
-        # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
-
-
-        if pc_all.shape[0] != 0:
-
-            sampled_pts, sampled_idx = farthest_point_sampling(
-                pc_all,
-                n_samples=512
-            )   
-
-            # Add noise and center point cloud around gripper
-            sampled_pts = add_noise_to_pcd(sampled_pts) - self.gripper_pose_r_lie[:, 3:].cpu().numpy()*2
-            self.processed_pc = torch.tensor(sampled_pts).to(self.device)
-
-            if self.count == 0:
-                for _ in range(self.cfg.horizon):
-                    self.pose_seq.enqueue(self.gripper_pose_r_lie)
-                    self.pc_seq.enqueue(self.processed_pc)
-
-            else:
+        if self.count == 0:
+            for _ in range(self.cfg.horizon):
                 self.pose_seq.enqueue(self.gripper_pose_r_lie)
-                self.pc_seq.enqueue(self.processed_pc)        
+                self.pc_seq.enqueue(self.processed_pc)
+
+        else:
+            self.pose_seq.enqueue(self.gripper_pose_r_lie)
+            self.pc_seq.enqueue(self.processed_pc)        
 
 
     def save_step(self):
@@ -1076,11 +1049,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         cam_p = torch.rand((64*64)).float().cpu().numpy()
         pcd_p = torch.zeros((512, 3)).float().cpu().numpy()
+        pcd_net = torch.zeros((128)).float().cpu().numpy()
 
         # ---- Save step ----
         self.writer.add_step(cam, cam_ext, cam_front, 
                              cam_p, cam_p, cam_p,
-                             pcd_p,
+                             pcd_p, pcd_net,
                              pc_w, pc_ext, pc_front, 
                              target_pose, gripper_pose, action, diff, self.gripper_action)
 
@@ -1506,7 +1480,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.test_model = CnnPolicy(6, 6, 
                       in_channels = 3,
                       pc=True,
-                      hidden_dim=256).to(self.device)
+                      hidden_dim=128).to(self.device)
 
             # Load checkpoint
             checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
