@@ -235,6 +235,99 @@ def preprocess_img_sam2(dataset):
     return dataset
 
 
+
+
+
+def preprocess_pcd_single(pc_all, model):
+
+    # ============================================================
+    # 2. VOXEL DOWNSAMPLE
+    # ============================================================
+
+    voxel_size = 0.025
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+    pcd = pcd.voxel_down_sample(voxel_size)
+
+    pc_all = np.asarray(pcd.points)
+
+    # keep RGB if exists
+    if pc_all.shape[1] > 3:
+        colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
+    else:
+        colors = np.zeros_like(pc_all)
+
+    pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+    # ============================================================
+    # 3. FILTERING (your original logic cleaned)
+    # ============================================================
+
+    pc_all = pc_all[pc_all[:, 2] > 0.025]
+    pc_all = pc_all[pc_all[:, 0] > -0.8]
+    pc_all = pc_all[pc_all[:, 0] < 0.1]
+    pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+    # ============================================================
+    # 4. OPEN3D POINT CLOUD + NORMALS
+    # ============================================================
+
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+
+    # ============================================================
+    # 5. POINTNET FEATURES (conv1 output)
+    # ============================================================
+
+    pc_xyz = pc_all[:, :3]
+    pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+    # normalize
+    pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+    # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+
+
+    # sample for PointNet
+    NUM_POINTS = 4096
+    if len(pc_xyz) == 0.0:
+        return None
+    idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+
+    xyz_sample = pc_xyz[idx]
+    rgb_sample = pc_rgb[idx]
+
+
+    # ============================================================
+    # 6. BUILD POINTNET INPUT
+    # ============================================================
+
+    xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+
+    features_in = np.concatenate(
+        [
+            xyz_sample,      # xyz
+            xyz_norm,        # normalized xyz
+            rgb_sample       # optional color
+        ],
+        axis=1
+    )
+
+    points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+
+
+
+    with torch.no_grad():
+        _, _, point_features = model(points)
+
+    point_features = point_features.mean(-1)[0].cpu().numpy()
+
+    return point_features
+
+
 def preprocess_pcd(dataset):
     num_classes = 13
     model = get_model(num_classes=num_classes).cuda()
@@ -259,95 +352,16 @@ def preprocess_pcd(dataset):
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        # ============================================================
-        # 2. VOXEL DOWNSAMPLE
-        # ============================================================
-
-        voxel_size = 0.025
-
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-        pcd = pcd.voxel_down_sample(voxel_size)
-
-        pc_all = np.asarray(pcd.points)
-
-        # keep RGB if exists
-        if pc.shape[1] > 3:
-            colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
-        else:
-            colors = np.zeros_like(pc_all)
-
-        pc_all = np.concatenate([pc_all, colors], axis=1)
-
-
-        # ============================================================
-        # 3. FILTERING (your original logic cleaned)
-        # ============================================================
-
-        pc_all = pc_all[pc_all[:, 2] > 0.025]
-        pc_all = pc_all[pc_all[:, 0] > -0.8]
-        pc_all = pc_all[pc_all[:, 0] < 0.1]
-        pc_all = pc_all[pc_all[:, 1] > -0.5]
-
-        # ============================================================
-        # 4. OPEN3D POINT CLOUD + NORMALS
-        # ============================================================
-
-        cloud = o3d.geometry.PointCloud()
-        cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-
-        # ============================================================
-        # 5. POINTNET FEATURES (conv1 output)
-        # ============================================================
-
-        pc_xyz = pc_all[:, :3]
-        pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
-
-        # normalize
-        pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
-        # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
-
-
-        # sample for PointNet
-        NUM_POINTS = 4096
-        if len(pc_xyz) == 0.0:
+        point_features = preprocess_pcd_single(pc_all, model)
+        
+        if point_features is None:
             continue
-        idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
 
-        xyz_sample = pc_xyz[idx]
-        rgb_sample = pc_rgb[idx]
-
-
-        # ============================================================
-        # 6. BUILD POINTNET INPUT
-        # ============================================================
-
-        xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
-
-        features_in = np.concatenate(
-            [
-                xyz_sample,      # xyz
-                xyz_norm,        # normalized xyz
-                rgb_sample       # optional color
-            ],
-            axis=1
-        )
-
-        points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
-
-
-
-        with torch.no_grad():
-            _, _, point_features = model(points)
-
-        point_features = point_features.mean(-1)[0].cpu().numpy()
-
-        dataset.set_item(i, pcd_p = point_features)
+        dataset.set_item(i, pcd_net = point_features)
 
     return dataset
         
+
 
 
 def farthest_point_sampling(points, n_samples):
@@ -417,6 +431,50 @@ def add_noise_to_pcd(points,
     return points
 
 
+def preprocess_single_pcd_raw(pc_all, mean_dataset):
+    # ============================================================
+    # 2. VOXEL DOWNSAMPLE
+    # ============================================================
+
+    voxel_size = 0.025
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+    pcd = pcd.voxel_down_sample(voxel_size)
+
+    pc_all = np.asarray(pcd.points)
+
+    # ============================================================
+    # 3. FILTERING (your original logic cleaned)
+    # ============================================================
+
+    pc_all = pc_all[pc_all[:, 2] > 0.025]
+    pc_all = pc_all[pc_all[:, 0] > -0.8]
+    pc_all = pc_all[pc_all[:, 0] < 0.1]
+    pc_all = pc_all[pc_all[:, 1] > -0.5]
+
+    # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
+
+    if pc_all.shape[0] != 0:
+
+        sampled_pts, sampled_idx = farthest_point_sampling(
+            pc_all,
+            n_samples=512
+        )   
+
+
+        # Add noise and center point cloud around gripper
+        sampled_pts = add_noise_to_pcd(sampled_pts) - mean_dataset[3:]*2
+
+        # cloud = o3d.geometry.PointCloud()
+        # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
+
+        # o3d.visualization.draw_geometries([cloud])
+
+    return sampled_pts
+
+
 def preprocess_pcd_raw(dataset):
 
     mean_diff = np.zeros(dataset[0]["diff"].shape)
@@ -431,51 +489,13 @@ def preprocess_pcd_raw(dataset):
 
         pc_all = np.concatenate([pc[:, :3], pc_ext[:, :3], pc_front[:, :3]], axis=0)
 
-        # ============================================================
-        # 2. VOXEL DOWNSAMPLE
-        # ============================================================
+        sampled_pts = preprocess_single_pcd_raw(pc_all, dataset[i]["gripper_pose"])
 
-        voxel_size = 0.025
-
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-        pcd = pcd.voxel_down_sample(voxel_size)
-
-        pc_all = np.asarray(pcd.points)
-
-        # ============================================================
-        # 3. FILTERING (your original logic cleaned)
-        # ============================================================
-
-        pc_all = pc_all[pc_all[:, 2] > 0.025]
-        pc_all = pc_all[pc_all[:, 0] > -0.8]
-        pc_all = pc_all[pc_all[:, 0] < 0.1]
-        pc_all = pc_all[pc_all[:, 1] > -0.5]
-
-        # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
-
-        if pc_all.shape[0] != 0:
-
-            sampled_pts, sampled_idx = farthest_point_sampling(
-                pc_all,
-                n_samples=512
-            )   
+        dataset.set_item(i, pcd_p = sampled_pts)
 
 
-            # Add noise and center point cloud around gripper
-            sampled_pts = add_noise_to_pcd(sampled_pts) - dataset[i]["gripper_pose"][3:]*2
-
-            # cloud = o3d.geometry.PointCloud()
-            # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
-
-            # o3d.visualization.draw_geometries([cloud])
-
-            dataset.set_item(i, pcd_p = sampled_pts)
-
-
-            mean_diff += dataset[i]["diff"]
-            mean_sym += dataset[i]["sym"]
+        mean_diff += dataset[i]["diff"]
+        mean_sym += dataset[i]["sym"]
 
 
     mean_diff /= len(dataset)
@@ -489,14 +509,5 @@ def preprocess_pcd_raw(dataset):
 
     dataset.mean_sym = mean_sym
     dataset.std_sym = std_sym
-
-    # print("\n\n ------ \n\n")
-    # print("MEAN DIFF: ", mean_diff)
-    # print("STD DIFF: ", std_diff)
-
-
-    # print("MEAN sym: ", mean_sym)
-    # print("STD sym: ", std_sym)
-    # print("\n\n ------ \n\n")
 
     return dataset
