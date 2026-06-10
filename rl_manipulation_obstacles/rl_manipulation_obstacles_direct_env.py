@@ -1480,7 +1480,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.test_model = CnnPolicy(6, 6, 
                       in_channels = 3,
                       pc=True,
-                      hidden_dim=128).to(self.device)
+                      hidden_dim=64).to(self.device)
 
             # Load checkpoint
             checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
