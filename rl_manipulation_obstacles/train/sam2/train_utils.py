@@ -17,7 +17,7 @@ from segment_anything import sam_model_registry
 
 from sam2.build_sam import build_sam2
 
-from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
+from .Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 
@@ -252,6 +252,11 @@ def preprocess_pcd_single(pc_all, model):
     pcd = pcd.voxel_down_sample(voxel_size)
 
     pc_all = np.asarray(pcd.points)
+
+
+    # Add noise
+    pc_all = add_noise_to_pcd(points = pc_all)
+
 
     # keep RGB if exists
     if pc_all.shape[1] > 3:
