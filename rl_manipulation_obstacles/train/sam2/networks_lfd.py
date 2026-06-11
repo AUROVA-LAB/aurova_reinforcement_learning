@@ -254,7 +254,7 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
-        self.dct = FastDCTFeatureReducer(input_dim=1024, output_dim=hidden_dim)
+        self.dct = FastDCTFeatureReducer(input_dim=128, output_dim=hidden_dim)
 
 
         self.pose_mlp = nn.Sequential(
@@ -272,8 +272,8 @@ class CnnPolicy(nn.Module):
         )
 
         self.gru = nn.GRU(
-            input_size=hidden_dim,
-            hidden_size=hidden_dim,
+            input_size=hidden_dim*2,
+            hidden_size=hidden_dim*2,
             num_layers=2,
             batch_first=True,
         )
@@ -534,56 +534,25 @@ class CnnPolicy(nn.Module):
         pose = pose_seq.reshape(B * T, -1)
 
         # -----------------------------------------------------
-        # PointNet
+        # PointNet ENCODER
         # -----------------------------------------------------
-
-        f_pc = self.mlp(pc)
-
-        # max_feat = torch.max(f_pc, dim=1)[0]
-        # mean_feat = torch.mean(f_pc, dim=1)
-
-        # max_feat = self.after_max(max_feat)
-        # mean_feat = self.after_mean(mean_feat)
-
-        # feat_pc = torch.cat(
-        #     [max_feat, mean_feat],
-        #     dim=-1
-        # )
-
-
-        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))        
+        f_pc_dct = self.dct.encode(pc.view(pc.shape[0], -1))        
 
         # -----------------------------------------------------
         # Pose encoder
         # -----------------------------------------------------
-
         f_pose = self.pose_mlp(pose)
 
-        # -----------------------------------------------------
-        # Fusion
-        # -----------------------------------------------------
-
-        fused = torch.cat(
-            [f_pc_dct, f_pose],
-            dim=-1
-        )
-
-        fused = self.fusion(fused)
 
         # -----------------------------------------------------
-        # Restore time dimension
+        # Concatenation
         # -----------------------------------------------------
+        fused = torch.stack((f_pc_dct, f_pose), dim=-1).reshape(B,T,-1)
 
-        fused = fused.reshape(
-            B,
-            T,
-            -1
-        )
 
         # -----------------------------------------------------
         # GRU
         # -----------------------------------------------------
-
         gru_out, h_n = self.gru(fused)
 
         # last hidden state
