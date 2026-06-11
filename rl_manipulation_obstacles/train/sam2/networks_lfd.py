@@ -282,12 +282,12 @@ class CnnPolicy(nn.Module):
         self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(2*hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.LayerNorm(hidden_dim),
             # nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim * H),
-            # nn.LayerNorm(action_dim * H)
+            nn.LayerNorm(action_dim * H)
         )
 
         self.forward = self.forward_temporal_DCT

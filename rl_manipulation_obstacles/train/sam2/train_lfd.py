@@ -113,7 +113,7 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            sel = random.randomint(0,4)
+            sel = random.randint(0,4)
 
             pc =  b["pc_net_seq"].to(device)[:, sel:]
             pose = b["pose_seq"].to(device)[:, sel:]
@@ -144,6 +144,9 @@ def train():
                     k: v.to(device, non_blocking=True)
                     for k, v in b.items()
                 }
+
+                sel = random.randint(0,4)
+
             
                 # f1 = b["cam_p"]
                 # f2 = b["cam_ext_p"]
@@ -153,8 +156,8 @@ def train():
                 #     f1, f2, f3,
                 #     b["sym"],
                 # )
-                pc = b["pc_net_seq"].to(device)
-                pose = b["pose_seq"].to(device)
+                pc =  b["pc_net_seq"].to(device)[:, sel:]
+                pose = b["pose_seq"].to(device)[:, sel:]
                 traj = b["traj"].to(device)
                 
 
