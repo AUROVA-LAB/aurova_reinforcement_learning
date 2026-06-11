@@ -11,6 +11,8 @@ from train_utils import collate_fn, preprocess_img_sam, preprocess_img_sam2, pre
 import matplotlib.pyplot as plt
 import cv2 as cv
 
+import random
+
 
 import time
 # =========================================================
@@ -28,6 +30,9 @@ def train():
     train_size = int(0.8 * len(dataset))
     val_size = int(0.1 * len(dataset))
     test_size = len(dataset) - train_size - val_size
+
+
+    random.seed(14)
 
 
 
@@ -65,9 +70,9 @@ def train():
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=128, shuffle=False, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=128, shuffle = False, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=128, shuffle = False, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=64, shuffle=False, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=64, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=64, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -108,8 +113,10 @@ def train():
               
             b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
-            pc =  b["pc_net_seq"].to(device)
-            pose = b["pose_seq"].to(device)
+            sel = random.randomint(0,4)
+
+            pc =  b["pc_net_seq"].to(device)[:, sel:]
+            pose = b["pose_seq"].to(device)[:, sel:]
             traj = b["traj"].to(device)
 
             pred = model(pc, pose)
