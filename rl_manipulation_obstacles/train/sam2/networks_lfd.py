@@ -556,6 +556,8 @@ class CnnPolicy(nn.Module):
         # Concatenation
         # -----------------------------------------------------
         # fused = torch.stack((f_pc_dct, f_pose), dim=-1).reshape(B,T,-1)
+        f_pc_dct = f_pc_dct.reshape(B,T,-1)
+        f_pose = f_pose.reshape(B,T,-1)
 
 
         # -----------------------------------------------------
