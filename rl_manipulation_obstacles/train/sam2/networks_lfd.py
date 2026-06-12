@@ -123,7 +123,6 @@ class SimpleCNN(nn.Module):
 # =========================================================
 # DCT FEATIRE REDUCER
 # =========================================================
-
 class FastDCTFeatureReducer:
     """
     Fast deterministic DCT-based feature reducer.
@@ -135,6 +134,22 @@ class FastDCTFeatureReducer:
         self.input_dim = input_dim
         self.output_dim = output_dim
 
+        self.dct_matrix = self.create_dct_matrix(self.input_dim)
+
+    @staticmethod
+    def create_dct_matrix(D, device="cuda"):
+        n = torch.arange(D, device=device).float()
+        k = torch.arange(D, device=device).float()
+
+        M = torch.cos(
+            torch.pi / D * (n[None, :] + 0.5) * k[:, None]
+        )
+
+        M[0] *= 1.0 / torch.sqrt(torch.tensor(D, device=device))
+        M[1:] *= torch.sqrt(torch.tensor(2.0 / D, device=device))
+
+        return M
+
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
         x: (B, D) -> z: (B, K)
@@ -145,19 +160,11 @@ class FastDCTFeatureReducer:
 
         B, D = x.shape
         K = self.output_dim
+      #  if D==K: return x
 
-        # Even extension for DCT-II via FFT trick
-        x_ext = torch.cat([x, x.flip(-1)], dim=-1)  # (B, 2D)
+        coeffs = x @ self.dct_matrix.T
 
-        # FFT
-        X = torch.fft.fft(x_ext, dim=-1)
-
-        # Take only first D real components (DCT equivalent region)
-        dct_coeffs = X[..., :D].real
-
-        # 🔥 FIXED OUTPUT SIZE: keep only K features         
-        return torch.tanh(dct_coeffs[:, :K] / (1 + dct_coeffs[:, :K].abs()))
-
+        return coeffs[..., :K]
 
     def decode(self, z: torch.Tensor, original_dim: int = None) -> torch.Tensor:
         """
@@ -168,17 +175,12 @@ class FastDCTFeatureReducer:
 
         if original_dim is None:
             original_dim = D
-
-        # Reconstruct only from K components (zero-pad)
-        z_padded = torch.zeros(z.shape[0], D, device=z.device, dtype=z.dtype)
-        z_padded[:, :K] = z
-
-        # inverse FFT approximation
-        z_ext = torch.cat([z_padded, z_padded.flip(-1)], dim=-1)
-        x_rec = torch.fft.ifft(z_ext, dim=-1).real
-
-        return x_rec[:, :original_dim]
-
+    
+#        if D==K: return z
+        
+        coeffs = torch.zeros( *z.shape[:-1],D,device=z.device,dtype=z.dtype)
+        coeffs[..., :K] = z
+        x_rec = coeffs @ self.dct_matrix
 
 
 class CnnPolicy(nn.Module):
