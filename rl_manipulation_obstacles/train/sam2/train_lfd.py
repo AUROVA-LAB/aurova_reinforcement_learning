@@ -117,7 +117,7 @@ def train():
 
             pc =  b["pc_net_seq"].to(device)[:, sel:]
             pose = b["pose_seq"].to(device)[:, sel:]
-            traj = b["traj"].to(device)
+            traj = b["action"].to(device)
 
             pred = model(pc, pose)
 
@@ -158,7 +158,7 @@ def train():
                 # )
                 pc =  b["pc_net_seq"].to(device)[:, sel:]
                 pose = b["pose_seq"].to(device)[:, sel:]
-                traj = b["traj"].to(device)
+                traj = b["action"].to(device)
                 
 
                 pred = model(pc, pose)

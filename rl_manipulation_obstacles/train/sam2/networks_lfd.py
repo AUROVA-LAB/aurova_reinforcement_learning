@@ -286,8 +286,8 @@ class CnnPolicy(nn.Module):
             nn.ReLU(),
             nn.LayerNorm(hidden_dim),
             # nn.Dropout(0.15),
-            nn.Linear(hidden_dim, action_dim * H),
-            nn.LayerNorm(action_dim * H)
+            nn.Linear(hidden_dim, action_dim),
+            nn.LayerNorm(action_dim)
         )
 
         self.forward = self.forward_temporal_DCT
