@@ -271,15 +271,21 @@ class CnnPolicy(nn.Module):
             nn.LayerNorm(hidden_dim)
         )
 
-        self.gru = nn.GRU(
-            input_size=hidden_dim*2,
-            hidden_size=hidden_dim*2,
+        self.gru_1 = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+        )
+        self.gru_2 = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
             num_layers=2,
             batch_first=True,
         )
 
-        # Optional novelty: gating
-        self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
+        # # Optional novelty: gating
+        # self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
             nn.Linear(2*hidden_dim, hidden_dim),
@@ -547,31 +553,26 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         # Concatenation
         # -----------------------------------------------------
-        fused = torch.stack((f_pc_dct, f_pose), dim=-1).reshape(B,T,-1)
+        # fused = torch.stack((f_pc_dct, f_pose), dim=-1).reshape(B,T,-1)
 
 
         # -----------------------------------------------------
         # GRU
         # -----------------------------------------------------
-        gru_out, h_n = self.gru(fused)
+        gru_out, h_n1 = self.gru_1(f_pc_dct)
+        gru_out, h_n2 = self.gru_2(f_pose)
 
         # last hidden state
-        temporal_feat = h_n[-1]
+        temporal_feat1 = h_n1[-1]
+        temporal_feat2 = h_n2[-1]
 
-        # alternatively:
-        # temporal_feat = gru_out[:, -1]
+        temporal_feat = torch.cat((temporal_feat1, temporal_feat2), dim = -1)
 
         # -----------------------------------------------------
         # Predict future trajectory
         # -----------------------------------------------------
 
         pred = self.head(temporal_feat)
-
-        pred = pred.reshape(
-            B,
-            self.pred_horizon,
-            self.action_dim
-        )
 
         return pred
     
