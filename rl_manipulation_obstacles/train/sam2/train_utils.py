@@ -17,8 +17,17 @@ from segment_anything import sam_model_registry
 
 from sam2.build_sam import build_sam2
 
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+
+
 from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
+
+from networks_lfd import FastDCTFeatureReducer
 
 
 
@@ -238,7 +247,7 @@ def preprocess_img_sam2(dataset):
 
 
 
-def preprocess_pcd_single(pc_all, model):
+def preprocess_pcd_single(pc_all, model, dct_reducer):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
@@ -327,8 +336,9 @@ def preprocess_pcd_single(pc_all, model):
 
     with torch.no_grad():
         _, _, point_features = model(points)
-
-    point_features = point_features.mean(-1)[0].cpu().numpy()
+        point_features = dct_reducer.encode(point_features[0]).permute(1,0)
+        
+    # point_features = point_features.mean(-1)[0].cpu().numpy()
 
     return point_features
 
@@ -346,6 +356,8 @@ def preprocess_pcd(dataset):
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
+    dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
+
 
 
     for i in range(len(dataset)):
@@ -357,12 +369,12 @@ def preprocess_pcd(dataset):
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        point_features = preprocess_pcd_single(pc_all, model)
+        point_features = preprocess_pcd_single(pc_all, model, dct_reducer)
         
         if point_features is None:
             continue
 
-        dataset.set_item(i, pcd_net = point_features)
+        dataset.set_item(i, pcd_net2 = point_features)
 
     return dataset
         

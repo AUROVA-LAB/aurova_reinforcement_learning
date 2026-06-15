@@ -22,7 +22,7 @@ class HDF5EpisodeWriter:
 
     def _init_datasets(self, cam_shape = None, cam_ext_shape = None, cam_front_shape = None, 
                        cam_p_shape = None, cam_ext_p_shape = None, cam_front_p_shape = None, 
-                       pcd_p_shape = None, pcd_net_shape = None, 
+                       pcd_p_shape = None, pcd_net_shape = None, pcd_net2_shape = None, 
                        pc_shape = None, pc_ext_shape = None, pc_front_shape = None, 
                        pose_dim = None, action_dim = None, gripper_action_dim = None):
         T = self.max_steps
@@ -57,6 +57,10 @@ class HDF5EpisodeWriter:
         if pcd_net_shape is not None:
             self.pcd_net_ds = self.file.create_dataset(
                 "pc/pcd_net", (T, *pcd_net_shape), dtype="float32"
+            )
+        if pcd_net2_shape is not None:
+            self.pcd_net2_ds = self.file.create_dataset(
+                "pc/pcd_net2", (T, *pcd_net2_shape), dtype="float32"
             )
 
 
@@ -100,7 +104,7 @@ class HDF5EpisodeWriter:
 
     def add_step(self, cam, cam_ext, cam_front, 
                  cam_p, cam_ext_p, cam_front_p,
-                 pcd_p, pcd_net,
+                 pcd_p, pcd_net, pcd_net2,
                  pc_w, pc_ext, pc_front, 
                  target_pose, gripper_pose, action, diff, gripper_action):
         """
@@ -122,6 +126,7 @@ class HDF5EpisodeWriter:
                 cam_front_p.shape,
                 pcd_p.shape,
                 pcd_net.shape,
+                pcd_net2.shape,
                 pc_w.shape,
                 pc_ext.shape,
                 pc_front.shape,
@@ -140,6 +145,7 @@ class HDF5EpisodeWriter:
         self.cam_front_p_ds[idx] = cam_front_p
         self.pcd_p_ds[idx] = pcd_p
         self.pcd_net_ds[idx] = pcd_net
+        self.pcd_net2_ds[idx] = pcd_net2
         self.pc_ds[idx] = pc_w
         self.pc_ext_ds[idx] = pc_ext
         self.pc_front_ds[idx] = pc_front
@@ -287,6 +293,7 @@ class HDF5LfDDataset(Dataset):
 
         pc_seq = f["/pc/pcd_p"][t0:t1]            # [T_obs, 512, 3]
         pc_net_seq = f["/pc/pcd_net"][t0:t1]            # [T_obs, 512, 3]
+        pc_net2_seq = f["/pc/pcd_net2"][t0:t1]            # [T_obs, 512, 128]
         pose_seq = f["/states/gripper_pose"][t0:t1]
         sym_seq = (f["/states/target_pose"][t0:t1]
                    - f["/states/gripper_pose"][t0:t1])
@@ -336,6 +343,7 @@ class HDF5LfDDataset(Dataset):
             # Observations
             "pc_seq": torch.tensor(pc_seq, dtype=torch.float32),
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
+            "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32),
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32),
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions
@@ -358,6 +366,7 @@ class HDF5LfDDataset(Dataset):
         cam_front_p=None,
         pcd_p = None,
         pcd_net = None,
+        pcd_net2 = None,
         pc_raw = None,
         target_pose=None,
         gripper_pose=None,
@@ -479,6 +488,14 @@ class HDF5LfDDataset(Dataset):
             if pcd_net.ndim == 1 and pcd_net.shape[0] == 128:
                 f["/pc/pcd_net"][t] = pcd_net
                 print("Setting NET...")
+
+        if pcd_net2 is not None:
+            if torch.is_tensor(pcd_net2):
+                pcd_net2 = pcd_net2.detach().cpu().numpy()
+
+            if pcd_net2.ndim == 2 and pcd_net2.shape == (512,128):
+                f["/pc/pcd_net2"][t] = pcd_net2
+                print("Setting NET2...")
         
 
 
