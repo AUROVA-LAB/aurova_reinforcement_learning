@@ -223,6 +223,9 @@ class CnnPolicy(nn.Module):
                 H = 5
 
                 self.mlp = nn.Sequential(
+                    nn.Linear(3,128), # falta poner el tamaño
+                    nn.LayerNorm(128), # falta poner el tamaño
+                    nn.ReLU(),
                     nn.Linear(128,256), # falta poner el tamaño
                     nn.LayerNorm(256), # falta poner el tamaño
                     nn.ReLU(),
@@ -256,7 +259,7 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
-        self.dct = FastDCTFeatureReducer(input_dim=128, output_dim=hidden_dim)
+        self.dct = FastDCTFeatureReducer(input_dim=524288, output_dim=hidden_dim) # 128
 
 
         self.pose_mlp = nn.Sequential(
@@ -298,8 +301,8 @@ class CnnPolicy(nn.Module):
             nn.LayerNorm(action_dim)
         )
 
-        self.forward = self.forward_temporal_DCT
-        # self.forward = self.forward_temporal
+        # self.forward = self.forward_temporal_DCT
+        self.forward = self.forward_temporal_DCT_raw
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -442,6 +445,8 @@ class CnnPolicy(nn.Module):
         pose_seq : [B,T,pose_dim]
         """
 
+        
+
         B, T, N, _ = pc_seq.shape
 
         # -----------------------------------------------------
@@ -454,7 +459,7 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         # PointNet
         # -----------------------------------------------------
-
+        print(pc.shape)
         f_pc = self.mlp(pc)
 
         # max_feat = torch.max(f_pc, dim=1)[0]
@@ -481,18 +486,23 @@ class CnnPolicy(nn.Module):
         # Fusion
         # -----------------------------------------------------
 
-        fused = torch.cat(
-            [f_pc_dct, f_pose],
-            dim=-1
-        )
+        # fused = torch.cat(
+        #     [f_pc_dct, f_pose],
+        #     dim=-1
+        # )
 
-        fused = self.fusion(fused)
+        # fused = self.fusion(fused)
 
         # -----------------------------------------------------
         # Restore time dimension
         # -----------------------------------------------------
 
-        fused = fused.reshape(
+        f_pose = f_pose.reshape(
+            B,
+            T,
+            -1
+        )
+        f_pc_dct = f_pc_dct.reshape(
             B,
             T,
             -1
@@ -502,10 +512,15 @@ class CnnPolicy(nn.Module):
         # GRU
         # -----------------------------------------------------
 
-        gru_out, h_n = self.gru(fused)
+        gru_out1, h_n1 = self.gru_1(f_pose)
 
         # last hidden state
-        temporal_feat = h_n[-1]
+        temporal_feat1 = h_n1[-1]
+
+        gru_out2, h_n2 = self.gru_2(f_pose)
+
+        # last hidden state
+        temporal_feat2 = h_n2[-1]
 
         # alternatively:
         # temporal_feat = gru_out[:, -1]
@@ -513,6 +528,9 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         # Predict future trajectory
         # -----------------------------------------------------
+
+        temporal_feat = torch.cat((temporal_feat1, temporal_feat2), dim = -1)
+
 
         pred = self.head(temporal_feat)
 

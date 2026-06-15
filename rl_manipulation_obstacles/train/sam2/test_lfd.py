@@ -58,7 +58,7 @@ def test():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd_raw(dataset)
+        dataset = preprocess_pcd(dataset)
 
 
 
@@ -81,10 +81,10 @@ def test():
     model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = 3,
                       pc=True,
-                      hidden_dim=128).to(device)
+                      hidden_dim=64).to(device)
     criterion = nn.MSELoss()
     
-    model.load_state_dict(torch.load("best_model_PC_seq_rel.pth"))
+    model.load_state_dict(torch.load("best_model.pth"))
     model.eval()
 
     test_loss = 0
@@ -98,15 +98,11 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc = b["pc_seq"].to(device)
+            pc = b["pc_net_seq"].to(device)
             pose = b["pose_seq"].to(device)
-            traj = b["traj"].to(device)
+            traj = b["action"].to(device)
 
             pred = model(pc, pose)
-
-            print(pred)
-            print(traj)
-            print("-----")
 
             test_loss = criterion(pred, traj)
             mae += torch.abs(pred - traj).mean().item()
