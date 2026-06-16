@@ -273,7 +273,6 @@ class HDF5LfDDataset(Dataset):
         target_pose = f["/states/target_pose"][t0]
         gripper_pose = f["/states/gripper_pose"][t0] 
 
-        action = f["actions"][t0] 
         # prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
         diff = f["diff"][t0] 
         gripper_action = f["gripper_action"][t0]
@@ -305,6 +304,8 @@ class HDF5LfDDataset(Dataset):
 
         traj = f["actions"][t1:t2]                # [T_pred, 6]
         diff_seq = f["diff"][t1:t2]
+        action = f["actions"][t1] 
+
 
         # optional: gripper
         # if "gripper_action" in f:
