@@ -89,7 +89,7 @@ def train():
                       hidden_dim=64,
                       pc = True).to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4)
     criterion = nn.L1Loss()
 
     best_val = float("inf")
@@ -115,7 +115,7 @@ def train():
 
             sel = random.randint(0,4)
 
-            pc =  b["pc_seq"].to(device)[:, sel:]
+            pc =  b["pc_net2_seq"].to(device)[:, sel:]
             pose = b["pose_seq"].to(device)[:, sel:]
             traj = b["action"].to(device)
 
@@ -156,7 +156,7 @@ def train():
                 #     f1, f2, f3,
                 #     b["sym"],
                 # )
-                pc =  b["pc_seq"].to(device)[:, sel:]
+                pc =  b["pc_net2_seq"].to(device)[:, sel:]
                 pose = b["pose_seq"].to(device)[:, sel:]
                 traj = b["action"].to(device)
                 
