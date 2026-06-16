@@ -8,14 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
 
-from isaaclab.utils.math import matrix_from_quat
 
 import cv2 as cv
 
-from segment_anything import sam_model_registry
+# from segment_anything import sam_model_registry
 
 
-from sam2.build_sam import build_sam2
+# from sam2.build_sam import build_sam2
 
 import os
 import sys
@@ -31,6 +30,12 @@ from networks_lfd import FastDCTFeatureReducer
 
 
 
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.enabled = False
+
+
+
 def collate_fn(batch):
 
     out = {}
@@ -42,6 +47,40 @@ def collate_fn(batch):
         out[k] = torch.from_numpy(arr).float()
 
     return out
+
+
+@torch.jit.script
+def matrix_from_quat(quaternions: torch.Tensor) -> torch.Tensor:
+    """Convert rotations given as quaternions to rotation matrices.
+
+    Args:
+        quaternions: The quaternion orientation in (w, x, y, z). Shape is (..., 4).
+
+    Returns:
+        Rotation matrices. The shape is (..., 3, 3).
+
+    Reference:
+        https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py#L41-L70
+    """
+    r, i, j, k = torch.unbind(quaternions, -1)
+    # pyre-fixme[58]: `/` is not supported for operand types `float` and `Tensor`.
+    two_s = 2.0 / (quaternions * quaternions).sum(-1)
+
+    o = torch.stack(
+        (
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * k + j * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (j * k - i * r),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+            1 - two_s * (i * i + j * j),
+        ),
+        -1,
+    )
+    return o.reshape(quaternions.shape[:-1] + (3, 3))
 
 
 
@@ -330,7 +369,7 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
         axis=1
     )
 
-    points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).cuda()
+    points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
 
 
 
@@ -347,13 +386,16 @@ def preprocess_pcd(dataset):
     num_classes = 13
     model = get_model(num_classes=num_classes).cuda()
 
+    torch.cuda.init()
+
     checkpoint = torch.load(
         "best_model_sem.pth",
-        map_location="cuda:0",
+        map_location="cpu",
         weights_only=False
     )
 
     model.load_state_dict(checkpoint["model_state_dict"])
+    model = model.to("cuda:0")
     model.eval()
 
     dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)

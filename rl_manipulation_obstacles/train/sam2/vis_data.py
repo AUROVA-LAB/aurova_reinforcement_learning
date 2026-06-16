@@ -12,12 +12,12 @@ from ultralytics import YOLO
 import os
 import cv2 as cv
 
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+# from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 from torchvision import models, transforms
 
-from sam2.build_sam import build_sam2
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
+# from sam2.build_sam import build_sam2
+# from sam2.sam2_image_predictor import SAM2ImagePredictor
+# from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 
 import open3d as o3d
 from sklearn.cluster import DBSCAN
@@ -30,7 +30,9 @@ from sklearn.preprocessing import StandardScaler
 from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 
-
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.enabled = False
 def visualize_o3d(pc, title="Point Cloud"):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc)
