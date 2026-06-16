@@ -1,122 +1,73 @@
 import torch
 from torch import nn
-from einops import rearrange
+# from einops import rearrange
 import copy
-# from ultralytics import YOLO
 
-# =========================================================
-# MODEL Transformers
-# =========================================================
-
-
-class TransfPolicy(nn.Module):
-    def __init__(self, image_encoder, image_embed_dim, pose_dim, pose_embed_dim,
-                 action_dim, seq_len, hidden_dim=256, n_heads=4, n_layers=3):
-        """
-        Args:
-            image_encoder: a CNN (e.g. timm model) producing features of dim `image_embed_dim`
-            image_embed_dim: output dim of CNN encoder
-            pose_dim: dimension of raw pose input
-            pose_embed_dim: embedding dim for pose
-            action_dim: output action dimension
-            seq_len: maximum sequence length
-        """
+class AttentionPool(nn.Module):
+    def __init__(self, F):
         super().__init__()
-        self.seq_len = seq_len
-        self.hidden_dim = hidden_dim
+        self.score = nn.Linear(F,1)
 
-        # Image encoders (shared weights or separate)
-        self.img_enc1 = copy.deepcopy(image_encoder)
-        self.img_enc2 = copy.deepcopy(image_encoder)  # could also use distinct encoder instance
+    def forward(self,x):
+        # x: [B,T,N,F]
 
-        # Pose encoder
-        self.pose_mlp = nn.Sequential(
-            nn.Linear(pose_dim, pose_embed_dim),
-            nn.ReLU(),
-            nn.Linear(pose_embed_dim, pose_embed_dim)
+        w = self.score(x)              # [B,T,N,1]
+        w = torch.softmax(w, dim=2)
+
+        pooled = (x*w).sum(dim=2)
+
+        return pooled
+
+
+class TemporalTransformer(nn.Module):
+    def __init__(
+        self,
+        input_dim,
+        d_model=256,
+        nhead=8,
+        num_layers=4,
+        ff_dim=1024,
+        dropout=0.1,
+        max_len=100
+    ):
+        super().__init__()
+
+        # Project features to transformer dimension
+        self.input_proj = nn.Linear(input_dim, d_model)
+
+        # Learnable temporal positional embedding
+        self.pos_embedding = nn.Parameter(
+            torch.randn(1, max_len, d_model)
         )
 
-        # Projection to common dimension for attention
-        self.proj_img = nn.Linear(image_embed_dim, hidden_dim)
-        self.proj_pose = nn.Linear(pose_embed_dim, hidden_dim)
-
-        self.fusion_proj = nn.Linear(3 * hidden_dim, hidden_dim)
-        self.pos_embed = nn.Parameter(torch.randn(1, seq_len, hidden_dim))
-
-        # Transformer Encoder for temporal fusion
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_dim, nhead=n_heads, dim_feedforward=hidden_dim*4, dropout=0.1)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
-
-        # Final MLP to actions
-        self.action_head = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim)
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=ff_dim,
+            dropout=dropout,
+            batch_first=True
         )
 
-    def forward(self, cam1, cam2, pose):
-        """
-        cam1, cam2: (B,T,3,H,W) RGB images
-        pose: (B,T,P) pose vectors
-        Returns:
-            actions: (B,T,action_dim)
-        """
-        B, T, C, H, W = cam1.shape
-        # Flatten batch and time to encode images
-        cam1_flat = rearrange(cam1, 'b t c h w -> (b t) c h w')
-        cam2_flat = rearrange(cam2, 'b t c h w -> (b t) c h w')
-        # CNN encode (outputs (B*T, image_embed_dim))
-        f1 = self.img_enc1(cam1_flat)
-        f2 = self.img_enc2(cam2_flat)
-        # Restore time dimension
-        f1 = rearrange(f1, '(b t) d -> b t d', b=B, t=T)
-        f2 = rearrange(f2, '(b t) d -> b t d', b=B, t=T)
-
-        # Pose encoding
-        f_pose = self.pose_mlp(pose)  # (B,T, pose_embed_dim)
-
-        # Project to hidden dim
-        img_feat1 = self.proj_img(f1)     # (B,T,hidden_dim)
-        img_feat2 = self.proj_img(f2)     # (B,T,hidden_dim)
-        pose_feat = self.proj_pose(f_pose)  # (B,T,hidden_dim)
-
-        # Feature fusion (concatenate along feature axis)
-        fused = torch.cat([img_feat1, img_feat2, pose_feat], dim=-1)  # (B,T, 3*hidden_dim)
-        fused = self.fusion_proj(fused)  # project back to hidden_dim
-
-        # Positional encoding (optional) can be added here
-        fused = fused + self.pos_embed[:, :T, :]
-        
-        # Transformer expects (T,B,E) 
-        fused = fused.permute(1, 0, 2)  # -> (T, B, hidden_dim)
-        traj = self.transformer(fused)  # (T, B, hidden_dim)
-        traj = traj.permute(1, 0, 2)    # (B, T, hidden_dim)
-
-        # Predict actions
-        actions = self.action_head(traj)  # (B, T, action_dim)
-        return actions
-
-
-
-
-# =========================================================
-# MODEL CNN
-# =========================================================
-
-class SimpleCNN(nn.Module):
-    def __init__(self, in_channels=3, out_dim=128):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(in_channels, 32, 3, stride=2), nn.Tanh(),
-            nn.Conv2d(32, 64, 3, stride=2), nn.Tanh(),
-            nn.Conv2d(64, 128, 3, stride=2), nn.Tanh(),
-            nn.Flatten(),
-            nn.Linear(596608, out_dim)  # adapt if resolution changes
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers
         )
 
     def forward(self, x):
-        return self.net(x)
+        """
+        x: [B,T,F]
+        """
+
+        B, T, _ = x.shape
+
+        x = self.input_proj(x)
+
+        # Add temporal position
+        x = x + self.pos_embedding[:, :T]
+
+        x = self.transformer(x)
+
+        return x
 
 
 
@@ -223,9 +174,9 @@ class CnnPolicy(nn.Module):
                 H = 5
 
                 self.mlp = nn.Sequential(
-                    nn.Linear(3,128), # falta poner el tamaño
-                    nn.LayerNorm(128), # falta poner el tamaño
-                    nn.ReLU(),
+                    # nn.Linear(3,128), # falta poner el tamaño
+                    # nn.LayerNorm(128), # falta poner el tamaño
+                    # nn.ReLU(),
                     nn.Linear(128,256), # falta poner el tamaño
                     nn.LayerNorm(256), # falta poner el tamaño
                     nn.ReLU(),
@@ -237,14 +188,14 @@ class CnnPolicy(nn.Module):
                     nn.ReLU(),
                     
                 )
-                self.after_mean = nn.Sequential(
-                    nn.Linear(512,hidden_dim), # falta poner el tamaño
-                    nn.LayerNorm(hidden_dim), # falta poner el tamaño)
-                )
-                self.after_max = nn.Sequential(
-                    nn.Linear(512,hidden_dim), # falta poner el tamaño
-                    nn.LayerNorm(hidden_dim), # falta poner el tamaño)
-                )
+                # self.after_mean = nn.Sequential(
+                #     nn.Linear(512,hidden_dim), # falta poner el tamaño
+                #     nn.LayerNorm(hidden_dim), # falta poner el tamaño)
+                # )
+                # self.after_max = nn.Sequential(
+                #     nn.Linear(512,hidden_dim), # falta poner el tamaño
+                #     nn.LayerNorm(hidden_dim), # falta poner el tamaño)
+                # )
 
                 # self.forward = self.forward_pc
 
@@ -259,8 +210,10 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
-        self.dct = FastDCTFeatureReducer(input_dim=524288, output_dim=hidden_dim) # 128
+        # self.dct = FastDCTFeatureReducer(input_dim=1024, output_dim=hidden_dim) # 128
 
+
+        self.att_pool = AttentionPool(F = 128)
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
@@ -270,30 +223,39 @@ class CnnPolicy(nn.Module):
 
 
         # 🔥 Proper fusion layer (fixed)
-        self.fusion = nn.Sequential(
-            nn.Linear(inc * hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.LayerNorm(hidden_dim)
-        )
+        # self.fusion = nn.Sequential(
+        #     nn.Linear(inc * hidden_dim, hidden_dim),
+        #     nn.ReLU(),
+        #     nn.LayerNorm(hidden_dim)
+        # )
 
-        self.gru_1 = nn.GRU(
-            input_size=hidden_dim,
-            hidden_size=hidden_dim,
-            num_layers=2,
-            batch_first=True,
-        )
-        self.gru_2 = nn.GRU(
-            input_size=hidden_dim,
-            hidden_size=hidden_dim,
-            num_layers=2,
-            batch_first=True,
+        # self.gru_1 = nn.GRU(
+        #     input_size=hidden_dim,
+        #     hidden_size=hidden_dim,
+        #     num_layers=2,
+        #     batch_first=True,
+        # )
+        # self.gru_2 = nn.GRU(
+        #     input_size=hidden_dim,
+        #     hidden_size=hidden_dim,
+        #     num_layers=2,
+        #     batch_first=True,
+        # )
+
+        self.cls_token = nn.Parameter(torch.randn(1, 1, 128+hidden_dim))
+
+        self.temporal_transformer = TemporalTransformer(
+            input_dim=128 + hidden_dim,
+            d_model=256,
+            nhead=8,
+            num_layers=4
         )
 
         # # Optional novelty: gating
         # self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
-            nn.Linear(2*hidden_dim, hidden_dim),
+            nn.Linear(256, hidden_dim),
             nn.ReLU(),
             nn.LayerNorm(hidden_dim),
             # nn.Dropout(0.15),
@@ -303,6 +265,9 @@ class CnnPolicy(nn.Module):
 
         # self.forward = self.forward_temporal_DCT
         self.forward = self.forward_temporal_DCT_raw
+
+
+
 
     def forward_cnn(self, cam, cam_ext, cam_front, pose):
         f1 = self.cnn1(cam)
@@ -445,100 +410,47 @@ class CnnPolicy(nn.Module):
         pose_seq : [B,T,pose_dim]
         """
 
-        
-
         B, T, N, _ = pc_seq.shape
 
         # -----------------------------------------------------
-        # Flatten batch and time
+        # Pose encoding
         # -----------------------------------------------------
-
-        pc = pc_seq.reshape(B * T, N, 3)
         pose = pose_seq.reshape(B * T, -1)
-
-        # -----------------------------------------------------
-        # PointNet
-        # -----------------------------------------------------
-        print(pc.shape)
-        f_pc = self.mlp(pc)
-
-        # max_feat = torch.max(f_pc, dim=1)[0]
-        # mean_feat = torch.mean(f_pc, dim=1)
-
-        # max_feat = self.after_max(max_feat)
-        # mean_feat = self.after_mean(mean_feat)
-
-        # feat_pc = torch.cat(
-        #     [max_feat, mean_feat],
-        #     dim=-1
-        # )
-
-
-        f_pc_dct = self.dct.encode(f_pc.view(f_pc.shape[0], -1))        
-
-        # -----------------------------------------------------
-        # Pose encoder
-        # -----------------------------------------------------
-
         f_pose = self.pose_mlp(pose)
+        f_pose = f_pose.reshape(B, T, -1)
 
         # -----------------------------------------------------
-        # Fusion
+        # Spatial pooling (Point cloud)
         # -----------------------------------------------------
+        f_scene = self.att_pool(pc_seq)  # [B,T,128]
 
-        # fused = torch.cat(
-        #     [f_pc_dct, f_pose],
-        #     dim=-1
+        # -----------------------------------------------------
+        # Fusion per timestep
+        # -----------------------------------------------------
+        x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+
+        # -----------------------------------------------------
+        # CLS token insertion
+        # -----------------------------------------------------
+        cls = self.cls_token.expand(B, 1, -1)     # [B,1,F]
+        x = torch.cat([cls, x], dim=1)            # [B,T+1,F]
+
+        # -----------------------------------------------------
+        # Temporal transformer
+        # -----------------------------------------------------
+        x = self.temporal_transformer(x)
+
+        # -----------------------------------------------------
+        # Use CLS output for prediction
+        # -----------------------------------------------------
+        cls_out = x[:, 0]   # [B, d_model]
+        pred = self.head(cls_out)  # [B, action_dim]
+        
+        # pred = pred.reshape(
+        #     B,
+        #     self.pred_horizon,
+        #     self.action_dim
         # )
-
-        # fused = self.fusion(fused)
-
-        # -----------------------------------------------------
-        # Restore time dimension
-        # -----------------------------------------------------
-
-        f_pose = f_pose.reshape(
-            B,
-            T,
-            -1
-        )
-        f_pc_dct = f_pc_dct.reshape(
-            B,
-            T,
-            -1
-        )
-
-        # -----------------------------------------------------
-        # GRU
-        # -----------------------------------------------------
-
-        gru_out1, h_n1 = self.gru_1(f_pose)
-
-        # last hidden state
-        temporal_feat1 = h_n1[-1]
-
-        gru_out2, h_n2 = self.gru_2(f_pose)
-
-        # last hidden state
-        temporal_feat2 = h_n2[-1]
-
-        # alternatively:
-        # temporal_feat = gru_out[:, -1]
-
-        # -----------------------------------------------------
-        # Predict future trajectory
-        # -----------------------------------------------------
-
-        temporal_feat = torch.cat((temporal_feat1, temporal_feat2), dim = -1)
-
-
-        pred = self.head(temporal_feat)
-
-        pred = pred.reshape(
-            B,
-            self.pred_horizon,
-            self.action_dim
-        )
 
         return pred
     
