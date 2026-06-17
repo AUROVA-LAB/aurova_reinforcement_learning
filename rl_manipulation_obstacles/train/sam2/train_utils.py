@@ -376,6 +376,8 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
     with torch.no_grad():
         _, _, point_features = model(points)
         point_features = dct_reducer.encode(point_features[0]).permute(1,0)
+        point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
+
         
     # point_features = point_features.mean(-1)[0].cpu().numpy()
 
@@ -405,6 +407,7 @@ def preprocess_pcd(dataset):
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
 
+        # Preprocess PCs
         pc = dataset[i]["pc"].astype(np.float32)
         pc_ext = dataset[i]["pc_ext"].astype(np.float32)
         pc_front = dataset[i]["pc_front"].astype(np.float32)
@@ -416,7 +419,12 @@ def preprocess_pcd(dataset):
         if point_features is None:
             continue
 
-        dataset.set_item(i, pcd_net2 = point_features)
+        
+        # Preprocess gemometrical info
+        norm_gripper = (dataset[i]["gripper_pose"] - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
+        norm_action = (dataset[i]["action"] - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
+        
+        dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
 
     return dataset
         
