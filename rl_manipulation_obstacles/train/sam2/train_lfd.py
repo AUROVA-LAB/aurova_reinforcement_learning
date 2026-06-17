@@ -92,7 +92,7 @@ def train():
     action_dim = sample["action"].shape[0]
 
 
-    # in_channels = dataset[0]["cam_D"].shape[0]
+    # in_channels = dataset[0]["cam_D"]
 
 
     
@@ -101,7 +101,7 @@ def train():
                       hidden_dim=64,
                       pc = True).to(device)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     criterion = nn.L1Loss()
 
     best_val = float("inf")
@@ -127,8 +127,8 @@ def train():
 
             sel = random.randint(0,4)
 
-            pc =  b["pc_net2_seq"].to(device)[:, sel:]
-            pose = b["pose_seq"].to(device)[:, sel:]
+            pc =  b["pc_net2_seq"].to(device)
+            pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
             pred = model(pc, pose)
@@ -164,8 +164,8 @@ def train():
 
                 sel = random.randint(0,4)
 
-                pc = b["pc_net2_seq"][:, sel:]
-                pose = b["pose_seq"][:, sel:]
+                pc = b["pc_net2_seq"]
+                pose = b["pose_seq"]
                 traj = b["action"]
 
                 pred = model(pc, pose)
