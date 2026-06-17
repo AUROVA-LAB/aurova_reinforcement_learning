@@ -133,6 +133,8 @@ class FastDCTFeatureReducer:
         coeffs[..., :K] = z
         x_rec = coeffs @ self.dct_matrix
 
+        return x_rec
+
 
 class CnnPolicy(nn.Module):
     def __init__(self, pose_dim, action_dim, in_channels = 3, hidden_dim=128, pred_horizon = 5, pretrained = True, pc = True):
