@@ -115,7 +115,7 @@ def train():
         
 
 
-    for epoch in range(300):
+    for epoch in range(500):
 
         # ================= TRAIN =================
         model.train()
