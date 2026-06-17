@@ -12,12 +12,24 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 
 import random
-
+import wandb
+from datetime import datetime
 
 import time
 # =========================================================
 # TRAINING
 # =========================================================
+wandb.init(
+    project="lfd-robotics",
+    name=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+    config={
+        "lr": 5e-4,
+        "optimizer": "AdamW",
+        "loss": "L1Loss",
+        "hidden_dim": 64,
+        "model": "CnnPolicy"
+    }
+)
 
 
 def train():
@@ -95,7 +107,7 @@ def train():
     best_val = float("inf")
 
 
-
+    global_step = 0
 
     print("\n ------ Start training \n")
 
@@ -130,6 +142,15 @@ def train():
 
             train_loss += loss.item()
 
+            # ================= WANDB (batch-level) =================
+            wandb.log({
+                "epoch": epoch,
+                "train/batch_loss": loss.item(),
+                "lr": optimizer.param_groups[0]["lr"]
+            }, step=global_step)
+
+            global_step += 1
+
         train_loss /= len(train_loader)
 
         # ================= VALIDATION =================
@@ -138,35 +159,30 @@ def train():
 
         with torch.no_grad():
             for b in val_loader:
-                
-            
-                b = {
-                    k: v.to(device, non_blocking=True)
-                    for k, v in b.items()
-                }
+
+                b = {k: v.to(device, non_blocking=True) for k, v in b.items()}
 
                 sel = random.randint(0,4)
 
-            
-                # f1 = b["cam_p"]
-                # f2 = b["cam_ext_p"]
-                # f3 = b["cam_front_p"]
-
-                # pred = model(
-                #     f1, f2, f3,
-                #     b["sym"],
-                # )
-                pc =  b["pc_net2_seq"].to(device)[:, sel:]
-                pose = b["pose_seq"].to(device)[:, sel:]
-                traj = b["action"].to(device)
-                
+                pc = b["pc_net2_seq"][:, sel:]
+                pose = b["pose_seq"][:, sel:]
+                traj = b["action"]
 
                 pred = model(pc, pose)
 
-
-                val_loss += criterion(pred, traj)
+                loss = criterion(pred, traj)
+                val_loss += loss.item()
 
         val_loss /= len(val_loader)
+
+        wandb.log({
+            "epoch": epoch,
+            "train/epoch_loss": train_loss,
+            "val/epoch_loss": val_loss,
+            "pred_mean": pred.mean().item(),
+            "pred_std": pred.std().item(),
+            "traj_mean": traj.mean().item(),
+        })
 
         print(f"Epoch {epoch} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")
         
@@ -175,6 +191,7 @@ def train():
             best_val = val_loss
             torch.save(model.state_dict(), "best_model.pth")
             print("SAVING BEST MODEL")
+
 
 
 if __name__ == "__main__":
