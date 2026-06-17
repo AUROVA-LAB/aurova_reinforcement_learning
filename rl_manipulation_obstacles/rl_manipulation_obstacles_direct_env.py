@@ -722,7 +722,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             elif "seq" in self.cfg.mode:
                 if self.count % self.cfg.save_interval == 0:
                     cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0),
-                                        self.pose_seq.queue.to(self.device).unsqueeze(0))[:, 0]
+                                        self.pose_seq.queue.to(self.device).unsqueeze(0))
 
 
             # actions = self._preprocess_actions(cmd)
@@ -1027,13 +1027,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
-                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
+                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model, dct_reducer=self.dct_reducer)
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
             self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
 
-            if self.count == 0:
+            if False:
                 for _ in range(self.cfg.horizon):
                     self.pose_seq.enqueue(self.gripper_pose_r_lie)
                     self.pc_seq.enqueue(self.processed_pc)
@@ -1490,6 +1490,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                             max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval)
                                             )
         else:
+
+            self.dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
+
+
             # Create model
             self.test_model = CnnPolicy(6, 6, 
                       in_channels = 3,
@@ -1512,22 +1516,22 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.test_model.eval()
 
             
-            checkpoint = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/checkpoints/sam2.1_hiera_tiny.pt"
-            model_cfg = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/sam2/configs/sam2.1/sam2.1_hiera_t.yaml"
-            sam2 = build_sam2(model_cfg, checkpoint)
+            # checkpoint = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/checkpoints/sam2.1_hiera_tiny.pt"
+            # model_cfg = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/sam2/configs/sam2.1/sam2.1_hiera_t.yaml"
+            # sam2 = build_sam2(model_cfg, checkpoint)
 
             
-            self.backbone = sam2.image_encoder
+            # self.backbone = sam2.image_encoder
 
-            self.transform = T.Compose([
-                    T.ToPILImage(),
-                    T.Resize((1024, 1024)),   # depends on model config
-                    T.ToTensor(),
-                    T.Normalize(
-                        mean=[0.485, 0.456, 0.406],
-                        std=[0.229, 0.224, 0.225]
-                    )
-                ])
+            # self.transform = T.Compose([
+            #         T.ToPILImage(),
+            #         T.Resize((1024, 1024)),   # depends on model config
+            #         T.ToTensor(),
+            #         T.Normalize(
+            #             mean=[0.485, 0.456, 0.406],
+            #             std=[0.229, 0.224, 0.225]
+            #         )
+            #     ])
             
             num_classes = 13
             self.pcd_model = get_model(num_classes=num_classes).cuda()

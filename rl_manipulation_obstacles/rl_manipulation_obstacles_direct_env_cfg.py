@@ -466,7 +466,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.05
 
-    test = False
+    test = True
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
     
     save_interval = 2
@@ -474,7 +474,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     horizon = 5
     
     if mode == "seq":
-        pc_shape = (128,)
+        pc_shape = (512,128)
     elif mode == "seq_raw":
         pc_shape = (512, 3)
 
