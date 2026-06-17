@@ -497,6 +497,22 @@ class HDF5LfDDataset(Dataset):
             if pcd_net2.ndim == 2 and pcd_net2.shape == (512,128):
                 f["/pc/pcd_net2"][t] = pcd_net2
                 print("Setting NET2...")
+
+        if action is not None:
+            if torch.is_tensor(action):
+                action = action.detach().cpu().numpy()
+
+            if action.ndim == 1 and action.shape == (6,):
+                f["actions"][t] = action
+                print("Setting ACTION...")
+
+        if gripper_pose is not None:
+            if torch.is_tensor(gripper_pose):
+                gripper_pose = gripper_pose.detach().cpu().numpy()
+
+            if gripper_pose.ndim == 1 and gripper_pose.shape == (6,):
+                f["/states/gripper_pose"][t] = gripper_pose
+                print("Setting GRIPPER POSE...")
         
 
 
