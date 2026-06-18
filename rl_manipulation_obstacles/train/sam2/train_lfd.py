@@ -44,7 +44,7 @@ def train():
     test_size = len(dataset) - train_size - val_size
 
 
-    random.seed(14)
+    # random.seed(14)
 
 
 
@@ -182,6 +182,9 @@ def train():
             "pred_mean": pred.mean().item(),
             "pred_std": pred.std().item(),
             "traj_mean": traj.mean().item(),
+            "max_pc": dataset.max_pc,
+            "max_gripper": dataset.max_gripper,
+            "max_action": dataset.max_action,
         })
 
         print(f"Epoch {epoch} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")

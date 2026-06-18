@@ -189,12 +189,10 @@ class HDF5LfDDataset(Dataset):
         self.pred_horizon = pred_horizon
         self.stride = stride
         
-        self.p_scale = 10
-        self.H = 5
-        self.mean_diff = 0.0
-        self.std_diff = 1.0
-        self.mean_sym = 0.0
-        self.std_sym = 1.0
+        self.max_pc = 1.0
+        self.max_gripper = 1.0
+        self.max_action = 1.0
+
 
         # -------------------------------------------------
         # Load files
@@ -335,7 +333,7 @@ class HDF5LfDDataset(Dataset):
 
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
-            "action": action, #np.concatenate([action, gripper_action], axis=-1),
+            "action": action / self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
             # "prev_action": prev_action
             "sym": (target_pose - gripper_pose - self.mean_sym) / (self.std_sym + 1e-8),
@@ -344,8 +342,8 @@ class HDF5LfDDataset(Dataset):
             # Observations
             "pc_seq": torch.tensor(pc_seq, dtype=torch.float32),
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
-            "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32),
-            "pose_seq": torch.tensor(pose_seq, dtype=torch.float32),
+            "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32) / self.max_action,
+            "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions
             "traj": torch.tensor(traj, dtype=torch.float32),

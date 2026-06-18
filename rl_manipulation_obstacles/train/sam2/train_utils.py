@@ -403,6 +403,10 @@ def preprocess_pcd(dataset):
     dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
 
 
+    max_pc = 0.0
+    max_gripper = 0.0
+    max_action = 0.0
+    
 
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
@@ -415,6 +419,8 @@ def preprocess_pcd(dataset):
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
         point_features = preprocess_pcd_single(pc_all, model, dct_reducer)
+
+        new_max_pc = torch.max(torch.abs(point_features)).item()
         
         if point_features is None:
             continue
@@ -423,8 +429,22 @@ def preprocess_pcd(dataset):
         # Preprocess gemometrical info
         norm_gripper = (dataset[i]["gripper_pose"] - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
         norm_action = (dataset[i]["action"] - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
-        
+
+        new_max_gripper = np.max(np.abs(norm_gripper))
+        new_max_action = np.max(np.abs(norm_action))
+
+        if new_max_pc > max_pc:
+            max_pc = new_max_pc
+        if new_max_gripper > max_gripper:
+            max_gripper = new_max_gripper
+        if new_max_action > max_action:
+            max_action = new_max_action
+
         dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
+
+        dataset.max_pc = max_pc
+        dataset.max_gripper = max_gripper
+        dataset.max_action = max_action
 
     return dataset
         

@@ -98,7 +98,7 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc = b["pc_net_seq"].to(device)
+            pc =  b["pc_net2_seq"].to(device)
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
