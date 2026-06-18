@@ -336,7 +336,7 @@ class HDF5LfDDataset(Dataset):
             "action": action / self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
             # "prev_action": prev_action
-            "sym": (target_pose - gripper_pose - self.mean_sym) / (self.std_sym + 1e-8),
+            "sym": (target_pose - gripper_pose),
 
             # --- Traj ---
             # Observations
