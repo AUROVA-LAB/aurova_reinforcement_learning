@@ -720,9 +720,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 cmd = self.test_model(sampled_pts, self.target_pose_r_lie - self.gripper_pose_r_lie)
 
             elif "seq" in self.cfg.mode:
-                if self.count % self.cfg.save_interval == 0:
-                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0),
-                                        self.pose_seq.queue.to(self.device).unsqueeze(0))
+                if self.count < self.cfg.save_interval * self.cfg.horizon:
+                    self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+                    cmd = self.trajectory_save[self.count].unsqueeze(0)
+
+                elif self.count % self.cfg.save_interval == 0:
+                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 83.02475,
+                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 2.20847) * 2.22163
 
 
             # actions = self._preprocess_actions(cmd)
@@ -1039,8 +1043,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     self.pc_seq.enqueue(self.processed_pc)
 
             else:
-                self.pose_seq.enqueue(self.gripper_pose_r_lie)
-                self.pc_seq.enqueue(self.processed_pc)        
+                if self.count % self.cfg.save_interval == 0:
+                    self.pose_seq.enqueue(self.gripper_pose_r_lie)
+                    self.pc_seq.enqueue(self.processed_pc)        
 
 
     def save_step(self):
