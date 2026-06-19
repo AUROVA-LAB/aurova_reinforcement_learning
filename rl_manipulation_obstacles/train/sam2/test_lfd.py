@@ -82,13 +82,19 @@ def test():
                       in_channels = 3,
                       pc=True,
                       hidden_dim=64).to(device)
-    criterion = nn.MSELoss()
+    criterion = nn.SmoothL1Loss()
+    criterion2 = nn.MSELoss()
     
     model.load_state_dict(torch.load("best_model.pth"))
     model.eval()
 
-    test_loss = 0
-    mae = 0
+    sl1_loss = 0
+    mse_loss = 0
+    mae_loss = 0
+
+    dataset.max_action = 2.22163
+    dataset.max_gripper = 2.20847
+    dataset.max_pc = 83.02475
 
     with torch.no_grad():
         for b in test_loader:
@@ -104,14 +110,17 @@ def test():
 
             pred = model(pc, pose)
 
-            test_loss = criterion(pred, traj)
-            mae += torch.abs(pred - traj).mean().item()
+            sl1_loss = criterion(pred, traj)
+            mse_loss = criterion2(pred, traj)
+            mae_loss += torch.abs(pred - traj).mean().item()
 
-    test_loss /= len(test_loader)
-    mae /= len(test_loader)
+    sl1_loss /= len(test_loader)
+    mse_loss /= len(test_loader)
+    mae_loss /= len(test_loader)
 
-    print(f"\nTest MSE: {test_loss:.4f}")
-    print(f"Test MAE: {mae:.4f}")
+    print(f"\nTest MSE: {mse_loss:.4f}")
+    print(f"Test MAE: {mae_loss:.4f}")
+    print(f"Test Smooth MAE: {sl1_loss:.4f}")
 
 
 if __name__ == "__main__":
