@@ -15,5 +15,7 @@ pip install --upgrade pip setuptools wheel
 rm -rf /isaac-sim/extscache/omni.kit.pip_archive*
 ./isaaclab.sh -p -c "from typing_extensions import deprecated"
 pip install toml
+pip install hilo_mpc ultralytics seaborn open3d wandb
+pip install git+https://github.com/facebookresearch/segment-anything.git
 
 
