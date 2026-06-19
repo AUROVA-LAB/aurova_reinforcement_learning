@@ -286,7 +286,7 @@ def preprocess_img_sam2(dataset):
 
 
 
-def preprocess_pcd_single(pc_all, model, dct_reducer):
+def preprocess_pcd_single(pc_all, model):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
@@ -296,21 +296,12 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+    pcd.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
 
     pcd = pcd.voxel_down_sample(voxel_size)
 
     pc_all = np.asarray(pcd.points)
-
-
-    # Add noise
-    pc_all = add_noise_to_pcd(points = pc_all)
-
-
-    # keep RGB if exists
-    if pc_all.shape[1] > 3:
-        colors = np.asarray(pcd.colors) if pcd.has_colors() else np.zeros_like(pc_all)
-    else:
-        colors = np.zeros_like(pc_all)
+    colors = np.asarray(pcd.colors)
 
     pc_all = np.concatenate([pc_all, colors], axis=1)
 
@@ -324,6 +315,10 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
     pc_all = pc_all[pc_all[:, 0] < 0.1]
     pc_all = pc_all[pc_all[:, 1] > -0.5]
 
+    # Add noise
+
+    # pc_all, _ = farthest_point_sampling(pc_all, 512)
+    # pc_all[:, :3] = add_noise_to_pcd(points = pc_all[:, :3])
     # ============================================================
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
@@ -337,28 +332,30 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
     # ============================================================
 
     pc_xyz = pc_all[:, :3]
-    pc_rgb = pc_all[:, 3:] if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+    pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
     # normalize
-    pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
+    # pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
     # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
 
 
-    # sample for PointNet
-    NUM_POINTS = 4096
-    if len(pc_xyz) == 0.0:
-        return None
-    idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
+    # # sample for PointNet
+    # NUM_POINTS = 512
+    # if len(pc_xyz) == 0.0:
+    #     return None
+    # rng = np.random.default_rng(seed=42)
+    # np.random.seed(42)
+    # idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
 
-    xyz_sample = pc_xyz[idx]
-    rgb_sample = pc_rgb[idx]
-
+    xyz_sample = pc_xyz
+    rgb_sample = pc_rgb
+    
 
     # ============================================================
     # 6. BUILD POINTNET INPUT
     # ============================================================
 
-    xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+    xyz_norm = xyz_sample# / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
 
     features_in = np.concatenate(
         [
@@ -371,8 +368,7 @@ def preprocess_pcd_single(pc_all, model, dct_reducer):
 
     points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
 
-
-
+    dct_reducer = FastDCTFeatureReducer(input_dim=len(xyz_sample), output_dim=512)
     with torch.no_grad():
         _, _, point_features = model(points)
         point_features = dct_reducer.encode(point_features[0]).permute(1,0)
@@ -392,7 +388,7 @@ def preprocess_pcd(dataset):
 
     checkpoint = torch.load(
         "best_model_sem.pth",
-        map_location="cpu",
+        map_location="cuda:0",
         weights_only=False
     )
 
@@ -400,7 +396,6 @@ def preprocess_pcd(dataset):
     model = model.to("cuda:0")
     model.eval()
 
-    dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
 
 
     max_pc = 0.0
@@ -418,7 +413,7 @@ def preprocess_pcd(dataset):
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        point_features = preprocess_pcd_single(pc_all, model, dct_reducer)
+        point_features = preprocess_pcd_single(pc_all, model)
 
         new_max_pc = torch.max(torch.abs(point_features)).item()
         
@@ -427,8 +422,8 @@ def preprocess_pcd(dataset):
 
         
         # Preprocess gemometrical info
-        norm_gripper = (dataset[i]["gripper_pose"] - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
-        norm_action = (dataset[i]["action"] - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
+        norm_gripper = (dataset[i]["gripper_pose"])# - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
+        norm_action = (dataset[i]["action"])# - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
 
         new_max_gripper = np.max(np.abs(norm_gripper))
         new_max_action = np.max(np.abs(norm_action))
@@ -474,7 +469,7 @@ def farthest_point_sampling(points, n_samples):
         centroid = points[farthest]
 
         # Compute squared distances to the newly selected point
-        dist = np.sum((points - centroid) ** 2, axis=1)
+        dist = np.sum((points[:, :3] - centroid[:3]) ** 2, axis=1)
 
         # Keep minimum distance to any selected point
         distances = np.minimum(distances, dist)
