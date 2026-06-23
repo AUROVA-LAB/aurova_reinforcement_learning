@@ -92,9 +92,9 @@ def test():
     mse_loss = 0
     mae_loss = 0
 
-    dataset.max_action = 2.22163
+    dataset.max_action = 1.61571
     dataset.max_gripper = 2.20847
-    dataset.max_pc = 83.02475
+    dataset.max_pc = 78.4925
 
     with torch.no_grad():
         for b in test_loader:
