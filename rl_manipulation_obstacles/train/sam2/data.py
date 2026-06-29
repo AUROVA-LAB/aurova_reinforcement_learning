@@ -187,7 +187,7 @@ class HDF5LfDDataset(Dataset):
 
         self.obs_horizon = obs_horizon
         self.pred_horizon = pred_horizon
-        self.stride = stride
+        self.stride = 5
         
         self.max_pc = 1.0
         self.max_gripper = 1.0
@@ -219,7 +219,7 @@ class HDF5LfDDataset(Dataset):
 
             T = f["actions"].shape[0]
 
-            max_start = T - (obs_horizon + pred_horizon)
+            max_start = T - (obs_horizon)
 
             for t in range(0, max_start, stride):
                 self.index.append((file_id, t))
@@ -300,15 +300,9 @@ class HDF5LfDDataset(Dataset):
         # ACTION TRAJECTORY (TARGET)
         # -------------------------------------------------
 
-        traj = f["actions"][t1:t2]                # [T_pred, 6]
-        diff_seq = f["diff"][t1:t2]
+        # traj = f["actions"][t1:t2]                # [T_pred, 6]
+        # diff_seq = f["diff"][t1:t2]
         action = f["actions"][t1] 
-
-
-        # optional: gripper
-        # if "gripper_action" in f:
-        #     gripper = f["gripper_action"][t1:t2]
-        #     traj = np.concatenate([traj, gripper], axis=-1)
 
 
         
@@ -345,9 +339,9 @@ class HDF5LfDDataset(Dataset):
             "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32) / self.max_action,
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
-            # Actions
-            "traj": torch.tensor(traj, dtype=torch.float32),
-            "diff_seq": torch.tensor(diff_seq, dtype=torch.float32)
+            # Actions Interval
+            # "traj": torch.tensor(traj, dtype=torch.float32),
+            # "diff_seq": torch.tensor(diff_seq, dtype=torch.float32)
         }
 
     # =====================================================
