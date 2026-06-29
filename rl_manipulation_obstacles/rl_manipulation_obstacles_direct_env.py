@@ -725,8 +725,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     cmd = self.trajectory_save[self.count].unsqueeze(0)
 
                 elif self.count % self.cfg.save_interval == 0:
-                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 83.02475,
-                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 2.20847) * 2.22163
+                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 78.4925,
+                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 2.20847) * 1.61571
 
 
             # actions = self._preprocess_actions(cmd)
@@ -1031,7 +1031,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
-                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model, dct_reducer=self.dct_reducer)
+                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
@@ -1400,6 +1400,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         save_idx = 0
         self.start_grip_idx = 0
 
+        latch_end = 0
+
         for idx, ref in enumerate(references):
 
             
@@ -1470,7 +1472,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
                 if torch.norm(x0_tensor[:, 3:].to(self.device) - ref[:, 3:]).item() < self.cfg.plan_chg_thres - 2.0*self.cfg.plan_chg_thres/3.0*(idx == len(references) - 1):
-                    break
+                    if idx < 1:
+                        break
+                    elif latch_end > 50:
+                        break 
+                    latch_end += 1
 
             if idx == 1:
                 self.subs_limit = save_idx

@@ -469,7 +469,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     test = False
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
     
-    save_interval = 2
+    save_interval = 5
     mode = "seq" # "pcd", "img", "seq", "seq_raw"
     horizon = 5
     
