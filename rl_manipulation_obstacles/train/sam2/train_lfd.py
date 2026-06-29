@@ -78,7 +78,7 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd(dataset)
+        dataset = preprocess_pcd_raw(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -127,7 +127,7 @@ def train():
 
             sel = random.randint(0,4)
 
-            pc =  b["pc_net2_seq"].to(device)
+            pc =  b["pc_seq"].to(device)
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
@@ -164,7 +164,7 @@ def train():
 
                 sel = random.randint(0,4)
 
-                pc = b["pc_net2_seq"]
+                pc = b["pc_seq"]
                 pose = b["pose_seq"]
                 traj = b["action"]
 

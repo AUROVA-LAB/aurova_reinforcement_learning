@@ -437,9 +437,9 @@ def preprocess_pcd(dataset):
 
         dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
 
-        dataset.max_pc = max_pc
-        dataset.max_gripper = max_gripper
-        dataset.max_action = max_action
+    dataset.max_pc = max_pc
+    dataset.max_gripper = max_gripper
+    dataset.max_action = max_action
 
     return dataset
         
@@ -547,7 +547,7 @@ def preprocess_single_pcd_raw(pc_all, mean_dataset):
 
 
         # Add noise and center point cloud around gripper
-        sampled_pts = add_noise_to_pcd(sampled_pts) - mean_dataset[3:]*2
+        sampled_pts = add_noise_to_pcd(sampled_pts)#  - mean_dataset[3:]*2
 
         # cloud = o3d.geometry.PointCloud()
         # cloud.points = o3d.utility.Vector3dVector(sampled_pts)
@@ -559,8 +559,9 @@ def preprocess_single_pcd_raw(pc_all, mean_dataset):
 
 def preprocess_pcd_raw(dataset):
 
-    mean_diff = np.zeros(dataset[0]["diff"].shape)
-    mean_sym = np.zeros(dataset[0]["sym"].shape)
+    max_pc = 0.0
+    max_gripper = 0.0
+    max_action = 0.0
 
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
@@ -576,20 +577,36 @@ def preprocess_pcd_raw(dataset):
         dataset.set_item(i, pcd_p = sampled_pts)
 
 
-        mean_diff += dataset[i]["diff"]
-        mean_sym += dataset[i]["sym"]
+        # Preprocess gemometrical info
+        norm_gripper = (dataset[i]["gripper_pose"])# - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
+        norm_action = (dataset[i]["action"])# - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
+
+        new_max_gripper = np.max(np.abs(norm_gripper))
+        new_max_action = np.max(np.abs(norm_action))
+        new_max_pc = np.max(np.abs(sampled_pts))
+
+        if new_max_pc > max_pc:
+            max_pc = new_max_pc
+        if new_max_gripper > max_gripper:
+            max_gripper = new_max_gripper
+        if new_max_action > max_action:
+            max_action = new_max_action
+
+    dataset.max_pc = max_pc
+    dataset.max_gripper = max_gripper
+    dataset.max_action = max_action
 
 
-    mean_diff /= len(dataset)
-    std_diff = np.std(mean_diff, axis=0)
+    # mean_diff /= len(dataset)
+    # std_diff = np.std(mean_diff, axis=0)
 
-    dataset.mean_diff = mean_diff
-    dataset.std_diff = std_diff
+    # dataset.mean_diff = mean_diff
+    # dataset.std_diff = std_diff
 
-    mean_sym /= len(dataset)
-    std_sym = np.std(mean_sym, axis=0)
+    # mean_sym /= len(dataset)
+    # std_sym = np.std(mean_sym, axis=0)
 
-    dataset.mean_sym = mean_sym
-    dataset.std_sym = std_sym
+    # dataset.mean_sym = mean_sym
+    # dataset.std_sym = std_sym
 
     return dataset

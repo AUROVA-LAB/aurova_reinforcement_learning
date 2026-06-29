@@ -179,16 +179,20 @@ class CnnPolicy(nn.Module):
                     # nn.Linear(3,128), # falta poner el tamaño
                     # nn.LayerNorm(128), # falta poner el tamaño
                     # nn.ReLU(),
+                    nn.Linear(3,64), # falta poner el tamaño
+                    nn.LayerNorm(64), # falta poner el tamaño
+                    nn.ReLU(),
+                    nn.Linear(64,128), # falta poner el tamaño
+                    nn.LayerNorm(128), # falta poner el tamaño
+                    nn.ReLU(),
                     nn.Linear(128,256), # falta poner el tamaño
                     nn.LayerNorm(256), # falta poner el tamaño
                     nn.ReLU(),
-                    nn.Linear(256,512), # falta poner el tamaño
-                    nn.LayerNorm(512), # falta poner el tamaño
-                    nn.ReLU(),
-                    nn.Linear(512,1024), # falta poner el tamaño
-                    nn.LayerNorm(1024), # falta poner el tamaño
-                    nn.ReLU(),
-                    
+                )
+
+                self.proj_mlp = nn.Sequential(
+                    nn.Linear(256,64),
+                    nn.LayerNorm(64)
                 )
                 # self.after_mean = nn.Sequential(
                 #     nn.Linear(512,hidden_dim), # falta poner el tamaño
@@ -231,23 +235,23 @@ class CnnPolicy(nn.Module):
         #     nn.LayerNorm(hidden_dim)
         # )
 
-        # self.gru_1 = nn.GRU(
-        #     input_size=hidden_dim,
-        #     hidden_size=hidden_dim,
-        #     num_layers=2,
-        #     batch_first=True,
-        # )
-        # self.gru_2 = nn.GRU(
-        #     input_size=hidden_dim,
-        #     hidden_size=hidden_dim,
-        #     num_layers=2,
-        #     batch_first=True,
-        # )
+        self.gru_1 = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+        )
+        self.gru_2 = nn.GRU(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+        )
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, 128+hidden_dim))
 
         self.temporal_transformer = TemporalTransformer(
-            input_dim=128 + hidden_dim,
+            input_dim=64 + hidden_dim,
             d_model=256,
             nhead=8,
             num_layers=4
@@ -257,9 +261,9 @@ class CnnPolicy(nn.Module):
         # self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
         self.head = nn.Sequential(
-            nn.Linear(256, hidden_dim),
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.LayerNorm(hidden_dim),
+            nn.LayerNorm(64),
             # nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim),
         )
@@ -404,7 +408,7 @@ class CnnPolicy(nn.Module):
 
         return pred
     
-    def forward_temporal_DCT_raw(self, pc_seq, pose_seq):
+    def forward_temporal_DCT(self, pc_seq, pose_seq):
 
         """
         pc_seq   : [B,T,512,3]
@@ -456,26 +460,29 @@ class CnnPolicy(nn.Module):
         return pred
     
 
-    def forward_temporal_DCT(self, pc_seq, pose_seq):
+    def forward_temporal_DCT_raw(self, pc_seq, pose_seq):
 
         """
         pc_seq   : [B,T,128]
         pose_seq : [B,T,pose_dim]
         """
 
-        B, T, _ = pc_seq.shape
+        B, T, N, _ = pc_seq.shape
 
         # -----------------------------------------------------
         # Flatten batch and time
         # -----------------------------------------------------
 
-        pc = pc_seq.reshape(B * T, -1)
+        pc = pc_seq.reshape(B * T, N, -1)
         pose = pose_seq.reshape(B * T, -1)
 
         # -----------------------------------------------------
         # PointNet ENCODER
         # -----------------------------------------------------
-        f_pc_dct = self.dct.encode(pc.view(pc.shape[0], -1))        
+        f_pc_dct = self.mlp(pc)
+        f_pc_dct = torch.max(f_pc_dct, dim=1)[0]
+        f_pc_dct = self.proj_mlp(f_pc_dct)
+
 
         # -----------------------------------------------------
         # Pose encoder
