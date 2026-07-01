@@ -78,7 +78,7 @@ def train():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd_raw(dataset)
+        dataset, curr_max = preprocess_pcd(dataset)
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
@@ -127,7 +127,7 @@ def train():
 
             sel = random.randint(0,4)
 
-            pc =  b["pc_seq"].to(device)
+            pc =  b["pc_net3_seq"].to(device)
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
@@ -164,7 +164,7 @@ def train():
 
                 sel = random.randint(0,4)
 
-                pc = b["pc_seq"]
+                pc = b["pc_net3_seq"]
                 pose = b["pose_seq"]
                 traj = b["action"]
 
@@ -185,6 +185,7 @@ def train():
             "max_pc": dataset.max_pc,
             "max_gripper": dataset.max_gripper,
             "max_action": dataset.max_action,
+            "curr_max": curr_max
         })
 
         print(f"Epoch {epoch} | Train: {train_loss:.4f} | Val: {val_loss:.4f}")

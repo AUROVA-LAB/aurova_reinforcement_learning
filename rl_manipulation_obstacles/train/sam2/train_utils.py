@@ -28,6 +28,9 @@ from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 from networks_lfd import FastDCTFeatureReducer
+from Point_BERT.models.Point_BERT import PointTransformer
+from easydict import EasyDict
+
 
 
 
@@ -297,13 +300,13 @@ def normalize_pc(pc):
         pc_norm = pc_centered / scale
         return pc_norm, centroid, scale
 
-def preprocess_pcd_single(pc_all, model):
+def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
     # ============================================================
 
-    voxel_size = 0.025
+    voxel_size = 0.015
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
@@ -346,61 +349,133 @@ def preprocess_pcd_single(pc_all, model):
     pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
    
-    sampled_pts, sampled_idx = farthest_point_sampling(
-            pc_xyz,
-            n_samples=512
-        )  
+    if mode == "PointNet2":
+        sampled_pts, sampled_idx = farthest_point_sampling(
+                pc_xyz,
+                1024
+            )  
+        xyz_sample = sampled_pts
+        rgb_sample = pc_rgb[sampled_idx]
 
-    xyz_sample = sampled_pts
-    rgb_sample = pc_rgb[sampled_idx]
+
+    elif mode == "BERT":
+        sampled_pts = farthest_point_sampling_BERT(
+                pc_xyz,
+                1024
+            ) 
+        
+        xyz_sample = sampled_pts
+
     
 
     # ============================================================
     # 6. BUILD POINTNET INPUT
     # ============================================================
 
-    # xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
-    xyz_norm, _, _ = normalize_pc(torch.tensor(xyz_sample))
+    if mode == "BERT":
+        points = torch.tensor(
+            xyz_sample,
+            dtype=torch.float32
+        ).cuda()
 
-    features_in = np.concatenate(
-        [
-            xyz_sample,      # xyz
-            xyz_norm,        # normalized xyz
-            rgb_sample       # optional color
-        ],
-        axis=1
-    )
-
-    points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
-
-    with torch.no_grad():
-        _, _, point_features = model(points)
-        # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
-        # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
+        with torch.no_grad():
+            # forward_features exists in PointTransformer
+            __, point_features, __  = model(points)
+            point_features = point_features.squeeze()
 
 
-        
-    # point_features = point_features.mean(-1)[0].cpu().numpy()
+    elif mode == "PointNet2":
+        # xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+        # xyz_norm, _, _ = normalize_pc(torch.tensor(xyz_sample))
 
-    return point_features[0].permute(1,0)
+        features_in = np.concatenate(
+            [
+                xyz_sample,      # xyz
+                xyz_sample,        # normalized xyz
+                rgb_sample       # optional color
+            ],
+            axis=1
+        )
+
+        points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
+
+        with torch.no_grad():
+            _, _, point_features = model(points)
+            point_features = point_features[0].permute(1,0)
+            # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
+            # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
 
 
-def preprocess_pcd(dataset):
-    num_classes = 13
-    model = get_model(num_classes=num_classes).cuda()
+    # point_features = point_features.cpu().numpy()
+    return point_features
 
-    torch.cuda.init()
 
-    checkpoint = torch.load(
-        "best_model_sem.pth",
-        map_location="cuda:0",
-        weights_only=False
-    )
+def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
 
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model = model.to("cuda:0")
-    model.eval()
+    curr_max = 0.0
 
+    if mode == "PointNet2":
+        num_classes = 13
+        model = get_model(num_classes=num_classes).cuda()
+
+        torch.cuda.init()
+
+        checkpoint = torch.load(
+            "best_model_sem.pth",
+            map_location="cuda:0",
+            weights_only=False
+        )
+
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model = model.to("cuda:0")
+        model.eval()
+    elif mode == "BERT":
+        config = EasyDict({
+            'trans_dim':384,
+            'depth':12,
+            'drop_path_rate':0.1,
+            'cls_dim':40,
+            'num_heads':6,
+            'group_size':32,
+            'num_group':128,
+            'encoder_dims':256
+        })
+
+        model = PointTransformer(config)
+
+        # load pretrained checkpoint
+        # ckpt = torch.load(
+        #     "Point-BERT.pth",
+        #     map_location="cpu",
+        #     weights_only=False
+        # )
+
+        # # depending on checkpoint structure:
+        # model.load_state_dict(
+        #     ckpt['base_model'],
+        #     strict=False
+        # )
+
+        model.load_model_from_ckpt(
+            bert_ckpt_path="Point-BERT.pth",)
+
+        model.eval()
+        model.cuda()
+
+    if test_curr_max is None:
+        for i in range(len(dataset)):
+            print("Calculating ", i, " max")
+            pc = dataset[i]["pc"].astype(np.float32)
+            pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+            pc_front = dataset[i]["pc_front"].astype(np.float32)
+            pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
+            new_max_pc = torch.max(torch.abs(pc_all)).item()
+
+            if new_max_pc > curr_max:
+                curr_max = new_max_pc
+
+    else:
+        curr_max = test_curr_max
 
 
     max_pc = 0.0
@@ -412,13 +487,13 @@ def preprocess_pcd(dataset):
         print("--- Image ", i / len(dataset))
 
         # Preprocess PCs
-        pc = dataset[i]["pc"].astype(np.float32)
-        pc_ext = dataset[i]["pc_ext"].astype(np.float32)
-        pc_front = dataset[i]["pc_front"].astype(np.float32)
+        pc = dataset[i]["pc"].astype(np.float32)  / curr_max
+        pc_ext = dataset[i]["pc_ext"].astype(np.float32)  / curr_max
+        pc_front = dataset[i]["pc_front"].astype(np.float32)  / curr_max
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        point_features = preprocess_pcd_single(pc_all, model)
+        point_features = preprocess_pcd_single(pc_all, model, mode = mode)
 
         new_max_pc = torch.max(torch.abs(point_features)).item()
         
@@ -440,13 +515,18 @@ def preprocess_pcd(dataset):
         if new_max_action > max_action:
             max_action = new_max_action
 
-        dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
+        point_features = point_features.cpu().numpy()
+
+        if mode == "PointNet2":
+            dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
+        elif mode == "BERT":
+            dataset.set_item(i, pcd_net3 = point_features, gripper_pose = norm_gripper, action = norm_action)
 
     dataset.max_pc = max_pc
     dataset.max_gripper = max_gripper
     dataset.max_action = max_action
 
-    return dataset
+    return dataset, curr_max
         
 
 
@@ -506,7 +586,7 @@ def farthest_point_sampling_BERT(xyz, npoint):
 
         farthest = distance.max(-1)[1]
 
-    return centroids.numpy()
+    return xyz[:, centroids.squeeze()].numpy()
 
 
 
