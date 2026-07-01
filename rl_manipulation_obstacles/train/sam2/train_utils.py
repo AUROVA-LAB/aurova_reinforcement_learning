@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
+import matplotlib.pyplot as plt
 
 
 import cv2 as cv
@@ -284,7 +285,17 @@ def preprocess_img_sam2(dataset):
 
 
 
-
+def normalize_pc(pc):
+        centroid = pc.mean(dim=1, keepdim=True)
+        pc_centered = pc - centroid
+        scale = (
+            torch.linalg.norm(pc_centered, dim=1)
+            .max(dim=0, keepdim=True)
+            .values
+            .unsqueeze(-1)
+        )  # (B,1,1)
+        pc_norm = pc_centered / scale
+        return pc_norm, centroid, scale
 
 def preprocess_pcd_single(pc_all, model):
 
@@ -334,28 +345,22 @@ def preprocess_pcd_single(pc_all, model):
     pc_xyz = pc_all[:, :3]
     pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
-    # normalize
-    # pc_xyz = pc_xyz - np.mean(pc_xyz, axis=0)
-    # pc_xyz = pc_xyz / (np.max(np.linalg.norm(pc_xyz, axis=1)) + 1e-8)
+   
+    sampled_pts, sampled_idx = farthest_point_sampling(
+            pc_xyz,
+            n_samples=512
+        )  
 
-
-    # # sample for PointNet
-    # NUM_POINTS = 512
-    # if len(pc_xyz) == 0.0:
-    #     return None
-    # rng = np.random.default_rng(seed=42)
-    # np.random.seed(42)
-    # idx = np.random.choice(len(pc_xyz), NUM_POINTS, replace=len(pc_xyz) < NUM_POINTS)
-
-    xyz_sample = pc_xyz
-    rgb_sample = pc_rgb
+    xyz_sample = sampled_pts
+    rgb_sample = pc_rgb[sampled_idx]
     
 
     # ============================================================
     # 6. BUILD POINTNET INPUT
     # ============================================================
 
-    xyz_norm = xyz_sample# / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+    # xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+    xyz_norm, _, _ = normalize_pc(torch.tensor(xyz_sample))
 
     features_in = np.concatenate(
         [
@@ -368,16 +373,16 @@ def preprocess_pcd_single(pc_all, model):
 
     points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
 
-    dct_reducer = FastDCTFeatureReducer(input_dim=len(xyz_sample), output_dim=512)
     with torch.no_grad():
         _, _, point_features = model(points)
-        point_features = dct_reducer.encode(point_features[0]).permute(1,0)
-        point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
+        # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
+        # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
+
 
         
     # point_features = point_features.mean(-1)[0].cpu().numpy()
 
-    return point_features
+    return point_features[0].permute(1,0)
 
 
 def preprocess_pcd(dataset):
@@ -478,6 +483,31 @@ def farthest_point_sampling(points, n_samples):
         farthest = np.argmax(distances)
 
     return points[sampled_indices], sampled_indices
+
+def farthest_point_sampling_BERT(xyz, npoint):
+    xyz = torch.tensor(xyz).float().unsqueeze(0)
+    B, N, C = xyz.shape
+
+    centroids = torch.zeros(B, npoint, dtype=torch.long)
+    distance = torch.ones(B, N) * 1e10
+    farthest = torch.zeros(B, dtype=torch.long)
+
+    batch_indices = torch.arange(B, device=xyz.device)
+
+    for i in range(npoint):
+        centroids[:, i] = farthest
+
+        centroid = xyz[batch_indices, farthest].view(B,1,3)
+
+        dist = ((xyz - centroid)**2).sum(-1)
+
+        mask = dist < distance
+        distance[mask] = dist[mask]
+
+        farthest = distance.max(-1)[1]
+
+    return centroids.numpy()
+
 
 
 def add_noise_to_pcd(points, 
