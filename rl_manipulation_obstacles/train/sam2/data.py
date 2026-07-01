@@ -297,6 +297,7 @@ class HDF5LfDDataset(Dataset):
         pc_seq = f["/pc/pcd_p"][t0:t1]            # [T_obs, 512, 3]
         pc_net_seq = f["/pc/pcd_net"][t0:t1]            # [T_obs, 512, 3]
         pc_net2_seq = f["/pc/pcd_net2"][t0:t1]            # [T_obs, 512, 128]
+        pc_net3_seq = f["/pc/pcd_net3"][t0:t1]            # [T_obs, 768]
         pose_seq = f["/states/gripper_pose"][t0:t1]
         sym_seq = (f["/states/target_pose"][t0:t1]
                    - f["/states/gripper_pose"][t0:t1])
@@ -343,6 +344,7 @@ class HDF5LfDDataset(Dataset):
             "pc_seq": torch.tensor(pc_seq, dtype=torch.float32),
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
             "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32) / self.max_pc,
+            "pc_net3_seq": torch.tensor(pc_net3_seq, dtype=torch.float32) / self.max_pc,
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions Interval
@@ -501,7 +503,7 @@ class HDF5LfDDataset(Dataset):
             if torch.is_tensor(pcd_net3):
                 pcd_net3 = pcd_net3.detach().cpu().numpy()
 
-            if pcd_net3.ndim == 1 and pcd_net3.shape == 768:
+            if pcd_net3.ndim == 1 and pcd_net3.shape == (768,):
                 f["/pc/pcd_net3"][t] = pcd_net3
                 print("Setting NET3...")
 

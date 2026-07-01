@@ -223,8 +223,17 @@ class CnnPolicy(nn.Module):
 
         self.pose_mlp = nn.Sequential(
             nn.Linear(pose_dim, hidden_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(hidden_dim)
+        )
+        self.bert_mlp = nn.Sequential(
+            nn.Linear(768, 256),
+            nn.GELU(),
+            nn.LayerNorm(256),
+            nn.Linear(256, hidden_dim),
+            nn.GELU(),
+            nn.LayerNorm(hidden_dim),
+
         )
 
 
@@ -248,11 +257,11 @@ class CnnPolicy(nn.Module):
             batch_first=True,
         )
 
-        self.cls_token = nn.Parameter(torch.randn(1, 1, 128+hidden_dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, 2*hidden_dim))
 
         self.temporal_transformer = TemporalTransformer(
-            input_dim=64 + hidden_dim,
-            d_model=256,
+            input_dim=hidden_dim*2,
+            d_model=128,
             nhead=8,
             num_layers=4
         )
@@ -262,14 +271,15 @@ class CnnPolicy(nn.Module):
 
         self.head = nn.Sequential(
             nn.Linear(128, 64),
-            nn.ReLU(),
+            nn.GELU(),
             nn.LayerNorm(64),
             # nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim),
         )
 
         # self.forward = self.forward_temporal_DCT
-        self.forward = self.forward_temporal_DCT_raw
+        # self.forward = self.forward_temporal_DCT_raw
+        self.forward = self.forward_temporal_DCT_BERT
 
 
 
@@ -428,6 +438,59 @@ class CnnPolicy(nn.Module):
         # Spatial pooling (Point cloud)
         # -----------------------------------------------------
         f_scene = self.att_pool(pc_seq)  # [B,T,128]
+
+        # -----------------------------------------------------
+        # Fusion per timestep
+        # -----------------------------------------------------
+        x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+
+        # -----------------------------------------------------
+        # CLS token insertion
+        # -----------------------------------------------------
+        cls = self.cls_token.expand(B, 1, -1)     # [B,1,F]
+        x = torch.cat([cls, x], dim=1)            # [B,T+1,F]
+
+        # -----------------------------------------------------
+        # Temporal transformer
+        # -----------------------------------------------------
+        x = self.temporal_transformer(x)
+
+        # -----------------------------------------------------
+        # Use CLS output for prediction
+        # -----------------------------------------------------
+        cls_out = x[:, 0]   # [B, d_model]
+        pred = self.head(cls_out)  # [B, action_dim]
+        
+        # pred = pred.reshape(
+        #     B,
+        #     self.pred_horizon,
+        #     self.action_dim
+        # )
+
+        return pred
+    
+    def forward_temporal_DCT_BERT(self, pc_seq, pose_seq):
+
+        """
+        pc_seq   : [B,T,F]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, T, F = pc_seq.shape
+
+        # -----------------------------------------------------
+        # Pose encoding
+        # -----------------------------------------------------
+        pose = pose_seq.reshape(B * T, -1)
+        f_pose = self.pose_mlp(pose)
+        f_pose = f_pose.reshape(B, T, -1)
+
+        # -----------------------------------------------------
+        # BERT encoding
+        # -----------------------------------------------------
+        pc_seq = pc_seq.reshape(B*T, -1)
+        f_scene = self.bert_mlp(pc_seq)
+        f_scene = f_scene.reshape(B, T, -1)
 
         # -----------------------------------------------------
         # Fusion per timestep
