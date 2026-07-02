@@ -196,6 +196,7 @@ class HDF5LfDDataset(Dataset):
         self.stride = 5
         
         self.max_pc = 1.0
+        self.min_pc = 0.0
         self.max_gripper = 1.0
         self.max_action = 1.0
 
@@ -343,8 +344,8 @@ class HDF5LfDDataset(Dataset):
             # Observations
             "pc_seq": torch.tensor(pc_seq, dtype=torch.float32),
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
-            "pc_net2_seq": torch.tensor(pc_net2_seq, dtype=torch.float32) / self.max_pc,
-            "pc_net3_seq": torch.tensor(pc_net3_seq, dtype=torch.float32) / self.max_pc,
+            "pc_net2_seq": 2*(torch.tensor(pc_net2_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            "pc_net3_seq": 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions Interval

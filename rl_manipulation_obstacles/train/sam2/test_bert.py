@@ -9,6 +9,8 @@ from data import *
 import open3d as o3d
 from train_utils import *
 
+from sklearn.preprocessing import QuantileTransformer
+
 # ---------------------------------------------------
 # Build model
 # ---------------------------------------------------
@@ -54,6 +56,56 @@ model.cuda()
 dataset = HDF5LfDDataset(
         os.path.join(os.getcwd(), "../../dataset")
     )
+
+actions = np.array([dataset[i]["action"] for i in range(len(dataset))])
+
+qt = QuantileTransformer(
+    output_distribution='uniform'
+)
+
+actions_norm = qt.fit_transform(actions)
+
+
+X_original = qt.inverse_transform(actions_norm)
+
+# median = np.median(actions_norm, axis=0)
+# q25 = np.percentile(actions_norm,25,axis=0)
+# q75 = np.percentile(actions_norm,75,axis=0)
+# iqr = q75-q25
+
+# actions_norm = (actions_norm-median)/(iqr+1e-8)
+
+# actions_norm = 2*(a-a_min)/(a_max-a_min)-1
+
+
+for j in range(6):
+    actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
+
+
+
+fig, axes = plt.subplots(2, 3, figsize=(12, 8))
+
+for j, ax in enumerate(axes.flat):
+    ax.hist(actions_norm[:, j], bins=30)
+    ax.set_title(f"Action {j}")
+
+plt.tight_layout()
+plt.savefig("action_distribution.png", dpi=300)
+plt.close()
+
+
+
+fig, axes = plt.subplots(2, 3, figsize=(12, 8))
+
+for j, ax in enumerate(axes.flat):
+    ax.hist(X_original[:, j], bins=30)
+    ax.set_title(f"Action {j}")
+
+plt.tight_layout()
+plt.savefig("action_distribution_original.png", dpi=300)
+plt.close()
+raise
+
 
 for i in range(len(dataset)):
     # Preprocess PCs
@@ -109,11 +161,12 @@ for i in range(len(dataset)):
 
     # [1,1024,3]
 
-    with torch.no_grad():
+    # with torch.no_grad():
 
-        # forward_features exists in PointTransformer
-        __, features, __  = model(points)
-        __, features2, __  = model(points)
+    #     # forward_features exists in PointTransformer
+    #     __, features, __  = model(points)
+    #     __, features2, __  = model(points)
 
-    print(features.shape)
-    raise
+
+
+    

@@ -30,6 +30,9 @@ import open3d as o3d
 from networks_lfd import FastDCTFeatureReducer
 from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
+from sklearn.preprocessing import QuantileTransformer
+import pickle
+
 
 
 
@@ -462,6 +465,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
         model.eval()
         model.cuda()
 
+    actions_list = []
+    pos_list = []
+
     if test_curr_max is None:
         for i in range(len(dataset)):
             print("Calculating ", i, " max")
@@ -474,14 +480,41 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
             if new_max_pc > curr_max:
                 curr_max = new_max_pc
 
+            actions_list.append(dataset[i]["action"])
+            pos_list.append(dataset[i]["gripper_pose"])
+
+        actions_list = np.array(actions_list)
+        pos_list = np.array(pos_list)
+
+
+        qt = QuantileTransformer(
+            output_distribution='uniform'
+        )
+        actions_norm = qt.fit_transform(actions_list)
+
+
+        qt_pos = QuantileTransformer(
+            output_distribution='uniform'
+        )
+        pos_norm = qt_pos.fit_transform(pos_list)
+
+
+        for j in range(6):
+            actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
+            pos_norm[:, j] = 2*(pos_norm[:, j]-pos_norm[:, j].min())/(pos_norm[:, j].max()-pos_norm[:, j].min())-1
+
+        for i in range(len(dataset)):
+            dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
+
+
+
     else:
         curr_max = test_curr_max
 
 
-    max_pc = 0.0
-    max_gripper = 0.0
-    max_action = 0.0
+
     
+    pc_data = []
 
     for i in range(len(dataset)):
         print("--- Image ", i / len(dataset))
@@ -495,36 +528,50 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
 
         point_features = preprocess_pcd_single(pc_all, model, mode = mode)
 
-        new_max_pc = torch.max(torch.abs(point_features)).item()
         
         if point_features is None:
             continue
 
-        
-        # Preprocess gemometrical info
-        norm_gripper = (dataset[i]["gripper_pose"])# - np.mean(dataset[i]["gripper_pose"])) / np.std(dataset[i]["gripper_pose"])
-        norm_action = (dataset[i]["action"])# - np.mean(dataset[i]["action"])) / np.std(dataset[i]["action"])
-
-        new_max_gripper = np.max(np.abs(norm_gripper))
-        new_max_action = np.max(np.abs(norm_action))
-
-        if new_max_pc > max_pc:
-            max_pc = new_max_pc
-        if new_max_gripper > max_gripper:
-            max_gripper = new_max_gripper
-        if new_max_action > max_action:
-            max_action = new_max_action
-
         point_features = point_features.cpu().numpy()
 
-        if mode == "PointNet2":
-            dataset.set_item(i, pcd_net2 = point_features, gripper_pose = norm_gripper, action = norm_action)
-        elif mode == "BERT":
-            dataset.set_item(i, pcd_net3 = point_features, gripper_pose = norm_gripper, action = norm_action)
+        pc_data.append(point_features)
 
+        if mode == "PointNet2":
+            dataset.set_item(i, pcd_net2 = point_features)
+        elif mode == "BERT":
+            dataset.set_item(i, pcd_net3 = point_features)
+
+
+
+
+    pc_data = np.array(pc_data)
+
+    pc_mean = np.mean(pc_data, axis = 0)
+    pc_std = np.std(pc_data, axis = 0)
+
+    pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
+    
+    max_pc = np.max(point_features, axis = -1)
+    min_pc = np.min(point_features, axis = -1)
+        
     dataset.max_pc = max_pc
-    dataset.max_gripper = max_gripper
-    dataset.max_action = max_action
+    dataset.min_pc = min_pc
+    
+    stats = {
+        "qt_pc": qt,
+        "qt_pos": qt_pos,
+        "pc_mean": pc_mean,
+        "pc_std": pc_std,
+        "max_pc": max_pc,
+        "min_pc": min_pc
+    }
+
+
+    with open("action_preprocessing.pkl","wb") as f:
+        pickle.dump(stats,f)
+
+    # with open("action_preprocessing.pkl","rb") as f:
+    #     stats = pickle.load(f)
 
     return dataset, curr_max
         

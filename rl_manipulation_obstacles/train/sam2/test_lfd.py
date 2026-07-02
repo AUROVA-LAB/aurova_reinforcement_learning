@@ -58,7 +58,7 @@ def test():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset = preprocess_pcd(dataset)
+        dataset, curr_max = preprocess_pcd(dataset, test_curr_max=1.11878)
 
 
 
@@ -92,9 +92,9 @@ def test():
     mse_loss = 0
     mae_loss = 0
 
-    dataset.max_action = 1.25151
-    dataset.max_gripper = 1.568855
-    dataset.max_pc = 79.22764
+    dataset.max_action = 1.56627
+    dataset.max_gripper = 1.56891
+    dataset.max_pc = 12.886685
 
     with torch.no_grad():
         for b in test_loader:
@@ -104,7 +104,7 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc =  b["pc_net2_seq"].to(device)
+            pc =  b["pc_net3_seq"].to(device)
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
