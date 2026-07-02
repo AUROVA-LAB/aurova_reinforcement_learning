@@ -38,7 +38,9 @@ import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single, preprocess_single_pcd_raw
+from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
+from easydict import EasyDict
 
 
 from .train.sam2.sam2.build_sam import build_sam2
@@ -725,8 +727,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     cmd = self.trajectory_save[self.count].unsqueeze(0)
 
                 elif self.count % self.cfg.save_interval == 0:
-                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 78.4925,
-                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 2.20847) * 1.61571
+                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 12.886685,
+                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 1.56891) * 1.56627
 
 
             # actions = self._preprocess_actions(cmd)
@@ -1031,7 +1033,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
-                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
+                self.processed_pc = preprocess_pcd_single(pc_all_color / 1.11878, self.pcd_model)
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
@@ -1545,15 +1547,49 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             #         )
             #     ])
             
-            num_classes = 13
-            self.pcd_model = get_model(num_classes=num_classes).cuda()
+            if self.cfg.pcd_model_type == "PointNet":
+                num_classes = 13
+                self.pcd_model = get_model(num_classes=num_classes).cuda()
 
-            checkpoint = torch.load(
-                "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_sem.pth",
-                map_location="cuda:0",
-                weights_only=False
-            )
+                checkpoint = torch.load(
+                    "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_sem.pth",
+                    map_location="cuda:0",
+                    weights_only=False
+                )
 
-            self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
-            self.pcd_model.eval()
+                self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
+                self.pcd_model.eval()
+            
+            elif self.cfg.pcd_model_type == "BERT":
+                config = EasyDict({
+                    'trans_dim':384,
+                    'depth':12,
+                    'drop_path_rate':0.1,
+                    'cls_dim':40,
+                    'num_heads':6,
+                    'group_size':32,
+                    'num_group':128,
+                    'encoder_dims':256
+                })
+
+                self.pcd_model = PointTransformer(config)
+
+                # load pretrained checkpoint
+                # ckpt = torch.load(
+                #     "Point-BERT.pth",
+                #     map_location="cpu",
+                #     weights_only=False
+                # )
+
+                # # depending on checkpoint structure:
+                # model.load_state_dict(
+                #     ckpt['base_model'],
+                #     strict=False
+                # )
+
+                self.pcd_model.load_model_from_ckpt(
+                    bert_ckpt_path="/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/Point-BERT.pth",)
+
+                self.pcd_model.eval()
+                self.pcd_model.cuda()
 

@@ -471,10 +471,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     save_interval = 5
     mode = "seq" # "pcd", "img", "seq", "seq_raw"
+    pcd_model_type = "BERT" # BERT, PointNet
     horizon = 5
     
     if mode == "seq":
-        pc_shape = (512,128)
+        pc_shape = (768,)# (512,128)
     elif mode == "seq_raw":
         pc_shape = (512, 3)
 
