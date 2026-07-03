@@ -351,7 +351,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pc_xyz = pc_all[:, :3]
     pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
-   
+    pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz))
+
     if mode == "PointNet2":
         sampled_pts, sampled_idx = farthest_point_sampling(
                 pc_xyz,
@@ -413,7 +414,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     return point_features
 
 
-def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
+def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
     curr_max = 0.0
 
@@ -498,6 +499,43 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
         )
         pos_norm = qt_pos.fit_transform(pos_list)
 
+        actions_minmax = []
+        pos_minmax = []
+        for j in range(6):
+
+            actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
+            pos_norm[:, j] = 2*(pos_norm[:, j]-pos_norm[:, j].min())/(pos_norm[:, j].max()-pos_norm[:, j].min())-1
+
+            actions_minmax.append((actions_norm[:, j].min(), actions_norm[:, j].max()))
+            pos_minmax.append((pos_norm[:, j].min(), pos_norm[:, j].max()))
+
+
+        for i in range(len(dataset)):
+            dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
+
+
+
+    else:
+
+        for i in range(len(dataset)):
+            print("Calculating ", i, " max")
+
+            actions_list.append(dataset[i]["action"])
+            pos_list.append(dataset[i]["gripper_pose"])
+
+        actions_list = np.array(actions_list)
+        pos_list = np.array(pos_list)
+
+        with open("action_preprocessing.pkl","rb") as f:
+            stats = pickle.load(f)
+
+        curr_max = test_curr_max
+
+        qt = stats["qt_pc"]
+        actions_norm = qt.fit_transform(actions_list)
+
+        qt_pos = stats["qt_pos"]
+        pos_norm = qt_pos.fit_transform(pos_list)
 
         for j in range(6):
             actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
@@ -507,9 +545,11 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
             dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
 
 
-
-    else:
-        curr_max = test_curr_max
+        pc_mean = stats["pc_mean"]
+        pc_std = stats["pc_std"]
+        max_pc = stats["max_pc"]
+        min_pc = stats["min_pc"]
+        
 
 
 
@@ -546,32 +586,35 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None):
 
     pc_data = np.array(pc_data)
 
-    pc_mean = np.mean(pc_data, axis = 0)
-    pc_std = np.std(pc_data, axis = 0)
+    if not test:
+        pc_mean = np.mean(pc_data, axis = 0)
+        pc_std = np.std(pc_data, axis = 0)
 
-    pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
+    # pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
     
-    max_pc = np.max(point_features, axis = -1)
-    min_pc = np.min(point_features, axis = -1)
+    if not test:
+        max_pc = np.max(point_features, axis = -1)
+        min_pc = np.min(point_features, axis = -1)
         
+        stats = {
+            "qt_pc": qt,
+            "qt_pos": qt_pos,
+            "pc_mean": pc_mean,
+            "pc_std": pc_std,
+            "max_pc": max_pc,
+            "min_pc": min_pc,
+            "actions_minmax": actions_minmax,
+            "actions_minmax": actions_minmax,
+        }
+
+        with open("action_preprocessing.pkl","wb") as f:
+            pickle.dump(stats,f)
+
+        # with open("action_preprocessing.pkl","rb") as f:
+        #     stats = pickle.load(f)
+
     dataset.max_pc = max_pc
     dataset.min_pc = min_pc
-    
-    stats = {
-        "qt_pc": qt,
-        "qt_pos": qt_pos,
-        "pc_mean": pc_mean,
-        "pc_std": pc_std,
-        "max_pc": max_pc,
-        "min_pc": min_pc
-    }
-
-
-    with open("action_preprocessing.pkl","wb") as f:
-        pickle.dump(stats,f)
-
-    # with open("action_preprocessing.pkl","rb") as f:
-    #     stats = pickle.load(f)
 
     return dataset, curr_max
         

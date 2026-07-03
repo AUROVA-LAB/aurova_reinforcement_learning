@@ -131,7 +131,7 @@ def train():
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
-            pred = model(pc, pose)
+            pred = model(pc)
 
 
             loss = criterion(pred, traj)
@@ -168,7 +168,7 @@ def train():
                 pose = b["pose_seq"]
                 traj = b["action"]
 
-                pred = model(pc, pose)
+                pred = model(pc)
 
                 loss = criterion(pred, traj)
                 val_loss += loss.item()

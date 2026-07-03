@@ -230,9 +230,9 @@ class CnnPolicy(nn.Module):
             nn.Linear(768, 256),
             nn.GELU(),
             nn.LayerNorm(256),
-            nn.Linear(256, hidden_dim),
+            nn.Linear(256, 2*hidden_dim),
             nn.GELU(),
-            nn.LayerNorm(hidden_dim),
+            nn.LayerNorm(2*hidden_dim),
 
         )
 
@@ -469,7 +469,7 @@ class CnnPolicy(nn.Module):
 
         return pred
     
-    def forward_temporal_DCT_BERT(self, pc_seq, pose_seq):
+    def forward_temporal_DCT_BERT(self, pc_seq):
 
         """
         pc_seq   : [B,T,F]
@@ -481,9 +481,9 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         # Pose encoding
         # -----------------------------------------------------
-        pose = pose_seq.reshape(B * T, -1)
-        f_pose = self.pose_mlp(pose)
-        f_pose = f_pose.reshape(B, T, -1)
+        # pose = pose_seq.reshape(B * T, -1)
+        # f_pose = self.pose_mlp(pose)
+        # f_pose = f_pose.reshape(B, T, -1)
 
         # -----------------------------------------------------
         # BERT encoding
@@ -495,7 +495,8 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         # Fusion per timestep
         # -----------------------------------------------------
-        x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+        # x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+        x = f_scene
 
         # -----------------------------------------------------
         # CLS token insertion
