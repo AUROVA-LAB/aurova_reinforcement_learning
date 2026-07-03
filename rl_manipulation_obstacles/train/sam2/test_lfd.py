@@ -58,15 +58,15 @@ def test():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset, curr_max = preprocess_pcd(dataset, test_curr_max=1.11878)
+        dataset, curr_max = preprocess_pcd(dataset, test_curr_max=1.11878, test = True)
 
 
 
     train_ds, val_ds, test_ds = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, collate_fn = collate_fn)
-    val_loader = DataLoader(val_ds, batch_size=32, shuffle = True, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=1, shuffle = False, collate_fn = collate_fn)
+    train_loader = DataLoader(train_ds, batch_size=32, shuffle=False, collate_fn = collate_fn)
+    val_loader = DataLoader(val_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -92,9 +92,14 @@ def test():
     mse_loss = 0
     mae_loss = 0
 
-    dataset.max_action = 1.56627
-    dataset.max_gripper = 1.56891
-    dataset.max_pc = 12.886685
+    dataset.max_action = 1.0
+    dataset.max_gripper = 1.0
+    dataset.max_pc = 9.827
+
+    with open("action_preprocessing.pkl","rb") as f:
+        stats = pickle.load(f)
+
+    qt = stats["qt_pc"]
 
     with torch.no_grad():
         for b in test_loader:
@@ -108,11 +113,26 @@ def test():
             pose = b["pose_seq"].to(device)
             traj = b["action"].to(device)
 
-            pred = model(pc, pose)
+            pred = model(pc)
+
+            traj = torch.tensor(qt.inverse_transform(traj.cpu().numpy()))
+            pred = torch.tensor(qt.inverse_transform(pred.cpu().numpy()))
+
+            
+
+            # print(pc)
+            # print(pose)
+            # print(traj)
+            # print(pred)
+
+            print("SL1: ", criterion(pred, traj))
+            print("MSE: ", criterion2(pred, traj))
+            print("L1: ", torch.abs(pred - traj).mean(dim=0))
 
             sl1_loss = criterion(pred, traj)
             mse_loss = criterion2(pred, traj)
             mae_loss += torch.abs(pred - traj).mean().item()
+            print("----")
 
     sl1_loss /= len(test_loader)
     mse_loss /= len(test_loader)

@@ -293,6 +293,7 @@ def preprocess_img_sam2(dataset):
 
 def normalize_pc(pc):
         centroid = pc.mean(dim=1, keepdim=True)
+
         pc_centered = pc - centroid
         scale = (
             torch.linalg.norm(pc_centered, dim=1)
@@ -300,7 +301,9 @@ def normalize_pc(pc):
             .values
             .unsqueeze(-1)
         )  # (B,1,1)
-        pc_norm = pc_centered / scale
+
+        pc_norm = pc_centered / scale.squeeze(-1)
+
         return pc_norm, centroid, scale
 
 def preprocess_pcd_single(pc_all, model, mode="BERT"):
@@ -351,7 +354,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pc_xyz = pc_all[:, :3]
     pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
-    pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz))
+    pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
+
 
     if mode == "PointNet2":
         sampled_pts, sampled_idx = farthest_point_sampling(
@@ -538,8 +542,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pos_norm = qt_pos.fit_transform(pos_list)
 
         for j in range(6):
-            actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
-            pos_norm[:, j] = 2*(pos_norm[:, j]-pos_norm[:, j].min())/(pos_norm[:, j].max()-pos_norm[:, j].min())-1
+
+            actions_norm[:, j] = 2*(actions_norm[:, j]-stats["actions_minmax"][j][0])/(stats["actions_minmax"][j][1]-stats["actions_minmax"][j][0])-1
+            pos_norm[:, j] = 2*(pos_norm[:, j]-stats["pos_minmax"][j][0])/(stats["pos_minmax"][j][1]-stats["pos_minmax"][j][0])-1
 
         for i in range(len(dataset)):
             dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
@@ -604,7 +609,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             "max_pc": max_pc,
             "min_pc": min_pc,
             "actions_minmax": actions_minmax,
-            "actions_minmax": actions_minmax,
+            "pos_minmax": pos_minmax,
         }
 
         with open("action_preprocessing.pkl","wb") as f:
@@ -655,7 +660,7 @@ def farthest_point_sampling(points, n_samples):
     return points[sampled_indices], sampled_indices
 
 def farthest_point_sampling_BERT(xyz, npoint):
-    xyz = torch.tensor(xyz).float().unsqueeze(0)
+    xyz = torch.tensor(xyz).float()#.unsqueeze(0)
     B, N, C = xyz.shape
 
     centroids = torch.zeros(B, npoint, dtype=torch.long)
