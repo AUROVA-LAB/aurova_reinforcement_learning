@@ -114,7 +114,7 @@ def train():
 
         
     weights = torch.tensor(
-        [[2,2,1.5,1,1.5,1]],
+        [[2,2,2,1,1.5,1]],
         device=device
     )
 
