@@ -113,7 +113,10 @@ def train():
 
 
         
-
+    weights = torch.tensor(
+        [[2,2,1.5,1,1.5,1]],
+        device=device
+    )
 
     for epoch in range(500):
 
@@ -134,7 +137,15 @@ def train():
             pred = model(pc)
 
 
-            loss = criterion(pred, traj)
+            loss = criterion(pred, traj)*weights
+            loss = (
+                weights *
+                nn.functional.smooth_l1_loss(
+                    pred,
+                    traj,
+                    reduction='none'
+                )
+            ).mean()
 
             optimizer.zero_grad()
             loss.backward()
