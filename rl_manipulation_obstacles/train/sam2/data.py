@@ -374,6 +374,7 @@ class HDF5LfDDataset(Dataset):
         target_pose=None,
         gripper_pose=None,
         action=None,
+        diff=None,
         gripper_action=None
     ):
 
@@ -515,6 +516,14 @@ class HDF5LfDDataset(Dataset):
             if action.ndim == 1 and action.shape == (6,):
                 f["actions"][t] = action
                 print("Setting ACTION...")
+
+        if diff is not None:
+            if torch.is_tensor(diff):
+                diff = diff.detach().cpu().numpy()
+
+            if diff.ndim == 1 and diff.shape == (6,):
+                f["diff"][t] = diff
+                print("Setting DIFF...")
 
         if gripper_pose is not None:
             if torch.is_tensor(gripper_pose):

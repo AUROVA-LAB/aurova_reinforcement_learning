@@ -485,7 +485,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             if new_max_pc > curr_max:
                 curr_max = new_max_pc
 
-            actions_list.append(dataset[i]["action"])
+            actions_list.append(dataset[i]["diff"])
             pos_list.append(dataset[i]["gripper_pose"])
 
         actions_list = np.array(actions_list)
@@ -506,7 +506,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pos_norm = pos_minmax.fit_transform(pos_norm)
 
         for i in range(len(dataset)):
-            dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
+            dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
 
 
@@ -515,7 +515,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         for i in range(len(dataset)):
             print("Calculating ", i, " max")
 
-            actions_list.append(dataset[i]["action"])
+            actions_list.append(dataset[i]["diff"])
             pos_list.append(dataset[i]["gripper_pose"])
 
         actions_list = np.array(actions_list)
