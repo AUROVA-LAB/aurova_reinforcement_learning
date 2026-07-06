@@ -30,7 +30,7 @@ import open3d as o3d
 from networks_lfd import FastDCTFeatureReducer
 from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
-from sklearn.preprocessing import QuantileTransformer
+from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler
 import pickle
 
 
@@ -492,27 +492,18 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pos_list = np.array(pos_list)
 
 
-        qt = QuantileTransformer(
-            output_distribution='uniform'
-        )
+        qt = RobustScaler()
         actions_norm = qt.fit_transform(actions_list)
 
 
-        qt_pos = QuantileTransformer(
-            output_distribution='uniform'
-        )
+        qt_pos = RobustScaler()
         pos_norm = qt_pos.fit_transform(pos_list)
 
-        actions_minmax = []
-        pos_minmax = []
-        for j in range(6):
-
-            actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
-            pos_norm[:, j] = 2*(pos_norm[:, j]-pos_norm[:, j].min())/(pos_norm[:, j].max()-pos_norm[:, j].min())-1
-
-            actions_minmax.append((actions_norm[:, j].min(), actions_norm[:, j].max()))
-            pos_minmax.append((pos_norm[:, j].min(), pos_norm[:, j].max()))
-
+        actions_minmax = MinMaxScaler(feature_range=(-1,1))
+        actions_norm = actions_minmax.fit_transform(actions_norm)
+        
+        pos_minmax = MinMaxScaler(feature_range=(-1,1))
+        pos_norm = pos_minmax.fit_transform(pos_norm)
 
         for i in range(len(dataset)):
             dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
@@ -536,10 +527,10 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         curr_max = test_curr_max
 
         qt = stats["qt_pc"]
-        actions_norm = qt.fit_transform(actions_list)
+        actions_norm = qt.transform(actions_list)
 
         qt_pos = stats["qt_pos"]
-        pos_norm = qt_pos.fit_transform(pos_list)
+        pos_norm = qt_pos.transform(pos_list)
 
         for j in range(6):
 

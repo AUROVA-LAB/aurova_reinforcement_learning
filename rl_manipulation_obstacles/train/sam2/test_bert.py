@@ -9,7 +9,7 @@ from data import *
 import open3d as o3d
 from train_utils import *
 
-from sklearn.preprocessing import QuantileTransformer
+from sklearn.preprocessing import RobustScaler
 
 # ---------------------------------------------------
 # Build model
@@ -57,11 +57,9 @@ dataset = HDF5LfDDataset(
         os.path.join(os.getcwd(), "../../dataset")
     )
 
-actions = np.array([dataset[i]["action"] for i in range(len(dataset))])
+actions = np.array([dataset[i]["diff"] for i in range(len(dataset))])
 
-qt = QuantileTransformer(
-    output_distribution='uniform'
-)
+qt = RobustScaler()
 
 actions_norm = qt.fit_transform(actions)
 
