@@ -495,6 +495,12 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         qt = RobustScaler()
         actions_norm = qt.fit_transform(actions_list)
 
+        print(qt.scale_)
+        print(qt.center_)
+        print(actions_list[0])
+        print("--------")
+        raise
+
 
         qt_pos = RobustScaler()
         pos_norm = qt_pos.fit_transform(pos_list)
