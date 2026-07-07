@@ -527,7 +527,14 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         curr_max = test_curr_max
 
+        # print(RobustScaler().scale_)
+        # print(RobustScaler().center_)
         qt = stats["qt_pc"]
+        print(qt.scale_)
+        print(qt.center_)
+        print(actions_list[0])
+        print("--------")
+        raise
         actions_norm = qt.transform(actions_list)
 
         qt_pos = stats["qt_pos"]
