@@ -498,7 +498,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         print("Scale: ", qt.scale_)
         print("Center: ", qt.center_)
         print("N features: ", qt.n_features_in_)
-        print("Names: ", qt.feature_names_in_)
+        # print("Names: ", qt.feature_names_in_)
         print(actions_list[0])
         print(actions_norm[0])
         print("--------")
