@@ -532,13 +532,16 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         qt_pos = stats["qt_pos"]
         pos_norm = qt_pos.transform(pos_list)
 
-        for j in range(6):
+        actions_minmax = stats["actions_minmax"]
+        pos_minmax = stats["pos_minmax"]
 
-            actions_norm[:, j] = 2*(actions_norm[:, j]-stats["actions_minmax"][j][0])/(stats["actions_minmax"][j][1]-stats["actions_minmax"][j][0])-1
-            pos_norm[:, j] = 2*(pos_norm[:, j]-stats["pos_minmax"][j][0])/(stats["pos_minmax"][j][1]-stats["pos_minmax"][j][0])-1
+        actions_norm = actions_minmax.transform(actions_norm)
+        
+        pos_norm = pos_minmax.transform(pos_norm)
 
         for i in range(len(dataset)):
-            dataset.set_item(i, action = actions_norm[i], gripper_pose = pos_norm[i])
+            print(actions_norm[i])
+            dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
 
         pc_mean = stats["pc_mean"]
