@@ -495,12 +495,13 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         qt = RobustScaler()
         actions_norm = qt.fit_transform(actions_list)
 
-        print(qt.scale_)
-        print(qt.center_)
+        print("Scale: ", qt.scale_)
+        print("Center: ", qt.center_)
+        print("N features: ", qt.n_features_in_)
+        print("Names: ", qt.feature_names_in_)
         print(actions_list[0])
         print(actions_norm[0])
         print("--------")
-        raise
 
 
         qt_pos = RobustScaler()
@@ -508,7 +509,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         actions_minmax = MinMaxScaler(feature_range=(-1,1))
         actions_norm = actions_minmax.fit_transform(actions_norm)
-        
+        print("MinMaxScaler: ", MinMaxScaler)
+        raise
         pos_minmax = MinMaxScaler(feature_range=(-1,1))
         pos_norm = pos_minmax.fit_transform(pos_norm)
 
@@ -534,16 +536,14 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         curr_max = test_curr_max
 
-        # print(RobustScaler().scale_)
-        # print(RobustScaler().center_)
         qt = stats["qt_pc"]
-        print(qt.scale_)
-        print(qt.center_)
-        print(actions_list[0])
-        print("--------")
-        raise
+
+        qt.scale_ = [0.02575445, 0.01569771, 0.05494297, 0.40629514, 0.08999834, 0.93448276]
+        qt.center_ = [ 5.5359721e-02,  2.8991699e-04, -7.7521920e-02,  4.3576503e-01, -2.1008968e-02,  6.2488914e-02,]
+
         actions_norm = qt.transform(actions_list)
 
+        
         qt_pos = stats["qt_pos"]
         pos_norm = qt_pos.transform(pos_list)
 
