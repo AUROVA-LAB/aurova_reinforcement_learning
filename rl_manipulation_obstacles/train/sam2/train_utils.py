@@ -495,21 +495,18 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         qt = RobustScaler()
         actions_norm = qt.fit_transform(actions_list)
 
-        print("Scale: ", qt.scale_)
-        print("Center: ", qt.center_)
-        print("N features: ", qt.n_features_in_)
-        # print("Names: ", qt.feature_names_in_)
-        print(actions_list[0])
-        print(actions_norm[0])
-        print("--------")
-
-
         qt_pos = RobustScaler()
         pos_norm = qt_pos.fit_transform(pos_list)
 
         actions_minmax = MinMaxScaler(feature_range=(-1,1))
         actions_norm = actions_minmax.fit_transform(actions_norm)
-        print("MinMaxScaler: ", MinMaxScaler)
+
+        print(actions_minmax.min_)
+        print(actions_minmax.scale_)
+        print(actions_minmax.data_min_)
+        print(actions_minmax.data_max_)
+        print(actions_minmax.data_range_)
+        print(actions_minmax.n_samples_seen_)
         raise
         pos_minmax = MinMaxScaler(feature_range=(-1,1))
         pos_norm = pos_minmax.fit_transform(pos_norm)
