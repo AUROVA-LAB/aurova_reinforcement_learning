@@ -338,7 +338,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # Add noise
 
     # pc_all, _ = farthest_point_sampling(pc_all, 512)
-    # pc_all[:, :3] = add_noise_to_pcd(points = pc_all[:, :3])
+    pc_all[:, :3] = add_noise_to_pcd(points = pc_all[:, :3])
     # ============================================================
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
@@ -501,21 +501,11 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         actions_minmax = MinMaxScaler(feature_range=(-1,1))
         actions_norm = actions_minmax.fit_transform(actions_norm)
 
-        print(actions_minmax.min_)
-        print(actions_minmax.scale_)
-        print(actions_minmax.data_min_)
-        print(actions_minmax.data_max_)
-        print(actions_minmax.data_range_)
-        print(actions_minmax.n_samples_seen_)
-        raise
         pos_minmax = MinMaxScaler(feature_range=(-1,1))
         pos_norm = pos_minmax.fit_transform(pos_norm)
 
         for i in range(len(dataset)):
-            print(actions_norm[i])
             dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
-
-
 
     else:
 
@@ -534,10 +524,6 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         curr_max = test_curr_max
 
         qt = stats["qt_pc"]
-
-        qt.scale_ = [0.02575445, 0.01569771, 0.05494297, 0.40629514, 0.08999834, 0.93448276]
-        qt.center_ = [ 5.5359721e-02,  2.8991699e-04, -7.7521920e-02,  4.3576503e-01, -2.1008968e-02,  6.2488914e-02,]
-
         actions_norm = qt.transform(actions_list)
 
         
@@ -552,7 +538,6 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pos_norm = pos_minmax.transform(pos_norm)
 
         for i in range(len(dataset)):
-            print(actions_norm[i])
             dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
 
