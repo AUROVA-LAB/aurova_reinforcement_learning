@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pickle
 import os
 import torch
 from collections.abc import Sequence
@@ -727,9 +728,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     cmd = self.trajectory_save[self.count].unsqueeze(0)
 
                 elif self.count % self.cfg.save_interval == 0:
-                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0) / 12.886685,
-                                        self.pose_seq.queue.to(self.device).unsqueeze(0) / 1.56891) * 1.56627
 
+                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
+
+                    cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
+                    cmd = self.stats["qt_pc"].transform(cmd)
+                    cmd = torch.tensor(cmd).to(self.device)
+                    
+                    
+                    cmd += self.gripper_pose_r_lie
 
             # actions = self._preprocess_actions(cmd)
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
@@ -1033,7 +1040,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
-                self.processed_pc = preprocess_pcd_single(pc_all_color / 1.11878, self.pcd_model)
+                pc_all_color /= 1.11878
+                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
+                self.processed_pc = 2*(self.processed_pc - self.stats["min_pc"]) / (self.stats["max_pc"] - self.stats["min_pc"]) - 1
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
@@ -1592,4 +1601,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 self.pcd_model.eval()
                 self.pcd_model.cuda()
+
+                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing.pkl","rb") as f:
+                    self.stats = pickle.load(f)
 

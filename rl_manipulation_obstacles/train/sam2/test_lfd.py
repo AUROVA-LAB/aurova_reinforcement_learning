@@ -94,12 +94,12 @@ def test():
 
     dataset.max_action = 1.0
     dataset.max_gripper = 1.0
-    dataset.max_pc = 9.827
 
     with open("action_preprocessing.pkl","rb") as f:
         stats = pickle.load(f)
 
-    qt = stats["qt_pc"]
+    dataset.max_pc = stats["max_pc"]
+    dataset.min_pc = stats["min_pc"]
 
     with torch.no_grad():
         for b in test_loader:
@@ -111,12 +111,30 @@ def test():
 
             pc =  b["pc_net3_seq"].to(device)
             pose = b["pose_seq"].to(device)
-            traj = b["action"].to(device)
+            traj = b["diff"].to(device)
 
             pred = model(pc)
 
-            traj = torch.tensor(qt.inverse_transform(traj.cpu().numpy()))
-            pred = torch.tensor(qt.inverse_transform(pred.cpu().numpy()))
+            sample_mag=torch.norm(
+                traj,
+                dim=1
+            )
+
+            sample_mag=(
+                sample_mag/
+                sample_mag.mean()
+            )
+
+            print(pc.max())
+            print(pc.min())
+            print(traj.max())
+            print(traj.min())
+            print(traj)
+            print(sample_mag)
+            print("-------")
+
+            # traj = torch.tensor(qt.inverse_transform(traj.cpu().numpy()))
+            # pred = torch.tensor(qt.inverse_transform(pred.cpu().numpy()))
 
             
 
@@ -129,8 +147,8 @@ def test():
             print("MSE: ", criterion2(pred, traj))
             print("L1: ", torch.abs(pred - traj).mean(dim=0))
 
-            sl1_loss = criterion(pred, traj)
-            mse_loss = criterion2(pred, traj)
+            sl1_loss += criterion(pred, traj)
+            mse_loss += criterion2(pred, traj)
             mae_loss += torch.abs(pred - traj).mean().item()
             print("----")
 
