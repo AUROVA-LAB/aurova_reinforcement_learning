@@ -303,6 +303,9 @@ class HDF5LfDDataset(Dataset):
         sym_seq = (f["/states/target_pose"][t0:t1]
                    - f["/states/gripper_pose"][t0:t1])
         
+        pc_all_seq = np.concatenate((f["/pc/pc"][t0:t1], 
+                                    f["/pc/pc_ext"][t0:t1], 
+                                    f["/pc/pc_front"][t0:t1]), axis=1)
 
         # -------------------------------------------------
         # ACTION TRAJECTORY (TARGET)
@@ -330,6 +333,8 @@ class HDF5LfDDataset(Dataset):
             "pc": pc,
             "pc_ext": pc_ext,
             "pc_front": pc_front,
+
+            "pc_all_seq": pc_all_seq,
 
             "pcd_p": pcd_p,
 
