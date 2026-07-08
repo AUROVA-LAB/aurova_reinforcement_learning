@@ -316,7 +316,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-    pcd.colors = o3d.utility.Vector3dVector(pc_all[:, 3:])
 
     pcd = pcd.voxel_down_sample(voxel_size)
 
