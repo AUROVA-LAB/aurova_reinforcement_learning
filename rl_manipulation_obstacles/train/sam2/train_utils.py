@@ -338,6 +338,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # Add noise
 
     # pc_all, _ = farthest_point_sampling(pc_all, 512)
+    print(noised)
     noised = add_noise_to_pcd(points = pc_all[:, :3])[0]
     pc_all[:, :3] = noised
     # ============================================================
@@ -705,6 +706,7 @@ def add_noise_to_pcd(points,
     points = points[mask]
 
     # restore fixed size
+    print(points.shape)
     points = farthest_point_sampling_BERT(torch.tensor(points).unsqueeze(0), N)
 
     return points

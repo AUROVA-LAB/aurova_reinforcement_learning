@@ -55,7 +55,8 @@ def train():
     MODE="pcd"
 
     if MODE=="pcd":
-        dataset,curr_max=preprocess_pcd(dataset)
+        # dataset,curr_max=preprocess_pcd(dataset)
+        curr_max = 1.1
 
     train_size=int(0.8*len(dataset))
     val_size=int(0.1*len(dataset))
@@ -244,15 +245,16 @@ def train():
                 for k,v in b.items()
             }
 
-            pcds = b["pc_all_seq"]
+            pcds = b["pc_all_seq"][:,:,:,:3]
 
-            B, T, N, _ = pcds.shape
+            B, T, N, a = pcds.shape
             pcds = pcds.view(B*T, N, -1)
 
             p_f = torch.zeros((B*T, 768))
 
             for l in range(B*T):
                 pc = (pcds[l] / curr_max).cpu().numpy()
+                print("In train: ", pc.shape)
                 features = preprocess_pcd_single(pc, mode="BERT", model = backbone)
 
                 p_f[l] = torch.tensor(features).detach().clone()
