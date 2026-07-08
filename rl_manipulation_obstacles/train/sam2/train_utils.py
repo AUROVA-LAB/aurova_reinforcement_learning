@@ -317,6 +317,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
 
+    print("Pre voxel: ", pc_all.shape)
     pcd = pcd.voxel_down_sample(voxel_size)
 
     pc_all = np.asarray(pcd.points)
@@ -328,7 +329,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # ============================================================
     # 3. FILTERING (your original logic cleaned)
     # ============================================================
-
+    print("Pre cut: ", pc_all.shape)
     pc_all = pc_all[pc_all[:, 2] > 0.025]
     pc_all = pc_all[pc_all[:, 0] > -0.8]
     pc_all = pc_all[pc_all[:, 0] < 0.1]
