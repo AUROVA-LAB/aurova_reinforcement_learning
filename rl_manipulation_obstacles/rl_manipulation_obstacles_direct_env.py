@@ -1417,13 +1417,23 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         for idx, ref in enumerate(references):
 
             
-                
-            self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
-                                                    self.cfg.ellipsoid_r, 
-                                                    ini = x0, 
-                                                    ref = ref[0],
-                                                    dt = self.cfg.dt, 
-                                                    lie = self.cfg.lie_mpc,)
+            if idx == 0:
+                self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
+                                                        self.cfg.ellipsoid_r, 
+                                                        ini = x0, 
+                                                        ref = ref[0],
+                                                        dt = self.cfg.dt, 
+                                                        lie = self.cfg.lie_mpc,
+                                                        )
+            else:
+                self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
+                                                        self.cfg.ellipsoid_r, 
+                                                        ini = x0, 
+                                                        ref = ref[0],
+                                                        dt = self.cfg.dt, 
+                                                        lie = self.cfg.lie_mpc,
+                                                        limits = [[-0.2, -0.2, -0.2, -0.005, -0.005, -0.005],
+                                                                  [0.2, 0.2, 0.2, 0.005, 0.005, 0.005]])
 
             # ======================================================
             # Simulation loop
