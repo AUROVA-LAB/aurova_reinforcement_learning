@@ -355,6 +355,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
     pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
+    print(pc_xyz.shape)
 
 
     if mode == "PointNet2":

@@ -245,7 +245,6 @@ def train():
             }
 
             pcds = b["pc_all_seq"][:,:,:,:3]
-            print(pcds.shape)
 
             B, T, N, a = pcds.shape
             pcds = pcds.view(B*T, N, -1)
