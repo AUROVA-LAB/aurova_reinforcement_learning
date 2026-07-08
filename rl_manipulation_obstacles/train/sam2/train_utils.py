@@ -322,7 +322,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pc_all = np.asarray(pcd.points)
     colors = np.asarray(pcd.colors)
 
-    pc_all = np.concatenate([pc_all, colors], axis=1)
+    # pc_all = np.concatenate([pc_all, colors], axis=1)
 
 
     # ============================================================
@@ -344,8 +344,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
 
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+    # cloud = o3d.geometry.PointCloud()
+    # cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
 
 
     # ============================================================
@@ -353,7 +353,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # ============================================================
 
     pc_xyz = pc_all[:, :3]
-    pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+    # pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
     pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
 
