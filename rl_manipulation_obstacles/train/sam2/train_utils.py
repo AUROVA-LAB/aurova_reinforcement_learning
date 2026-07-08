@@ -338,6 +338,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     # pc_all, _ = farthest_point_sampling(pc_all, 512)
     noised = add_noise_to_pcd(points = pc_all[:, :3])[0]
+    print("noised: ", noised.shape)
+    print("pc_all prenoise: ", pc_all.shape)
     pc_all[:, :3] = noised
     # ============================================================
     # 4. OPEN3D POINT CLOUD + NORMALS
