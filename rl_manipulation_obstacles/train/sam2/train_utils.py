@@ -28,7 +28,7 @@ from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 from networks_lfd import FastDCTFeatureReducer
-# from Point_BERT.models.Point_BERT import PointTransformer
+from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler
 import pickle

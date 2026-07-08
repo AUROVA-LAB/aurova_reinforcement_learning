@@ -39,7 +39,7 @@ import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single, preprocess_single_pcd_raw
-# from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
+from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
 
