@@ -209,6 +209,10 @@ class HDF5LfDDataset(Dataset):
             for f in os.listdir(dataset_dir)
             if f.endswith(".h5")
         ])
+        for path in self.files:
+            print(path)
+            print("-----")
+            h5py.File(path, "r+")
 
         self.handles = [
             h5py.File(path, "r+")
