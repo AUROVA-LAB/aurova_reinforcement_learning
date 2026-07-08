@@ -338,7 +338,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # Add noise
 
     # pc_all, _ = farthest_point_sampling(pc_all, 512)
-    pc_all[:, :3] = add_noise_to_pcd(points = pc_all[:, :3])
+    noised = add_noise_to_pcd(points = pc_all[:, :3])[0]
+    pc_all[:, :3] = noised
     # ============================================================
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
@@ -704,7 +705,7 @@ def add_noise_to_pcd(points,
     points = points[mask]
 
     # restore fixed size
-    points, _ = farthest_point_sampling(points, N)
+    points = farthest_point_sampling_BERT(torch.tensor(points).unsqueeze(0), N)
 
     return points
 
