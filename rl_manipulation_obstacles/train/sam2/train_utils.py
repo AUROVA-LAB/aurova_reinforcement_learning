@@ -28,7 +28,7 @@ from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 from networks_lfd import FastDCTFeatureReducer
-from Point_BERT.models.Point_BERT import PointTransformer
+# from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler
 import pickle
@@ -377,6 +377,11 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             ) 
         
         xyz_sample = sampled_pts
+        print(xyz_sample.shape)
+        cloud = o3d.geometry.PointCloud()
+        cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
+
+        o3d.visualization.draw_geometries([cloud])
 
     
 
@@ -706,6 +711,7 @@ def add_noise_to_pcd(points,
     # dropout
     mask = np.random.rand(len(points)) > dropout_rate
     points = points[mask]
+    print("AAA: ", points.shape)
 
     # restore fixed size
     points = farthest_point_sampling_BERT(torch.tensor(points).unsqueeze(0), N)
