@@ -251,12 +251,8 @@ def train():
 
             p_f = torch.zeros((B*T, 768))
 
-            for l in range(B*T):
-                pc = (pcds[l] / curr_max).cpu().numpy()
-                features = preprocess_pcd_single(pc, mode="BERT", model = backbone)
-                
-                if features is not None:
-                    p_f[l] = torch.tensor(features).detach().clone()
+            pc = pcds / curr_max
+            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
             
             p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
             p_f = p_f.view(B,T,768)
@@ -340,11 +336,8 @@ def train():
 
                 p_f = torch.zeros((B*T, 768))
 
-                for l in range(B*T):
-                    pc = (pcds[l] / curr_max).cpu().numpy()
-                    features = preprocess_pcd_single(pc, mode="BERT", model = backbone)
-
-                    p_f[l] = torch.tensor(features).detach().clone()
+                pc = pcds / curr_max
+                p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
                 
                 p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
                 p_f = p_f.view(B,T,768)
@@ -457,12 +450,9 @@ def train():
 
             p_f = torch.zeros((B*T, 768))
 
-            for l in range(B*T):
-                pc = (pcds[l] / curr_max).cpu().numpy()
-                features = preprocess_pcd_single(pc, mode="BERT", model = backbone)
+            pc = pcds / curr_max
+            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
 
-                p_f[l] = torch.tensor(features).detach().clone()
-            
             p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
             p_f = p_f.view(B,T,768)
             p_f = torch.tensor(p_f).detach().clone().to(device)

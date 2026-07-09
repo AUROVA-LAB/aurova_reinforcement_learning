@@ -291,6 +291,267 @@ def preprocess_img_sam2(dataset):
 
 
 
+
+def add_noise_to_pcd_batch(
+    points,
+    t_std=(0.0, 0.005),
+    angle_std=(0.0, torch.deg2rad(torch.tensor(2.0)).item()),
+    jitter_std=(0.0, 0.003),
+    jitter_clip=0.01,
+    dropout_rate=0.05,
+):
+    """
+    Args:
+        points: (B, N, 3) torch.Tensor
+    Returns:
+        (B, N, 3) torch.Tensor
+    """
+
+    device = points.device
+    dtype = points.dtype
+
+    B, N, _ = points.shape
+
+    # -------------------------------------------------
+    # Random translation
+    # -------------------------------------------------
+    t = torch.normal(
+        mean=t_std[0],
+        std=t_std[1],
+        size=(B, 3),
+        device=device,
+        dtype=dtype,
+    )
+
+    # -------------------------------------------------
+    # Random rotation (XYZ Euler angles)
+    # -------------------------------------------------
+    angles = torch.normal(
+        mean=angle_std[0],
+        std=angle_std[1],
+        size=(B, 3),
+        device=device,
+        dtype=dtype,
+    )
+
+    cx, cy, cz = torch.cos(angles[:, 0]), torch.cos(angles[:, 1]), torch.cos(angles[:, 2])
+    sx, sy, sz = torch.sin(angles[:, 0]), torch.sin(angles[:, 1]), torch.sin(angles[:, 2])
+
+    Rx = torch.zeros((B, 3, 3), device=device, dtype=dtype)
+    Ry = torch.zeros((B, 3, 3), device=device, dtype=dtype)
+    Rz = torch.zeros((B, 3, 3), device=device, dtype=dtype)
+
+    Rx[:, 0, 0] = 1
+    Rx[:, 1, 1] = cx
+    Rx[:, 1, 2] = -sx
+    Rx[:, 2, 1] = sx
+    Rx[:, 2, 2] = cx
+
+    Ry[:, 0, 0] = cy
+    Ry[:, 0, 2] = sy
+    Ry[:, 1, 1] = 1
+    Ry[:, 2, 0] = -sy
+    Ry[:, 2, 2] = cy
+
+    Rz[:, 0, 0] = cz
+    Rz[:, 0, 1] = -sz
+    Rz[:, 1, 0] = sz
+    Rz[:, 1, 1] = cz
+    Rz[:, 2, 2] = 1
+
+    # Same convention as Open3D: R = Rx @ Ry @ Rz
+    R = Rx @ Ry @ Rz
+
+    # Apply rigid transform
+    points = torch.bmm(points, R.transpose(1, 2))
+    points = points + t[:, None, :]
+
+    # -------------------------------------------------
+    # Jitter
+    # -------------------------------------------------
+    jitter = torch.normal(
+        mean=jitter_std[0],
+        std=jitter_std[1],
+        size=points.shape,
+        device=device,
+        dtype=dtype,
+    )
+
+    jitter = torch.clamp(jitter, -jitter_clip, jitter_clip)
+    points = points + jitter
+
+    # -------------------------------------------------
+    # Random dropout + restore with FPS
+    # -------------------------------------------------
+    # output = []
+
+    # for b in range(B):
+    #     mask = torch.rand(N, device=device) > dropout_rate
+    #     p = points[b][mask]
+
+    #     # avoid empty cloud
+    #     if p.shape[0] == 0:
+    #         p = points[b][:1]
+
+    #     # Restore to N points
+    #     print("AAAAA", p.shape)
+    #     p = farthest_point_sampling_BERT(p.unsqueeze(0), N)
+
+    #     output.append(p)
+
+    return points# torch.cat(output, dim=0)
+
+
+def preprocess_pcd_single_batch(pc_all, model, mode="BERT"):
+
+    # ============================================================
+    # 2. VOXEL DOWNSAMPLE
+    # ============================================================
+
+    # voxel_size = 0.015
+
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+    # print("Pre voxel: ", pc_all.shape)
+    # pcd = pcd.voxel_down_sample(voxel_size)
+
+    # pc_all = np.asarray(pcd.points)
+    # colors = np.asarray(pcd.colors)
+
+    # pc_all = np.concatenate([pc_all, colors], axis=1)
+
+
+    # ============================================================
+    # 3. FILTERING (your original logic cleaned)
+    # ============================================================
+    
+    # pc_all = pc_all[:, pc_all[:, :, 2] > 0.025, :]
+    # pc_all = pc_all[:, pc_all[:, :, 0] > -0.8, :]
+    # pc_all = pc_all[:, pc_all[:, :, 0] < 0.1, :]
+    # pc_all = pc_all[:, pc_all[:, :, 1] > -0.5, :]
+
+    mask = pc_all[:, :, 2] > 0.025
+    pc_all = pc_all * mask.unsqueeze(-1)
+
+    mask = pc_all[:, :, 0] > -0.8
+    pc_all = pc_all * mask.unsqueeze(-1)
+
+    mask = pc_all[:, :, 0] < 0.1
+    pc_all = pc_all * mask.unsqueeze(-1)
+
+    mask = pc_all[:, :, 1] > -0.5
+    pc_all = pc_all * mask.unsqueeze(-1)
+    # Add noise
+
+    # pc_all, _ = farthest_point_sampling(pc_all, 512)
+
+    noised = add_noise_to_pcd_batch(points = pc_all[:, :, :3])
+    pc_all[:, :, :3] = noised
+    # ============================================================
+    # 4. OPEN3D POINT CLOUD + NORMALS
+    # ============================================================
+
+    # cloud = o3d.geometry.PointCloud()
+    # cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+
+
+    # ============================================================
+    # 5. POINTNET FEATURES (conv1 output)
+    # ============================================================
+
+    pc_xyz = pc_all[:, :, :3]
+    # pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
+
+    pc_xyz, _, _ = normalize_pc_batch(torch.tensor(pc_xyz))
+
+
+    if mode == "PointNet2":
+        sampled_pts, sampled_idx = farthest_point_sampling(
+                pc_xyz,
+                1024
+            )  
+        xyz_sample = sampled_pts
+        rgb_sample = pc_rgb[sampled_idx]
+
+
+    elif mode == "BERT":
+        if pc_xyz.shape[1] == 0:
+            return None
+        sampled_pts = farthest_point_sampling_BERT(
+                pc_xyz,
+                1024
+            ) 
+        
+        xyz_sample = sampled_pts
+        # print(xyz_sample.shape)
+        # cloud = o3d.geometry.PointCloud()
+        # cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
+
+        # o3d.visualization.draw_geometries([cloud])
+
+    
+
+    # ============================================================
+    # 6. BUILD POINTNET INPUT
+    # ============================================================
+
+    if mode == "BERT":
+        points = torch.tensor(
+            xyz_sample,
+            dtype=torch.float32
+        ).cuda()
+
+        with torch.no_grad():
+            # forward_features exists in PointTransformer
+            __, point_features, __  = model(points)
+            # point_features = point_features.squeeze()
+
+
+    elif mode == "PointNet2":
+        # xyz_norm = xyz_sample / (np.max(np.abs(xyz_sample), axis=0, keepdims=True) + 1e-8)
+        # xyz_norm, _, _ = normalize_pc(torch.tensor(xyz_sample))
+
+        features_in = np.concatenate(
+            [
+                xyz_sample,      # xyz
+                xyz_sample,        # normalized xyz
+                rgb_sample       # optional color
+            ],
+            axis=1
+        )
+
+        points = torch.tensor(features_in.T, dtype=torch.float32).unsqueeze(0).to("cuda:0")
+
+        with torch.no_grad():
+            _, _, point_features = model(points)
+            point_features = point_features[0].permute(1,0)
+            # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
+            # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
+
+
+    # point_features = point_features.cpu().numpy()
+    return point_features
+
+
+
+def normalize_pc_batch(pc):
+        centroid = pc.mean(dim=1, keepdim=True)
+
+        pc_centered = pc - centroid
+        scale = (
+            torch.linalg.norm(pc_centered, dim=0)
+            .max(dim=1, keepdim=True)
+            .values
+            .unsqueeze(-1)
+        )  # (B,1,1)
+
+        pc_norm = pc_centered / scale.squeeze(-1)
+
+        return pc_norm, centroid, scale
+
+
+
 def normalize_pc(pc):
         centroid = pc.mean(dim=1, keepdim=True)
 
@@ -317,7 +578,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
 
-    print("Pre voxel: ", pc_all.shape)
     pcd = pcd.voxel_down_sample(voxel_size)
 
     pc_all = np.asarray(pcd.points)
@@ -339,8 +599,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     # pc_all, _ = farthest_point_sampling(pc_all, 512)
     noised = add_noise_to_pcd(points = pc_all[:, :3])[0]
-    print("noised: ", noised.shape)
-    print("pc_all prenoise: ", pc_all.shape)
     pc_all[:, :3] = noised
     # ============================================================
     # 4. OPEN3D POINT CLOUD + NORMALS
@@ -358,7 +616,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
     pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
-    print(pc_xyz.shape)
 
 
     if mode == "PointNet2":
@@ -372,14 +629,16 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     elif mode == "BERT":
         if pc_xyz.shape[1] == 0:
+            print("None")
             return None
+        
         sampled_pts = farthest_point_sampling_BERT(
-                pc_xyz,
+                torch.tensor(pc_xyz),
                 1024
-            ) 
+            ).cpu().numpy()
         
         xyz_sample = sampled_pts
-        print(xyz_sample.shape)
+
         cloud = o3d.geometry.PointCloud()
         cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
 
@@ -662,14 +921,15 @@ def farthest_point_sampling(points, n_samples):
     return points[sampled_indices], sampled_indices
 
 def farthest_point_sampling_BERT(xyz, npoint):
+    device = xyz.device
     xyz = torch.tensor(xyz).float()#.unsqueeze(0)
     B, N, C = xyz.shape
 
-    centroids = torch.zeros(B, npoint, dtype=torch.long)
-    distance = torch.ones(B, N) * 1e10
-    farthest = torch.zeros(B, dtype=torch.long)
+    centroids = torch.zeros(B, npoint, dtype=torch.long).to(device)
+    distance = torch.ones(B, N).to(device) * 1e10
+    farthest = torch.zeros(B, dtype=torch.long).to(device)
 
-    batch_indices = torch.arange(B, device=xyz.device)
+    batch_indices = torch.arange(B, device=xyz.device).to(device)
 
     for i in range(npoint):
         centroids[:, i] = farthest
@@ -683,7 +943,7 @@ def farthest_point_sampling_BERT(xyz, npoint):
 
         farthest = distance.max(-1)[1]
 
-    return xyz[:, centroids.squeeze()].numpy()
+    return torch.gather(xyz, dim=1, index=centroids.unsqueeze(-1).expand(-1, -1, C))
 
 
 
@@ -713,7 +973,6 @@ def add_noise_to_pcd(points,
     # dropout
     mask = np.random.rand(len(points)) > dropout_rate
     points = points[mask]
-    print("AAA: ", points.shape)
 
     # restore fixed size
     points = farthest_point_sampling_BERT(torch.tensor(points).unsqueeze(0), N)
