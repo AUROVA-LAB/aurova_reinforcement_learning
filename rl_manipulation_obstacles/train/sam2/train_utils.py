@@ -371,6 +371,8 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
 
     elif mode == "BERT":
+        if pc_xyz.shape[1] == 0:
+            return None
         sampled_pts = farthest_point_sampling_BERT(
                 pc_xyz,
                 1024
