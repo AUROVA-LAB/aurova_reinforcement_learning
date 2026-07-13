@@ -76,23 +76,19 @@ def train():
 
     actions = np.array([dataset[idx]["diff"] for idx in train_ds.indices])
 
-    num_bins = 30
-
-    weights = np.zeros(len(actions))
+    weights = np.zeros(len(actions), dtype=np.float64)
 
     for j in range(actions.shape[1]):
+        values, counts = np.unique(actions[:, j], return_counts=True)
 
-        hist, edges = np.histogram(actions[:, j], bins=num_bins)
+        freq = dict(zip(values, counts))
 
-        bins = np.digitize(actions[:, j], edges[:-1], right=False)
-        bins = np.clip(bins, 0, num_bins-1)
-
-        freq = hist[bins]
-
-        weights += 1.0 / (freq + 1)
+        weights += np.array([
+            1.0 / freq[a]
+            for a in actions[:, j]
+        ])
 
     weights /= actions.shape[1]
-
     weights /= weights.mean()
 
     sampler = WeightedRandomSampler(
