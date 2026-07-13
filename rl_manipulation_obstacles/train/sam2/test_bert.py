@@ -8,7 +8,7 @@ from Point_BERT.models.Point_BERT import PointTransformer
 from data import *
 import open3d as o3d
 from train_utils import *
-
+import copy
 from sklearn.preprocessing import RobustScaler
 
 # ---------------------------------------------------
@@ -56,15 +56,24 @@ model.cuda()
 dataset = HDF5LfDDataset(
         os.path.join(os.getcwd(), "../../dataset")
     )
-
-actions = np.array([dataset[i]["diff"] for i in range(len(dataset))])
+print("init dataset: ")
+actions = []
+for i in range(len(dataset)):
+    # print()
+    if i == 1000:
+        break
+    actions.append(np.clip(np.round(dataset[i]["diff"], decimals=2), a_min = -0.01, a_max=0.01) / 0.01)
+    print(dataset[i]["cat_diff"])
+    raise
+actions = np.array(actions)
+actions = np.round(actions, decimals=2)
 
 qt = RobustScaler()
 
-actions_norm = qt.fit_transform(actions)
+actions_norm = copy.deepcopy(actions)# qt.fit_transform(actions)
 
 
-X_original = qt.inverse_transform(actions_norm)
+# X_original = qt.inverse_transform(actions_norm)
 
 # median = np.median(actions_norm, axis=0)
 # q25 = np.percentile(actions_norm,25,axis=0)
@@ -77,6 +86,7 @@ X_original = qt.inverse_transform(actions_norm)
 
 
 for j in range(6):
+    print(j)
     actions_norm[:, j] = 2*(actions_norm[:, j]-actions_norm[:, j].min())/(actions_norm[:, j].max()-actions_norm[:, j].min())-1
 
 
@@ -96,7 +106,7 @@ plt.close()
 fig, axes = plt.subplots(2, 3, figsize=(12, 8))
 
 for j, ax in enumerate(axes.flat):
-    ax.hist(X_original[:, j], bins=30)
+    ax.hist(actions[:, j], bins=30)
     ax.set_title(f"Action {j}")
 
 plt.tight_layout()

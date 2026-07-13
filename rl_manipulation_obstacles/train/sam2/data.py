@@ -307,6 +307,14 @@ class HDF5LfDDataset(Dataset):
                                     f["/pc/pc_ext"][t0:t1], 
                                     f["/pc/pc_front"][t0:t1]), axis=1)
 
+        cat = np.clip(np.round(diff, decimals=2), a_min = -0.01, a_max=0.01) / 0.01
+        new_cat = np.zeros(6*3)
+        for j in range(len(cat)):
+            idx = 0
+            if cat[j] == -1: idx = 0
+            elif cat[j] == 1: idx = 2
+            new_cat[idx + j*3] = 1
+
         # -------------------------------------------------
         # ACTION TRAJECTORY (TARGET)
         # -------------------------------------------------
@@ -342,6 +350,7 @@ class HDF5LfDDataset(Dataset):
             "gripper_pose": gripper_pose,
             "action": action / self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
+            "cat_diff": new_cat,
             # "prev_action": prev_action
             "sym": (target_pose - gripper_pose),
 

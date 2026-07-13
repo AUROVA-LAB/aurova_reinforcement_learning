@@ -101,6 +101,25 @@ def test():
     dataset.max_pc = stats["max_pc"]
     dataset.min_pc = stats["min_pc"]
 
+    config = EasyDict({
+            'trans_dim':384,
+            'depth':12,
+            'drop_path_rate':0.1,
+            'cls_dim':40,
+            'num_heads':6,
+            'group_size':32,
+            'num_group':128,
+            'encoder_dims':256
+        })
+
+    backbone = PointTransformer(config)
+
+    backbone.load_model_from_ckpt(
+        bert_ckpt_path="Point-BERT.pth",)
+
+    backbone.eval()
+    backbone.cuda()
+
     with torch.no_grad():
         for b in test_loader:
             
@@ -109,9 +128,22 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc =  b["pc_net3_seq"].to(device)
-            pose = b["pose_seq"].to(device)
-            traj = b["diff"].to(device)
+            pcds = b["pc_all_seq"][:,:,:,:3]
+
+            B, T, N, a = pcds.shape
+            pcds = pcds.view(B*T, N, -1)
+
+            p_f = torch.zeros((B*T, 768))
+
+            pc = pcds / curr_max
+            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
+            
+            p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
+            p_f = p_f.view(B,T,768)
+            p_f = torch.tensor(p_f).detach().clone().to(device)
+
+            pc= p_f # b["pc_net3_seq"]
+            traj=b["diff"]
 
             pred = model(pc)
 
@@ -127,10 +159,11 @@ def test():
 
             print(pc.max())
             print(pc.min())
-            print(traj.max())
-            print(traj.min())
-            print(traj)
-            print(sample_mag)
+            for m in range(6):
+                print("Dim ", m)
+
+                print(traj[:, m].max())
+                print(traj[:, m].min())
             print("-------")
 
             # traj = torch.tensor(qt.inverse_transform(traj.cpu().numpy()))

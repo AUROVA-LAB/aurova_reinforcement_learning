@@ -30,7 +30,7 @@ import open3d as o3d
 from networks_lfd import FastDCTFeatureReducer
 from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
-from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler
+from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler, MaxAbsScaler
 import pickle
 
 
@@ -567,7 +567,7 @@ def normalize_pc(pc):
 
         return pc_norm, centroid, scale
 
-def preprocess_pcd_single(pc_all, model, mode="BERT"):
+def preprocess_pcd_single(pc_all, model, mode="BERT", curr_max = 1):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
@@ -590,10 +590,10 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # 3. FILTERING (your original logic cleaned)
     # ============================================================
     print("Pre cut: ", pc_all.shape)
-    pc_all = pc_all[pc_all[:, 2] > 0.025]
-    pc_all = pc_all[pc_all[:, 0] > -0.8]
-    pc_all = pc_all[pc_all[:, 0] < 0.1]
-    pc_all = pc_all[pc_all[:, 1] > -0.5]
+    pc_all = pc_all[pc_all[:, 2] > 0.025 / curr_max]
+    pc_all = pc_all[pc_all[:, 0] > -0.8 / curr_max]
+    pc_all = pc_all[pc_all[:, 0] < 0.1 / curr_max]
+    pc_all = pc_all[pc_all[:, 1] > -0.5 / curr_max]
 
     # Add noise
 
@@ -660,6 +660,11 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             # forward_features exists in PointTransformer
             __, point_features, __  = model(points)
             point_features = point_features.squeeze()
+            
+            # print(point_features)
+            # print(torch.isnan(point_features).any())
+            # if torch.isnan(point_features).any():
+            #     raise
 
 
     elif mode == "PointNet2":
@@ -763,16 +768,16 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
 
         qt = RobustScaler()
-        actions_norm = qt.fit_transform(actions_list)
+        # actions_norm = qt.fit_transform(actions_list)
 
         qt_pos = RobustScaler()
-        pos_norm = qt_pos.fit_transform(pos_list)
+        # pos_norm = qt_pos.fit_transform(pos_list)
 
         actions_minmax = MinMaxScaler(feature_range=(-1,1))
-        actions_norm = actions_minmax.fit_transform(actions_norm)
+        actions_norm = actions_minmax.fit_transform(actions_list)
 
         pos_minmax = MinMaxScaler(feature_range=(-1,1))
-        pos_norm = pos_minmax.fit_transform(pos_norm)
+        pos_norm = pos_minmax.fit_transform(pos_list)
 
         for i in range(len(dataset)):
             dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
@@ -801,6 +806,12 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pos_norm = qt_pos.transform(pos_list)
 
         actions_minmax = stats["actions_minmax"]
+        # print(actions_norm)
+        # print(actions_minmax.min_)
+        # print(actions_minmax.scale_)
+        # print(actions_minmax.data_min_)
+        # print(actions_minmax.data_max_)
+        # raise
         pos_minmax = stats["pos_minmax"]
 
         actions_norm = actions_minmax.transform(actions_norm)
@@ -832,7 +843,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        point_features = preprocess_pcd_single(pc_all, model, mode = mode)
+        point_features = preprocess_pcd_single(pc_all, model, mode = mode, curr_max = curr_max)
 
         
         if point_features is None:

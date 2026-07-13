@@ -175,7 +175,7 @@ def drop_MPC_setup(obst_list, ellipsoid_r, ini = [0,0,0,0,0,0,
 
     mpc.quad_stage_cost.add_inputs(
         names=['ax', 'ay', 'az', 'ax_', 'ay_', 'az_'],
-        weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+        weights=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     )
 
     # Horizon
