@@ -28,7 +28,7 @@ from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 from networks_lfd import FastDCTFeatureReducer
-# from Point_BERT.models.Point_BERT import PointTransformer
+from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler, MaxAbsScaler
 import pickle
@@ -567,7 +567,7 @@ def normalize_pc(pc):
 
         return pc_norm, centroid, scale
 
-def preprocess_pcd_single(pc_all, model, mode="BERT", curr_max = 1):
+def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
@@ -590,10 +590,10 @@ def preprocess_pcd_single(pc_all, model, mode="BERT", curr_max = 1):
     # 3. FILTERING (your original logic cleaned)
     # ============================================================
     print("Pre cut: ", pc_all.shape)
-    pc_all = pc_all[pc_all[:, 2] > 0.025 / curr_max]
-    pc_all = pc_all[pc_all[:, 0] > -0.8 / curr_max]
-    pc_all = pc_all[pc_all[:, 0] < 0.1 / curr_max]
-    pc_all = pc_all[pc_all[:, 1] > -0.5 / curr_max]
+    pc_all = pc_all[pc_all[:, 2] > 0.025]
+    pc_all = pc_all[pc_all[:, 0] > -0.8]
+    pc_all = pc_all[pc_all[:, 0] < 0.1]
+    pc_all = pc_all[pc_all[:, 1] > -0.5]
 
     # Add noise
 
@@ -843,7 +843,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-        point_features = preprocess_pcd_single(pc_all, model, mode = mode, curr_max = curr_max)
+        point_features = preprocess_pcd_single(pc_all, model, mode = mode)
 
         
         if point_features is None:
