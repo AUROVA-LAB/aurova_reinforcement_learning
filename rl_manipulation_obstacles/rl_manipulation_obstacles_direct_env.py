@@ -815,10 +815,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
+                                                                         self.target_pose_r2[:, :3],
                                                                          self.cfg.camera_ext_trans_front,
                                                                          self.cfg.camera_ext_trans)), 
                                                                          
-                                                orientations = torch.cat((self.target_pose_r[:, 3:], 
+                                                orientations = torch.cat((self.target_pose_r[:, 3:],
+                                                                          self.target_pose_r2[:, 3:], 
                                                                           self.cfg.camera_ext_rot_front,
                                                                           self.cfg.camera_ext_rot)), 
 
@@ -898,6 +900,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         target_pos_r, target_quat_r = combine_frame_transforms(t01 = target_pos_r, q01 = target_quat_r,
                                                                      t12 = self.z_displ, q12 = self.cfg.rot_45_z_pos_quat)
         
+        target_pos_r2, target_quat_r2 = combine_frame_transforms(t01 = target_pos_r, q01 = target_quat_r,
+                                                                     t12 = self.z_displ*0, q12 = self.cfg.rot_180_z_pos_fr_quat)
+
         target_pos_w, target_quat_w = combine_frame_transforms(t01 = self.root_robot_pose[:, :3],        q01 = self.root_robot_pose[:, 3:],
                                                                t12 = target_pos_r,                       q12 = target_quat_r)
         
@@ -912,6 +917,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.target_pose_r_group = self.convert_to_group(target_pos_r, target_quat_r)
         self.target_pose_r_lie = self.log(self.target_pose_r_group)
 
+        self.target_pose_r2 = torch.cat((target_pos_r2, target_quat_r2), dim = -1)
+        self.target_pose_r_group2 = self.convert_to_group(target_pos_r2, target_quat_r2)
+        self.target_pose_r_lie2 = self.log(self.target_pose_r_group2)
+
         self.interm_pose_r = self.target_pose_r.clone()
         self.interm_pose_r[:, 2] += 0.225
         self.interm_pose_r_group = self.convert_to_group(self.interm_pose_r[:, :3], self.interm_pose_r[:, 3:])
@@ -924,6 +933,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
+
+        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)
+        dist2 = self.dist_function(self.pose_group_r, self.target_pose_r_group2, self.log, self.diff_operator)
+
+        if dist.item() > dist2.item():
+            self.target_pose_r = torch.cat((target_pos_r2, target_quat_r2), dim = -1)
+            self.target_pose_r_group = self.convert_to_group(target_pos_r2, target_quat_r2)
+            self.target_pose_r_lie = self.log(self.target_pose_r_group2)
+
+
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
 
@@ -1071,6 +1090,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         action = self.trajectory_save[self.count].float().cpu().numpy()
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
+        print(np.round(diff, decimals=2))
 
         pc_w = self.pc_w.float().cpu().numpy()
         pc_ext = self.pc_ext.float().cpu().numpy()

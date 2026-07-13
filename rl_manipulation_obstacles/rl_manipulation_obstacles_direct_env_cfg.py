@@ -43,6 +43,7 @@ def rot2tensor(rot: Rotation) -> torch.tensor:
 
 
 rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
+rot_180_z_pos_fr = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
 rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0.05, 0.05, 1.05]))     # Positive 45 degrees rotation in Z axis 
 
 
@@ -90,7 +91,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True       # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_steps = 6            # Render images every certain amount of steps
 
@@ -192,6 +193,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         prim_path="/Visuals/myMarkers",
         markers={
             "ur5e_ee_pose": sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                scale=(0.1, 0.1, 0.1),
+                visible = debug_markers
+            ),
+            "ur5e_ee_pose2": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -492,7 +498,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                          [-0.1*0,   0.1*0],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
-                         [-pi/2,  pi/2]]
+                         [-pi,  pi]]
     
     target_poses_incs2 = [[-0.1*0,  0.1*0],
                           [-0.1*0,  0.1*0],
@@ -506,6 +512,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
     rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
+    rot_180_z_pos_fr_quat = rot2tensor(rot_180_z_pos_fr).numpy().tolist()
 
     # Object pose adjustments
     object_translation = torch.tensor([np.array([0.0, 0.0, 0.1])])
@@ -572,6 +579,7 @@ def update_cfg(cfg, num_envs, device):
 
     cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
     cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_fr_quat = torch.tensor(cfg.rot_180_z_pos_fr_quat).repeat(num_envs, 1).to(device)
 
     cfg.obst_list = torch.tensor(cfg.obst_list).repeat(num_envs, 1).to(device)
 
