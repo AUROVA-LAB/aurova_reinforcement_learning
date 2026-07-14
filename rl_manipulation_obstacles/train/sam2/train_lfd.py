@@ -273,9 +273,9 @@ def train():
                     for k,v in b.items()
                 }
 
-                pcds = b["pc_all_seq"]
+                pcds = b["pc_all_seq"][:,:,:,:3]
 
-                B, T, N, _ = pcds.shape
+                B, T, N, a = pcds.shape
                 pcds = pcds.view(B*T, N, -1)
 
                 p_f = torch.zeros((B*T, 768))
@@ -287,7 +287,7 @@ def train():
                 p_f = p_f.view(B,T,768)
                 p_f = torch.tensor(p_f).detach().clone().to(device)
 
-                pc= b["pc_net3_seq"]
+                pc= p_f # b["pc_net3_seq"]
                 traj=b["cat_diff"]
 
                 pred=model(pc)
@@ -387,22 +387,22 @@ def train():
                 for k,v in b.items()
             }
 
-            pcds = b["pc_all_seq"]
+            pcds = b["pc_all_seq"][:,:,:,:3]
 
-            B, T, N, _ = pcds.shape
+            B, T, N, a = pcds.shape
             pcds = pcds.view(B*T, N, -1)
 
             p_f = torch.zeros((B*T, 768))
 
             pc = pcds / curr_max
             p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
-
+            
             p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
             p_f = p_f.view(B,T,768)
             p_f = torch.tensor(p_f).detach().clone().to(device)
 
             pc= p_f # b["pc_net3_seq"]
-            traj = b["cat_diff"]
+            traj=b["cat_diff"]
 
             pred = model(pc)
 
