@@ -799,11 +799,11 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         curr_max = test_curr_max
 
         qt = stats["qt_pc"]
-        actions_norm = qt.transform(actions_list)
+        # actions_norm = qt.transform(actions_list)
 
         
         qt_pos = stats["qt_pos"]
-        pos_norm = qt_pos.transform(pos_list)
+        # pos_norm = qt_pos.transform(pos_list)
 
         actions_minmax = stats["actions_minmax"]
         # print(actions_norm)
@@ -814,9 +814,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         # raise
         pos_minmax = stats["pos_minmax"]
 
-        actions_norm = actions_minmax.transform(actions_norm)
+        actions_norm = actions_minmax.transform(actions_list)
         
-        pos_norm = pos_minmax.transform(pos_norm)
+        pos_norm = pos_minmax.transform(pos_list)
 
         for i in range(len(dataset)):
             dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
@@ -830,68 +830,68 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
 
 
-    
-    pc_data = []
-
-    for i in range(len(dataset)):
-        print("--- Image ", i / len(dataset))
-
-        # Preprocess PCs
-        pc = dataset[i]["pc"].astype(np.float32)  / curr_max
-        pc_ext = dataset[i]["pc_ext"].astype(np.float32)  / curr_max
-        pc_front = dataset[i]["pc_front"].astype(np.float32)  / curr_max
-
-        pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
-
-        point_features = preprocess_pcd_single(pc_all, model, mode = mode)
-
-        
-        if point_features is None:
-            continue
-
-        point_features = point_features.cpu().numpy()
-
-        pc_data.append(point_features)
-
-        if mode == "PointNet2":
-            dataset.set_item(i, pcd_net2 = point_features)
-        elif mode == "BERT":
-            dataset.set_item(i, pcd_net3 = point_features)
-
-
-
-
-    pc_data = np.array(pc_data)
-
     if not test:
-        pc_mean = np.mean(pc_data, axis = 0)
-        pc_std = np.std(pc_data, axis = 0)
+        pc_data = []
 
-    # pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
-    
-    if not test:
-        max_pc = np.max(point_features, axis = -1)
-        min_pc = np.min(point_features, axis = -1)
+        for i in range(len(dataset)):
+            print("--- Image ", i / len(dataset))
+
+            # Preprocess PCs
+            pc = dataset[i]["pc"].astype(np.float32)  / curr_max
+            pc_ext = dataset[i]["pc_ext"].astype(np.float32)  / curr_max
+            pc_front = dataset[i]["pc_front"].astype(np.float32)  / curr_max
+
+            pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+
+            point_features = preprocess_pcd_single(pc_all, model, mode = mode)
+
+            
+            if point_features is None:
+                continue
+
+            point_features = point_features.cpu().numpy()
+
+            pc_data.append(point_features)
+
+            if mode == "PointNet2":
+                dataset.set_item(i, pcd_net2 = point_features)
+            elif mode == "BERT":
+                dataset.set_item(i, pcd_net3 = point_features)
+
+
+
+
+        pc_data = np.array(pc_data)
+
+        if not test:
+            pc_mean = np.mean(pc_data, axis = 0)
+            pc_std = np.std(pc_data, axis = 0)
+
+        # pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
         
-        stats = {
-            "qt_pc": qt,
-            "qt_pos": qt_pos,
-            "pc_mean": pc_mean,
-            "pc_std": pc_std,
-            "max_pc": max_pc,
-            "min_pc": min_pc,
-            "actions_minmax": actions_minmax,
-            "pos_minmax": pos_minmax,
-        }
+        if not test:
+            max_pc = np.max(point_features, axis = -1)
+            min_pc = np.min(point_features, axis = -1)
+            
+            stats = {
+                "qt_pc": qt,
+                "qt_pos": qt_pos,
+                "pc_mean": pc_mean,
+                "pc_std": pc_std,
+                "max_pc": max_pc,
+                "min_pc": min_pc,
+                "actions_minmax": actions_minmax,
+                "pos_minmax": pos_minmax,
+            }
 
-        with open("action_preprocessing.pkl","wb") as f:
-            pickle.dump(stats,f)
+            with open("action_preprocessing.pkl","wb") as f:
+                pickle.dump(stats,f)
 
-        # with open("action_preprocessing.pkl","rb") as f:
-        #     stats = pickle.load(f)
+            # with open("action_preprocessing.pkl","rb") as f:
+            #     stats = pickle.load(f)
 
-    dataset.max_pc = max_pc
-    dataset.min_pc = min_pc
+        dataset.max_pc = max_pc
+        dataset.min_pc = min_pc
 
     return dataset, curr_max
         
