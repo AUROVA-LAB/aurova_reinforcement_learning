@@ -78,7 +78,7 @@ def test():
 
 
     
-    model = CnnPolicy(pose_dim, action_dim, 
+    model = CnnPolicy(pose_dim, action_dim*3, 
                       in_channels = 3,
                       pc=True,
                       hidden_dim=64).to(device)
@@ -91,6 +91,7 @@ def test():
     sl1_loss = 0
     mse_loss = 0
     mae_loss = 0
+    test_loss = 0
 
     dataset.max_action = 1.0
     dataset.max_gripper = 1.0
@@ -120,6 +121,9 @@ def test():
     backbone.eval()
     backbone.cuda()
 
+    criterion = nn.BCEWithLogitsLoss()
+
+
     with torch.no_grad():
         for b in test_loader:
             
@@ -143,55 +147,90 @@ def test():
             p_f = torch.tensor(p_f).detach().clone().to(device)
 
             pc= p_f # b["pc_net3_seq"]
-            traj=b["diff"]
+            traj=b["cat_diff"]
 
             pred = model(pc)
 
-            sample_mag=torch.norm(
-                traj,
-                dim=1
-            )
+            #################################
+            # LOSSES
+            #################################
 
-            sample_mag=(
-                sample_mag/
-                sample_mag.mean()
-            )
+            # smooth = F.smooth_l1_loss(
+            #     pred,
+            #     traj
+            # )
 
-            print(pc.max())
-            print(pc.min())
-            for m in range(6):
-                print("Dim ", m)
+            # mse = F.mse_loss(
+            #     pred,
+            #     traj
+            # )
 
-                print(traj[:, m].max())
-                print(traj[:, m].min())
-            print("-------")
+            # mae = F.l1_loss(
+            #     pred,
+            #     traj
+            # )
 
-            # traj = torch.tensor(qt.inverse_transform(traj.cpu().numpy()))
-            # pred = torch.tensor(qt.inverse_transform(pred.cpu().numpy()))
+            print(traj)
+
 
             
 
-            # print(pc)
-            # print(pose)
-            # print(traj)
-            # print(pred)
+            loss = criterion(
+                pred,
+                traj
+            )
 
-            print("SL1: ", criterion(pred, traj))
-            print("MSE: ", criterion2(pred, traj))
-            print("L1: ", torch.abs(pred - traj).mean(dim=0))
 
-            sl1_loss += criterion(pred, traj)
-            mse_loss += criterion2(pred, traj)
-            mae_loss += torch.abs(pred - traj).mean().item()
-            print("----")
 
-    sl1_loss /= len(test_loader)
-    mse_loss /= len(test_loader)
-    mae_loss /= len(test_loader)
+            test_loss += loss.item()
+            # test_loss += smooth.item()
+            # test_mse += mse.item()
+            # test_mae += mae.item()
 
-    print(f"\nTest MSE: {mse_loss:.4f}")
-    print(f"Test MAE: {mae_loss:.4f}")
-    print(f"Test Smooth MAE: {sl1_loss:.4f}")
+            #################################
+            # PER-DIMENSION MAE
+            #################################
+
+            # mae_dim = torch.abs(
+            #     pred-traj
+            # ).mean(dim=0)
+
+            # mae_per_dim.append(
+            #     mae_dim.cpu().numpy()
+            # )
+
+            #################################
+            # MAGNITUDES
+            #################################
+
+            # pred_mag = torch.norm(
+            #     pred,
+            #     dim=1
+            # )
+
+            # target_mag = torch.norm(
+            #     traj,
+            #     dim=1
+            # )
+
+            # pred_mag_all.extend(
+            #     pred_mag.cpu().numpy()
+            # )
+
+            # target_mag_all.extend(
+            #     target_mag.cpu().numpy()
+            # )
+
+
+    #################################
+    # FINAL STATISTICS
+    #################################
+
+    test_loss /= len(test_loader)
+
+    print(f"\nTest Loss: {test_loss:.4f}")
+    # print(f"Test MAE: {mae_loss:.4f}")
+    # print(f"Test Smooth MAE: {sl1_loss:.4f}")
 
 
 if __name__ == "__main__":
