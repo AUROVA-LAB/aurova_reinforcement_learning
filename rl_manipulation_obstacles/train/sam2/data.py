@@ -310,7 +310,7 @@ class HDF5LfDDataset(Dataset):
         cat = np.clip(np.round(diff, decimals=2), a_min = -0.01, a_max=0.01) / 0.01
         new_cat = np.zeros(6*3)
         for j in range(len(cat)):
-            idx = 0
+            idx = 1
             if cat[j] == -1: idx = 0
             elif cat[j] == 1: idx = 2
             new_cat[idx + j*3] = 1
