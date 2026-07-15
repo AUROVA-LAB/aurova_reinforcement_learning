@@ -169,7 +169,7 @@ def train():
     backbone.eval()
     backbone.cuda()
 
-    for epoch in range(100):
+    for epoch in range(300):
 
         ########################################
         # TRAIN
@@ -189,21 +189,21 @@ def train():
                 for k,v in b.items()
             }
 
-            pcds = b["pc_all_seq"][:,:,:,:3]
+            # pcds = b["pc_all_seq"][:,:,:,:3]
 
-            B, T, N, a = pcds.shape
-            pcds = pcds.view(B*T, N, -1)
+            # B, T, N, a = pcds.shape
+            # pcds = pcds.view(B*T, N, -1)
 
-            p_f = torch.zeros((B*T, 768))
+            # p_f = torch.zeros((B*T, 768))
 
-            pc = pcds / curr_max
-            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
+            # pc = pcds / 1.0
+            # p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
             
-            p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
-            p_f = p_f.view(B,T,768)
-            p_f = torch.tensor(p_f).detach().clone().to(device)
+            # p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
+            # p_f = p_f.view(B,T,768)
+            # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc= p_f # b["pc_net3_seq"]
+            pc= b["pc_net3_seq"] #  p_f
             traj=b["cat_diff"]
 
             pred=model(pc)
@@ -273,21 +273,21 @@ def train():
                     for k,v in b.items()
                 }
 
-                pcds = b["pc_all_seq"][:,:,:,:3]
+                # pcds = b["pc_all_seq"][:,:,:,:3]
 
-                B, T, N, a = pcds.shape
-                pcds = pcds.view(B*T, N, -1)
+                # B, T, N, a = pcds.shape
+                # pcds = pcds.view(B*T, N, -1)
 
-                p_f = torch.zeros((B*T, 768))
+                # p_f = torch.zeros((B*T, 768))
 
-                pc = pcds / curr_max
-                p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
+                # pc = pcds / curr_max
+                # p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
                 
-                p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
-                p_f = p_f.view(B,T,768)
-                p_f = torch.tensor(p_f).detach().clone().to(device)
+                # p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
+                # p_f = p_f.view(B,T,768)
+                # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-                pc= p_f # b["pc_net3_seq"]
+                pc= b["pc_net3_seq"] # p_f
                 traj=b["cat_diff"]
 
                 pred=model(pc)
@@ -346,7 +346,7 @@ def train():
 
             torch.save(
                 model.state_dict(),
-                "best_model.pth"
+                "best_model_.pth"
             )
 
             print(
@@ -362,7 +362,7 @@ def train():
 
     model.load_state_dict(
         torch.load(
-            "best_model.pth",
+            "best_model_.pth",
             map_location=device
         )
     )
@@ -387,22 +387,22 @@ def train():
                 for k,v in b.items()
             }
 
-            pcds = b["pc_all_seq"][:,:,:,:3]
+            # pcds = b["pc_all_seq"][:,:,:,:3]
 
-            B, T, N, a = pcds.shape
-            pcds = pcds.view(B*T, N, -1)
+            # B, T, N, a = pcds.shape
+            # pcds = pcds.view(B*T, N, -1)
 
-            p_f = torch.zeros((B*T, 768))
+            # p_f = torch.zeros((B*T, 768))
 
-            pc = pcds / curr_max
-            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
+            # pc = pcds / curr_max
+            # p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
             
-            p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
-            p_f = p_f.view(B,T,768)
-            p_f = torch.tensor(p_f).detach().clone().to(device)
+            # p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
+            # p_f = p_f.view(B,T,768)
+            # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc= p_f # b["pc_net3_seq"]
-            traj=b["cat_diff"]
+            pc=  b["pc_net3_seq"] # p_f
+            traj = b["cat_diff"]
 
             pred = model(pc)
 
