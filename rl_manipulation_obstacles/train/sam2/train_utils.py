@@ -573,15 +573,15 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # 2. VOXEL DOWNSAMPLE
     # ============================================================
 
-    voxel_size = 0.015
+    # voxel_size = 0.015
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
 
-    pcd = pcd.voxel_down_sample(voxel_size)
+    # pcd = pcd.voxel_down_sample(voxel_size)
 
-    pc_all = np.asarray(pcd.points)
-    colors = np.asarray(pcd.colors)
+    # pc_all = np.asarray(pcd.points)
+    # colors = np.asarray(pcd.colors)
 
     # pc_all = np.concatenate([pc_all, colors], axis=1)
 
@@ -589,7 +589,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # ============================================================
     # 3. FILTERING (your original logic cleaned)
     # ============================================================
-    print("Pre cut: ", pc_all.shape)
     pc_all = pc_all[pc_all[:, 2] > 0.025]
     pc_all = pc_all[pc_all[:, 0] > -0.8]
     pc_all = pc_all[pc_all[:, 0] < 0.1]
@@ -688,6 +687,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
             # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
 
+    point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
 
     # point_features = point_features.cpu().numpy()
     return point_features
@@ -695,7 +695,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
 
 def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
-    curr_max = 0.0
+    curr_max = 1.0
 
     if mode == "PointNet2":
         num_classes = 13
@@ -748,84 +748,86 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     actions_list = []
     pos_list = []
 
-    if test_curr_max is None:
-        for i in range(len(dataset)):
-            print("Calculating ", i, " max")
-            pc = dataset[i]["pc"].astype(np.float32)
-            pc_ext = dataset[i]["pc_ext"].astype(np.float32)
-            pc_front = dataset[i]["pc_front"].astype(np.float32)
-            pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
-            new_max_pc = torch.max(torch.abs(pc_all)).item()
+    # if test_curr_max is None:
+    #     for i in range(len(dataset)):
+    #         print("Calculating ", i, " max")
+    #         pc = dataset[i]["pc"].astype(np.float32)
+    #         pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+    #         pc_front = dataset[i]["pc_front"].astype(np.float32)
+    #         pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
+    #         new_max_pc = torch.max(torch.abs(pc_all)).item()
 
-            if new_max_pc > curr_max:
-                curr_max = new_max_pc
+    #         if new_max_pc > curr_max:
+    #             curr_max = new_max_pc
 
-            actions_list.append(dataset[i]["diff"])
-            pos_list.append(dataset[i]["gripper_pose"])
+    #         actions_list.append(dataset[i]["diff"])
+    #         pos_list.append(dataset[i]["gripper_pose"])
 
-        actions_list = np.array(actions_list)
-        pos_list = np.array(pos_list)
+    #     actions_list = np.array(actions_list)
+    #     pos_list = np.array(pos_list)
 
 
-        qt = RobustScaler()
-        # actions_norm = qt.fit_transform(actions_list)
+    #     qt = RobustScaler()
+    #     # actions_norm = qt.fit_transform(actions_list)
 
-        qt_pos = RobustScaler()
-        # pos_norm = qt_pos.fit_transform(pos_list)
+    #     qt_pos = RobustScaler()
+    #     # pos_norm = qt_pos.fit_transform(pos_list)
 
-        actions_minmax = MinMaxScaler(feature_range=(-1,1))
-        actions_norm = actions_minmax.fit_transform(actions_list)
+    #     #  ----- NO HACER ESTO -----
+    #     # - Escalar según la esfera unidad
+    #     actions_minmax = MinMaxScaler(feature_range=(-1,1))
+    #     actions_norm = actions_minmax.fit_transform(actions_list)
 
-        pos_minmax = MinMaxScaler(feature_range=(-1,1))
-        pos_norm = pos_minmax.fit_transform(pos_list)
+    #     pos_minmax = MinMaxScaler(feature_range=(-1,1))
+    #     pos_norm = pos_minmax.fit_transform(pos_list)
 
-        for i in range(len(dataset)):
-            dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
+    #     for i in range(len(dataset)):
+    #         dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
-    else:
+    # else:
 
-        for i in range(len(dataset)):
-            print("Calculating ", i, " max")
+    #     for i in range(len(dataset)):
+    #         print("Calculating ", i, " max")
 
-            actions_list.append(dataset[i]["diff"])
-            pos_list.append(dataset[i]["gripper_pose"])
+    #         actions_list.append(dataset[i]["diff"])
+    #         pos_list.append(dataset[i]["gripper_pose"])
 
-        actions_list = np.array(actions_list)
-        pos_list = np.array(pos_list)
+    #     actions_list = np.array(actions_list)
+    #     pos_list = np.array(pos_list)
 
-        with open("action_preprocessing.pkl","rb") as f:
-            stats = pickle.load(f)
+    #     with open("action_preprocessing.pkl","rb") as f:
+    #         stats = pickle.load(f)
 
-        curr_max = test_curr_max
+    #     curr_max = test_curr_max
 
-        qt = stats["qt_pc"]
-        # actions_norm = qt.transform(actions_list)
+    #     qt = stats["qt_pc"]
+    #     # actions_norm = qt.transform(actions_list)
 
         
-        qt_pos = stats["qt_pos"]
-        # pos_norm = qt_pos.transform(pos_list)
+    #     qt_pos = stats["qt_pos"]
+    #     # pos_norm = qt_pos.transform(pos_list)
 
-        actions_minmax = stats["actions_minmax"]
-        # print(actions_norm)
-        # print(actions_minmax.min_)
-        # print(actions_minmax.scale_)
-        # print(actions_minmax.data_min_)
-        # print(actions_minmax.data_max_)
-        # raise
-        pos_minmax = stats["pos_minmax"]
+    #     actions_minmax = stats["actions_minmax"]
+    #     # print(actions_norm)
+    #     # print(actions_minmax.min_)
+    #     # print(actions_minmax.scale_)
+    #     # print(actions_minmax.data_min_)
+    #     # print(actions_minmax.data_max_)
+    #     # raise
+    #     pos_minmax = stats["pos_minmax"]
 
-        actions_norm = actions_minmax.transform(actions_list)
+    #     actions_norm = actions_minmax.transform(actions_list)
         
-        pos_norm = pos_minmax.transform(pos_list)
+    #     pos_norm = pos_minmax.transform(pos_list)
 
-        for i in range(len(dataset)):
-            dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
+    #     for i in range(len(dataset)):
+    #         dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
 
-        pc_mean = stats["pc_mean"]
-        pc_std = stats["pc_std"]
-        max_pc = stats["max_pc"]
-        min_pc = stats["min_pc"]
+    #     pc_mean = stats["pc_mean"]
+    #     pc_std = stats["pc_std"]
+    #     max_pc = stats["max_pc"]
+    #     min_pc = stats["min_pc"]
         
 
 
@@ -874,14 +876,14 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             min_pc = np.min(point_features, axis = -1)
             
             stats = {
-                "qt_pc": qt,
-                "qt_pos": qt_pos,
+                # "qt_pc": qt,
+                # "qt_pos": qt_pos,
                 "pc_mean": pc_mean,
                 "pc_std": pc_std,
                 "max_pc": max_pc,
                 "min_pc": min_pc,
-                "actions_minmax": actions_minmax,
-                "pos_minmax": pos_minmax,
+                # "actions_minmax": actions_minmax,
+                # "pos_minmax": pos_minmax,
             }
 
             with open("action_preprocessing.pkl","wb") as f:
@@ -890,8 +892,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # with open("action_preprocessing.pkl","rb") as f:
             #     stats = pickle.load(f)
 
-        dataset.max_pc = max_pc
-        dataset.min_pc = min_pc
+        # dataset.max_pc = max_pc
+        # dataset.min_pc = min_pc
 
     return dataset, curr_max
         
