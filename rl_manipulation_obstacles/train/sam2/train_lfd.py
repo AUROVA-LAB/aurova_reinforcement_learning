@@ -346,7 +346,7 @@ def train():
 
             torch.save(
                 model.state_dict(),
-                "best_model_.pth"
+                "best_model.pth"
             )
 
             print(
@@ -362,7 +362,7 @@ def train():
 
     model.load_state_dict(
         torch.load(
-            "best_model_.pth",
+            "best_model.pth",
             map_location=device
         )
     )
