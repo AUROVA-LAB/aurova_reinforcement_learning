@@ -532,7 +532,7 @@ def train():
 
     wandb.log({
 
-        "test/binary_cross_entropy_loss": test_loss,
+        "test/smooth_l1": test_loss,
         "test/mse": test_mse,
         "test/l1": test_mae,
 
