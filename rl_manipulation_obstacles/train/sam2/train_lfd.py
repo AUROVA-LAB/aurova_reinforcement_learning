@@ -126,7 +126,7 @@ def train():
     sample=dataset[0]
 
     pose_dim=sample["gripper_pose"].shape[0]
-    action_dim=sample["cat_diff"].shape[0]
+    action_dim=sample["action"].shape[0]
 
     model=CnnPolicy(
         pose_dim,
@@ -169,7 +169,7 @@ def train():
     backbone.eval()
     backbone.cuda()
 
-    for epoch in range(300):
+    for epoch in range(100):
 
         ########################################
         # TRAIN
@@ -204,7 +204,7 @@ def train():
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
             pc= b["pc_net3_seq"] #  p_f
-            traj=b["cat_diff"]
+            traj=b["action"]
 
             pred=model(pc)
 
@@ -212,25 +212,26 @@ def train():
             # MAGNITUDE-WEIGHTED LOSS
             ##################################
 
-            # sample_mag=torch.norm(
-            #     traj,
-            #     dim=1
-            # )
-
-            # sample_mag=(
-            #     sample_mag/
-            #     sample_mag.mean()
-            # )
-
-            loss=criterion(
-                pred,
+            sample_mag=torch.norm(
                 traj,
+                dim=1
             )
 
-            # loss=(
-            #     sample_mag*
-            #     loss_per_sample
-            # ).mean()
+            sample_mag=(
+                sample_mag/
+                sample_mag.mean()
+            )
+
+            loss_per_sample=F.smooth_l1_loss(
+                pred,
+                traj,
+                reduction='none'
+            ).mean(dim=1)
+
+            loss=(
+                sample_mag*
+                loss_per_sample
+            ).mean()
 
             ##################################
 
@@ -245,8 +246,8 @@ def train():
             wandb.log({
                 "epoch":epoch,
                 "train/batch_loss":loss.item(),
-                # "sample_mag_mean":
-                #     sample_mag.mean().item()
+                "sample_mag_mean":
+                    sample_mag.mean().item()
             },
             step=global_step)
 
@@ -288,7 +289,7 @@ def train():
                 # p_f = torch.tensor(p_f).detach().clone().to(device)
 
                 pc= b["pc_net3_seq"] # p_f
-                traj=b["cat_diff"]
+                traj=b["action"]
 
                 pred=model(pc)
 
@@ -299,20 +300,20 @@ def train():
 
                 val_loss+=loss.item()
 
-                # mae=torch.abs(
-                #     pred-traj
-                # ).mean(0)
+                mae=torch.abs(
+                    pred-traj
+                ).mean(0)
 
-                # mae_per_dim.append(
-                #     mae.cpu().numpy()
-                # )
+                mae_per_dim.append(
+                    mae.cpu().numpy()
+                )
 
         val_loss/=len(val_loader)
 
-        # mae_per_dim=np.mean(
-        #     mae_per_dim,
-        #     axis=0
-        # )
+        mae_per_dim=np.mean(
+            mae_per_dim,
+            axis=0
+        )
 
         wandb.log({
 
@@ -322,11 +323,11 @@ def train():
             "val/epoch_loss":
                 val_loss,
 
-            # **{
-            #     f"mae_dim_{i}":v
-            #     for i,v
-            #     in enumerate(mae_per_dim)
-            # }
+            **{
+                f"mae_dim_{i}":v
+                for i,v
+                in enumerate(mae_per_dim)
+            }
         })
 
         print(
@@ -402,7 +403,7 @@ def train():
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
             pc=  b["pc_net3_seq"] # p_f
-            traj = b["cat_diff"]
+            traj = b["action"]
 
             pred = model(pc)
 
@@ -410,20 +411,20 @@ def train():
             # LOSSES
             #################################
 
-            # smooth = F.smooth_l1_loss(
-            #     pred,
-            #     traj
-            # )
+            smooth = F.smooth_l1_loss(
+                pred,
+                traj
+            )
 
-            # mse = F.mse_loss(
-            #     pred,
-            #     traj
-            # )
+            mse = F.mse_loss(
+                pred,
+                traj
+            )
 
-            # mae = F.l1_loss(
-            #     pred,
-            #     traj
-            # )
+            mae = F.l1_loss(
+                pred,
+                traj
+            )
 
             loss = criterion(
                 pred,
@@ -433,43 +434,43 @@ def train():
 
 
             test_loss += loss.item()
-            # test_loss += smooth.item()
-            # test_mse += mse.item()
-            # test_mae += mae.item()
+            test_loss += smooth.item()
+            test_mse += mse.item()
+            test_mae += mae.item()
 
             #################################
             # PER-DIMENSION MAE
             #################################
 
-            # mae_dim = torch.abs(
-            #     pred-traj
-            # ).mean(dim=0)
+            mae_dim = torch.abs(
+                pred-traj
+            ).mean(dim=0)
 
-            # mae_per_dim.append(
-            #     mae_dim.cpu().numpy()
-            # )
+            mae_per_dim.append(
+                mae_dim.cpu().numpy()
+            )
 
             #################################
             # MAGNITUDES
             #################################
 
-            # pred_mag = torch.norm(
-            #     pred,
-            #     dim=1
-            # )
+            pred_mag = torch.norm(
+                pred,
+                dim=1
+            )
 
-            # target_mag = torch.norm(
-            #     traj,
-            #     dim=1
-            # )
+            target_mag = torch.norm(
+                traj,
+                dim=1
+            )
 
-            # pred_mag_all.extend(
-            #     pred_mag.cpu().numpy()
-            # )
+            pred_mag_all.extend(
+                pred_mag.cpu().numpy()
+            )
 
-            # target_mag_all.extend(
-            #     target_mag.cpu().numpy()
-            # )
+            target_mag_all.extend(
+                target_mag.cpu().numpy()
+            )
 
 
     #################################
@@ -477,21 +478,21 @@ def train():
     #################################
 
     test_loss /= len(test_loader)
-    # test_mse /= len(test_loader)
-    # test_mae /= len(test_loader)
+    test_mse /= len(test_loader)
+    test_mae /= len(test_loader)
 
-    # mae_per_dim = np.mean(
-    #     mae_per_dim,
-    #     axis=0
-    # )
+    mae_per_dim = np.mean(
+        mae_per_dim,
+        axis=0
+    )
 
-    # pred_mag_mean = np.mean(
-    #     pred_mag_all
-    # )
+    pred_mag_mean = np.mean(
+        pred_mag_all
+    )
 
-    # target_mag_mean = np.mean(
-    #     target_mag_all
-    # )
+    target_mag_mean = np.mean(
+        target_mag_all
+    )
 
     print("\n========== TEST RESULTS ==========")
 
@@ -499,31 +500,31 @@ def train():
         f"SmoothL1: {test_loss:.6f}"
     )
 
-    # print(
-    #     f"MSE: {test_mse:.6f}"
-    # )
+    print(
+        f"MSE: {test_mse:.6f}"
+    )
 
-    # print(
-    #     f"L1: {test_mae:.6f}"
-    # )
+    print(
+        f"L1: {test_mae:.6f}"
+    )
 
-    # print(
-    #     "\nPer-dim MAE:"
-    # )
+    print(
+        "\nPer-dim MAE:"
+    )
 
-    # for i,m in enumerate(mae_per_dim):
+    for i,m in enumerate(mae_per_dim):
 
-    #     print(
-    #         f"Action {i}: {m:.6f}"
-    #     )
+        print(
+            f"Action {i}: {m:.6f}"
+        )
 
-    # print(
-    #     f"\nPrediction magnitude mean: {pred_mag_mean:.6f}"
-    # )
+    print(
+        f"\nPrediction magnitude mean: {pred_mag_mean:.6f}"
+    )
 
-    # print(
-    #     f"Target magnitude mean: {target_mag_mean:.6f}"
-    # )
+    print(
+        f"Target magnitude mean: {target_mag_mean:.6f}"
+    )
 
     #################################
     # WANDB
@@ -532,20 +533,20 @@ def train():
     wandb.log({
 
         "test/binary_cross_entropy_loss": test_loss,
-        # "test/mse": test_mse,
-        # "test/l1": test_mae,
+        "test/mse": test_mse,
+        "test/l1": test_mae,
 
-        # "test/pred_mag_mean":
-        #     pred_mag_mean,
+        "test/pred_mag_mean":
+            pred_mag_mean,
 
-        # "test/target_mag_mean":
-        #     target_mag_mean,
+        "test/target_mag_mean":
+            target_mag_mean,
 
-        # **{
-        #     f"test/mae_dim_{i}":v
-        #     for i,v
-        #     in enumerate(mae_per_dim)
-        # }
+        **{
+            f"test/mae_dim_{i}":v
+            for i,v
+            in enumerate(mae_per_dim)
+        }
     })
 
 

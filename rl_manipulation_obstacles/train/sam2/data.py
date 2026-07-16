@@ -348,7 +348,7 @@ class HDF5LfDDataset(Dataset):
 
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
-            "action": action / self.max_action, #np.concatenate([action, gripper_action], axis=-1),
+            "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "diff": diff,
             "cat_diff": new_cat,
             # "prev_action": prev_action

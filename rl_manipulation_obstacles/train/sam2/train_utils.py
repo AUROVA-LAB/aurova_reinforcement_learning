@@ -614,7 +614,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     pc_xyz = pc_all[:, :3]
     # pc_rgb = pc_all[:, 3:]#  if pc_all.shape[1] > 3 else np.zeros_like(pc_xyz)
 
-    pc_xyz, _, _ = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
+    pc_xyz, centroid, scale = normalize_pc(torch.tensor(pc_xyz).unsqueeze(0))
 
 
     if mode == "PointNet2":
@@ -690,7 +690,7 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
 
     # point_features = point_features.cpu().numpy()
-    return point_features
+    return point_features, centroid, scale
 
 
 def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
@@ -832,7 +832,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
 
 
-    if not test:
+    if True:
         pc_data = []
 
         for i in range(len(dataset)):
@@ -845,9 +845,12 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
             pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
 
-            point_features = preprocess_pcd_single(pc_all, model, mode = mode)
-
+            point_features, centroid, scale = preprocess_pcd_single(pc_all, model, mode = mode)
             
+            action = dataset[i]["action"]
+            action[3:] = (action[3:] - centroid.squeeze(0).squeeze(0).cpu().numpy())
+            action /= scale.squeeze(0).squeeze(0).squeeze(-1).repeat(2).cpu().numpy()
+
             if point_features is None:
                 continue
 
@@ -858,7 +861,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             if mode == "PointNet2":
                 dataset.set_item(i, pcd_net2 = point_features)
             elif mode == "BERT":
-                dataset.set_item(i, pcd_net3 = point_features)
+                dataset.set_item(i, pcd_net3 = point_features, action = action)
 
 
 
