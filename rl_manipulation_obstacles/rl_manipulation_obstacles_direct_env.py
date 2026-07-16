@@ -38,8 +38,8 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
-from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single, preprocess_single_pcd_raw
-# from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
+from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
+from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
 
@@ -464,6 +464,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
         self.pcd_model.eval()
 
+
+        self.my_cmd = torch.zeros((1,6)).to(self.device)
+
         
         
 
@@ -727,16 +730,30 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
                     cmd = self.trajectory_save[self.count].unsqueeze(0)
 
-                elif self.count % self.cfg.save_interval == 0:
+                else:
+                    if self.count % self.cfg.save_interval == 0:
 
-                    cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
+                        cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
 
-                    cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
-                    cmd = self.stats["qt_pc"].transform(cmd)
-                    cmd = torch.tensor(cmd).to(self.device)
-                    
-                    
-                    cmd += self.gripper_pose_r_lie
+                        # cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
+                        # cmd = self.stats["qt_pc"].transform(cmd)
+
+                        cmd = torch.tensor(cmd).to(self.device)
+                        cmd = torch.clip(cmd, min = 0, max = 1)
+
+                        new_cmd = []
+                        for i in range(6):
+                            inc = 0.0
+                            if cmd[0, i*3].item() > 0: inc = -0.01
+                            if cmd[0, i*3+2].item() > 0: inc = 0.01
+                            new_cmd.append(inc)
+                        cmd = torch.tensor(new_cmd).unsqueeze(0).to(self.device)
+                        self.my_cmd = cmd.clone()
+
+                        cmd += self.gripper_pose_r_lie
+                    else:
+                        cmd = self.my_cmd.clone()
+                        cmd += self.gripper_pose_r_lie
 
             # actions = self._preprocess_actions(cmd)
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
@@ -1060,7 +1077,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if self.cfg.test:
             if self.cfg.mode == "seq":
                 pc_all_color /= 1.11878
-                self.processed_pc = preprocess_pcd_single(pc_all_color, self.pcd_model)
+                pc_all_color = torch.tensor(pc_all_color).unsqueeze(0)
+
+                self.processed_pc = preprocess_pcd_single_batch(pc_all_color, self.pcd_model)
+                self.processed_pc = self.processed_pc[0].cpu().numpy()
                 self.processed_pc = 2*(self.processed_pc - self.stats["min_pc"]) / (self.stats["max_pc"] - self.stats["min_pc"]) - 1
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
@@ -1090,7 +1110,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         action = self.trajectory_save[self.count].float().cpu().numpy()
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
-        print(np.round(diff, decimals=2))
+        print("diff: ", np.round(diff, decimals=3))
 
         pc_w = self.pc_w.float().cpu().numpy()
         pc_ext = self.pc_ext.float().cpu().numpy()
@@ -1548,7 +1568,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
             # Create model
-            self.test_model = CnnPolicy(6, 6, 
+            self.test_model = CnnPolicy(6, 6*3, 
                       in_channels = 3,
                       pc=True,
                       hidden_dim=64).to(self.device)
