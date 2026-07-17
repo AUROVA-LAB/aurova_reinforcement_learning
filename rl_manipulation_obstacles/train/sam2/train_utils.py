@@ -631,12 +631,12 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             print("None")
             return None
         
-        sampled_pts = farthest_point_sampling_BERT(
-                torch.tensor(pc_xyz),
-                1024
-            ).cpu().numpy()
+        # sampled_pts = farthest_point_sampling_BERT(
+        #         torch.tensor(pc_xyz),
+        #         1024
+        #     ).cpu().numpy()
         
-        xyz_sample = sampled_pts
+        xyz_sample = torch.tensor(pc_xyz)
 
         cloud = o3d.geometry.PointCloud()
         cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
