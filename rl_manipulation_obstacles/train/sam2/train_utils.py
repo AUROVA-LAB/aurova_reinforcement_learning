@@ -847,9 +847,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
             point_features, centroid, scale = preprocess_pcd_single(pc_all, model, mode = mode)
             
-            action = dataset[i]["action"]
-            action[3:] = (action[3:] - centroid.squeeze(0).squeeze(0).cpu().numpy())
-            action /= scale.squeeze(0).squeeze(0).squeeze(-1).repeat(2).cpu().numpy()
+            # action = dataset[i]["action"]
+            # action[3:] = (action[3:] - centroid.squeeze(0).squeeze(0).cpu().numpy())
+            # action /= scale.squeeze(0).squeeze(0).squeeze(-1).repeat(2).cpu().numpy()
 
             if point_features is None:
                 continue
@@ -861,7 +861,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             if mode == "PointNet2":
                 dataset.set_item(i, pcd_net2 = point_features)
             elif mode == "BERT":
-                dataset.set_item(i, pcd_net3 = point_features, action = action)
+                dataset.set_item(i, pcd_net3 = point_features)
 
 
 

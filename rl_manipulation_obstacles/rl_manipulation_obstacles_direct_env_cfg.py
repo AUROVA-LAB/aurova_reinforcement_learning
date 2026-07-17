@@ -91,7 +91,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = True       # Activate marker visualization
+    debug_markers = False       # Activate marker visualization
     save_imgs = True           # Activate image saving from cameras
     render_steps = 6            # Render images every certain amount of steps
 
@@ -472,8 +472,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.05
 
-    test = False
-    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
+    test = True
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_BERT_cat2.pth"
     
     save_interval = 5
     mode = "seq" # "pcd", "img", "seq", "seq_raw"

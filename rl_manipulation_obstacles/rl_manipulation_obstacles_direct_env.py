@@ -1076,12 +1076,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
-                pc_all_color /= 1.11878
-                pc_all_color = torch.tensor(pc_all_color).unsqueeze(0)
+                pc_all_color /= 1.0
+                pc_all_color = pc_all_color
 
-                self.processed_pc = preprocess_pcd_single_batch(pc_all_color, self.pcd_model)
-                self.processed_pc = self.processed_pc[0].cpu().numpy()
-                self.processed_pc = 2*(self.processed_pc - self.stats["min_pc"]) / (self.stats["max_pc"] - self.stats["min_pc"]) - 1
+                self.processed_pc, _, _ = preprocess_pcd_single(pc_all_color, self.pcd_model)
+                
+                # self.processed_pc = self.processed_pc[0].cpu().numpy()
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
@@ -1652,6 +1652,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.pcd_model.eval()
                 self.pcd_model.cuda()
 
-                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing.pkl","rb") as f:
+                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing_BERT_cat2.pkl","rb") as f:
                     self.stats = pickle.load(f)
 
