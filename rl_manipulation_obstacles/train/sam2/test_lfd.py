@@ -66,7 +66,7 @@ def test():
 
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=False, collate_fn = collate_fn)
     val_loader = DataLoader(val_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=1, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -177,6 +177,9 @@ def test():
                 pred,
                 traj
             )
+            print(torch.clip(pred, 0, 1))
+            print(traj)
+            print("-----")
 
 
 
