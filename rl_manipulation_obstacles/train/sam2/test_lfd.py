@@ -82,10 +82,11 @@ def test():
                       in_channels = 3,
                       pc=True,
                       hidden_dim=64).to(device)
-    criterion = nn.SmoothL1Loss()
-    criterion2 = nn.MSELoss()
+    # criterion = nn.SmoothL1Loss()
+    # criterion2 = nn.MSELoss()
+    criterion = nn.BCEWithLogitsLoss()
     
-    model.load_state_dict(torch.load("best_model.pth"))
+    model.load_state_dict(torch.load("best_model_BERT_cat2.pth"))
     model.eval()
 
     sl1_loss = 0
@@ -96,7 +97,7 @@ def test():
     dataset.max_action = 1.0
     dataset.max_gripper = 1.0
 
-    with open("action_preprocessing.pkl","rb") as f:
+    with open("action_preprocessing_BERT_cat2.pkl","rb") as f:
         stats = pickle.load(f)
 
     dataset.max_pc = stats["max_pc"]
@@ -132,21 +133,21 @@ def test():
                     for k, v in b.items()
                 }
 
-            pcds = b["pc_all_seq"][:,:,:,:3]
+            # pcds = b["pc_all_seq"][:,:,:,:3]
 
-            B, T, N, a = pcds.shape
-            pcds = pcds.view(B*T, N, -1)
+            # B, T, N, a = pcds.shape
+            # pcds = pcds.view(B*T, N, -1)
 
-            p_f = torch.zeros((B*T, 768))
+            # p_f = torch.zeros((B*T, 768))
 
-            pc = pcds / curr_max
-            p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
+            # pc = pcds / curr_max
+            # p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
             
-            p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
-            p_f = p_f.view(B,T,768)
-            p_f = torch.tensor(p_f).detach().clone().to(device)
+            # p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
+            # p_f = p_f.view(B,T,768)
+            # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc= p_f # b["pc_net3_seq"]
+            pc= b["pc_net3_seq"] # p_f
             traj=b["cat_diff"]
 
             pred = model(pc)
@@ -169,9 +170,6 @@ def test():
             #     pred,
             #     traj
             # )
-
-            print(traj)
-
 
             
 

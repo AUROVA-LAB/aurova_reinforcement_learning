@@ -221,6 +221,9 @@ class HDF5LfDDataset(Dataset):
 
         for file_id, f in enumerate(self.handles):
 
+            if file_id == 3:
+                break
+
             if "actions" not in f:
                 continue
 
