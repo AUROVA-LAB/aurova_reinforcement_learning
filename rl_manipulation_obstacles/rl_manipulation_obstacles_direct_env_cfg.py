@@ -92,7 +92,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     num_envs = 1                # Number of environments by default (overriden)
 
     debug_markers = False       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
+    save_imgs = False           # Activate image saving from cameras
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -398,12 +398,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
                     [-0.05,  0.05],
-                    [0*-0.7 / 3 ,  0*0.7 / 3 ],
-                    [0*-0.7 / 3 ,  0*0.7 / 3 ],
-                    [0*-0.7 / 3 ,  0*0.7 / 3 ]]
+                    [-0.7 / 2 ,  0.7 / 2 ],
+                    [-0.7 / 2 ,  0.7 / 2 ],
+                    [-0.7 / 2 ,  0.7 / 2 ]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, False, False, False]  # [False, False, True, False]
+    apply_range = [False, False, True, False]  # [False, False, True, False]
 
     ee_translation = [0.0, 0.0, 0.25]
     ee_rotation = [1.0, 0.0, 0.0, 0.0]
@@ -472,7 +472,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     plan_chg_thres = 0.05
 
-    test = True
+    test = False
     model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_BERT_cat2.pth"
     
     save_interval = 5
