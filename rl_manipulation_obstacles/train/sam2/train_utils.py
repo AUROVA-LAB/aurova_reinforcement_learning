@@ -748,41 +748,43 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     actions_list = []
     pos_list = []
 
-    # if test_curr_max is None:
-    #     for i in range(len(dataset)):
-    #         print("Calculating ", i, " max")
-    #         pc = dataset[i]["pc"].astype(np.float32)
-    #         pc_ext = dataset[i]["pc_ext"].astype(np.float32)
-    #         pc_front = dataset[i]["pc_front"].astype(np.float32)
-    #         pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
-    #         new_max_pc = torch.max(torch.abs(pc_all)).item()
+    if test_curr_max is None:
+        for i in range(len(dataset)):
+            print("Calculating ", i, " max")
+            # pc = dataset[i]["pc"].astype(np.float32)
+            # pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+            # pc_front = dataset[i]["pc_front"].astype(np.float32)
+            # pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
+            # new_max_pc = torch.max(torch.abs(pc_all)).item()
 
-    #         if new_max_pc > curr_max:
-    #             curr_max = new_max_pc
+            # if new_max_pc > curr_max:
+            #     curr_max = new_max_pc
 
-    #         actions_list.append(dataset[i]["diff"])
-    #         pos_list.append(dataset[i]["gripper_pose"])
+            actions_list.append(dataset[i]["diff"])
+            # pos_list.append(dataset[i]["gripper_pose"])
 
-    #     actions_list = np.array(actions_list)
-    #     pos_list = np.array(pos_list)
+        actions_list = np.array(actions_list)
+        
+        dataset.max_diff = np.max(np.abs(actions_list)) 
+        # pos_list = np.array(pos_list)
 
 
-    #     qt = RobustScaler()
-    #     # actions_norm = qt.fit_transform(actions_list)
+        # qt = RobustScaler()
+        # actions_norm = qt.fit_transform(actions_list)
 
-    #     qt_pos = RobustScaler()
-    #     # pos_norm = qt_pos.fit_transform(pos_list)
+        # qt_pos = RobustScaler()
+        # pos_norm = qt_pos.fit_transform(pos_list)
 
-    #     #  ----- NO HACER ESTO -----
-    #     # - Escalar según la esfera unidad
-    #     actions_minmax = MinMaxScaler(feature_range=(-1,1))
-    #     actions_norm = actions_minmax.fit_transform(actions_list)
+        #  ----- NO HACER ESTO -----
+        # - Escalar según la esfera unidad
+        # actions_minmax = MinMaxScaler(feature_range=(-1,1))
+        # actions_norm = actions_minmax.fit_transform(actions_list)
 
-    #     pos_minmax = MinMaxScaler(feature_range=(-1,1))
-    #     pos_norm = pos_minmax.fit_transform(pos_list)
+        # pos_minmax = MinMaxScaler(feature_range=(-1,1))
+        # pos_norm = pos_minmax.fit_transform(pos_list)
 
-    #     for i in range(len(dataset)):
-    #         dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
+        # for i in range(len(dataset)):
+        #     dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
     # else:
 
