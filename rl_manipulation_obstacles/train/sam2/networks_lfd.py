@@ -277,6 +277,14 @@ class CnnPolicy(nn.Module):
             nn.Linear(hidden_dim, action_dim),
         )
 
+        self.head2 = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.GELU(),
+            nn.LayerNorm(64),
+            # nn.Dropout(0.15),
+            nn.Linear(hidden_dim, 6),
+        )
+
         # self.forward = self.forward_temporal_DCT
         # self.forward = self.forward_temporal_DCT_raw
         self.forward = self.forward_temporal_DCT_BERT
@@ -514,6 +522,7 @@ class CnnPolicy(nn.Module):
         # -----------------------------------------------------
         cls_out = x[:, 0]   # [B, d_model]
         pred = self.head(cls_out)  # [B, action_dim]
+        pred_mag = self.head2(cls_out)  # [B, action_dim]
         
         # pred = pred.reshape(
         #     B,
@@ -521,7 +530,7 @@ class CnnPolicy(nn.Module):
         #     self.action_dim
         # )
 
-        return pred
+        return pred, pred_mag
     
 
     def forward_temporal_DCT_raw(self, pc_seq, pose_seq):

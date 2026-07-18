@@ -311,8 +311,8 @@ class HDF5LfDDataset(Dataset):
         new_cat = np.zeros(6*3)
         for j in range(len(cat)):
             idx = 1
-            if cat[j] == -1: idx = 0
-            elif cat[j] == 1: idx = 2
+            if cat[j] > 0: idx = 2
+            if cat[j] < 0: idx = 0
             new_cat[idx + j*3] = 1
 
         # -------------------------------------------------
@@ -349,6 +349,7 @@ class HDF5LfDDataset(Dataset):
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
+            "mag": np.abs(action),
             "diff": diff,
             "cat_diff": new_cat,
             # "prev_action": prev_action
