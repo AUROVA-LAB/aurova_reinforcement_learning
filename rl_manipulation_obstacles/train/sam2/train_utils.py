@@ -887,6 +887,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                 "pc_std": pc_std,
                 "max_pc": max_pc,
                 "min_pc": min_pc,
+                "max_diff": dataset.max_diff,
                 # "actions_minmax": actions_minmax,
                 # "pos_minmax": pos_minmax,
             }
