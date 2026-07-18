@@ -199,6 +199,8 @@ class HDF5LfDDataset(Dataset):
         self.min_pc = 0.0
         self.max_gripper = 1.0
         self.max_action = 1.0
+        
+        self.max_diff = 1.0
 
 
         # -------------------------------------------------
@@ -279,7 +281,6 @@ class HDF5LfDDataset(Dataset):
         gripper_pose = f["/states/gripper_pose"][t0] 
 
         # prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
-        diff = f["diff"][t0] 
         gripper_action = f["gripper_action"][t0]
 
 
@@ -307,6 +308,7 @@ class HDF5LfDDataset(Dataset):
                                     f["/pc/pc_ext"][t0:t1], 
                                     f["/pc/pc_front"][t0:t1]), axis=1)
 
+        diff = f["diff"][t1] 
         cat = np.clip(np.round(diff, decimals=2), a_min = -0.01, a_max=0.01) / 0.01
         new_cat = np.zeros(6*3)
         for j in range(len(cat)):
@@ -349,7 +351,7 @@ class HDF5LfDDataset(Dataset):
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
-            "mag": np.abs(action),
+            "mag": np.abs(diff) / self.max_diff,
             "diff": diff,
             "cat_diff": new_cat,
             # "prev_action": prev_action
