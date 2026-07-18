@@ -398,9 +398,9 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_pose_incs = [[-0.3,  0.3],
                     [-0.3,  0.3],
                     [-0.05,  0.05],
-                    [-0.7 / 2 ,  0.7 / 2 ],
-                    [-0.7 / 2 ,  0.7 / 2 ],
-                    [-0.7 / 2 ,  0.7 / 2 ]]
+                    [-0.7 / 3,  0.7 / 3],
+                    [-0.7 / 3,  0.7 / 3],
+                    [-0.7 / 3,  0.7 / 3]]
     
     # Which robot apply the sampling poses
     apply_range = [False, False, True, False]  # [False, False, True, False]

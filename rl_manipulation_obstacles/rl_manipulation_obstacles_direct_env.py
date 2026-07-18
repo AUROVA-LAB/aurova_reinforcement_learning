@@ -642,8 +642,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if not self.cfg.test:
             if self.count < self.subs_limit:
-                self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+                my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
+                self.trajectory_save[self.count][:3] = my_inc # self.target_pose_r_lie[:, :3]
             else:
+                my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
                 self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
@@ -1434,6 +1436,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses() 
 
         print("--- Episode: ", self.episode_id)
+        if self.episode_id >= 850:
+            raise
 
         
         self.trajectory = []
