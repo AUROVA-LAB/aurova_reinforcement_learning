@@ -169,7 +169,7 @@ def train():
     backbone.eval()
     backbone.cuda()
 
-    for epoch in range(100):
+    for epoch in range(200):
 
         ########################################
         # TRAIN
