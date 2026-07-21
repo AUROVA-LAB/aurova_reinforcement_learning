@@ -380,7 +380,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Initial pose of the robots in quaternions
     ee_init_pose_quat = [[-0.2144, 0.1333, 0.6499, 0.2597, -0.6784, -0.2809, 0.6272],
                          [0.20954, -0.0250, 0.825, -0.6946,  0.2523, -0.6092,  0.2877],
-                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06],
+                         [-4.9190e-01,  1.3330e-01,  4.8790e-01,  -0.0190, -0.3845, -0.9191,  0.0843],
                          [-4.9190e-01,  1.3330e-01,  4.8790e-01,  3.1143e-06, -3.8268e-01,-9.2388e-01,  2.1756e-06]]
 
     # Obtain Euler angles from the quaternion
