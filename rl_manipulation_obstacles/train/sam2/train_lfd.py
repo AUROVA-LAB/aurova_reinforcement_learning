@@ -316,7 +316,7 @@ def train():
                 val_mag+=mag_loss.item()
 
                 mae=torch.abs(
-                    pred-traj
+                    pred_mag-traj_mag
                 ).mean(0)
 
                 mae_per_dim.append(
@@ -361,10 +361,10 @@ def train():
             f" Val {val_loss:.4f}"
         )
 
-        print(
-            "Per-dim MAE:",
-            mae_per_dim
-        )
+        # print(
+        #     "Per-dim MAE:",
+        #     mae_per_dim
+        # )
 
         if val_loss<best_val:
 
@@ -473,7 +473,7 @@ def train():
             #################################
 
             mae_dim = torch.abs(
-                pred-traj
+                pred_mag-traj_mag
             ).mean(dim=0)
 
             mae_per_dim.append(
@@ -513,10 +513,10 @@ def train():
     # test_mse /= len(test_loader)
     # test_mae /= len(test_loader)
 
-    # mae_per_dim = np.mean(
-    #     mae_per_dim,
-    #     axis=0
-    # )
+    mae_per_dim = np.mean(
+        mae_per_dim,
+        axis=0
+    )
 
     # pred_mag_mean = np.mean(
     #     pred_mag_all
@@ -552,11 +552,11 @@ def train():
     #     "\nPer-dim MAE:"
     # )
 
-    # for i,m in enumerate(mae_per_dim):
+    for i,m in enumerate(mae_per_dim):
 
-    #     print(
-    #         f"Action {i}: {m:.6f}"
-    #     )
+        print(
+            f"Action {i}: {m:.6f}"
+        )
 
     # print(
     #     f"\nPrediction magnitude mean: {pred_mag_mean:.6f}"
