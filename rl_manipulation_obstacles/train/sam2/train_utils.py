@@ -603,8 +603,9 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
 
-    # cloud = o3d.geometry.PointCloud()
-    # cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
+    # o3d.visualization.draw_geometries([cloud])
 
 
     # ============================================================
@@ -761,6 +762,19 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             #     curr_max = new_max_pc
 
             actions_list.append(dataset[i]["diff"])
+
+            flag = False
+            for j in actions_list[i]:
+                if abs(j) > 1.0:
+                    flag = True
+                    break
+            if flag:
+                actions_list[i] = np.clip(actions_list, -0.01, 0.01)
+            
+            actions_list[i] = np.round(actions_list[i], decimals=3)
+            dataset.set_item(i, diff = actions_list[i])
+
+            
             # pos_list.append(dataset[i]["gripper_pose"])
 
         actions_list = np.array(actions_list)
