@@ -93,6 +93,8 @@ def test():
     mse_loss = 0
     mae_loss = 0
     test_loss = 0
+    test_cat = 0
+    test_mag = 0
 
     dataset.max_action = 1.0
     dataset.max_gripper = 1.0
@@ -123,6 +125,7 @@ def test():
     backbone.cuda()
 
     criterion = nn.BCEWithLogitsLoss()
+    criterion_mag = nn.MSELoss()
 
 
     with torch.no_grad():
@@ -149,8 +152,9 @@ def test():
 
             pc= b["pc_net3_seq"] # p_f
             traj=b["cat_diff"]
+            traj_mag = b["mag"]
 
-            pred = model(pc)
+            pred, pred_mag = model(pc)
 
             #################################
             # LOSSES
@@ -173,17 +177,15 @@ def test():
 
             
 
-            loss = criterion(
-                pred,
-                traj
-            )
-            print(torch.clip(pred, 0, 1))
-            print(traj)
-            print("-----")
+            loss_cat = criterion(pred, traj)
+            loss_mag = criterion_mag(pred_mag, traj_mag)
+            loss = loss_cat + loss_mag
 
 
 
             test_loss += loss.item()
+            test_cat += loss_cat.item()
+            test_mag += loss_mag.item()
             # test_loss += smooth.item()
             # test_mse += mse.item()
             # test_mae += mae.item()
@@ -228,8 +230,12 @@ def test():
     #################################
 
     test_loss /= len(test_loader)
+    test_cat /= len(test_loader)
+    test_mag /= len(test_loader)
 
     print(f"\nTest Loss: {test_loss:.4f}")
+    print(f"\nTest Cat: {test_cat:.4f}")
+    print(f"\nTest Mag: {test_mag:.4f}")
     # print(f"Test MAE: {mae_loss:.4f}")
     # print(f"Test Smooth MAE: {sl1_loss:.4f}")
 

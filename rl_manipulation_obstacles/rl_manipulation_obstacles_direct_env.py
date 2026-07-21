@@ -735,7 +735,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 else:
                     if self.count % self.cfg.save_interval == 0:
 
-                        cmd = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
+                        cmd, cmd_mag = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
 
                         # cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
                         # cmd = self.stats["qt_pc"].transform(cmd)
@@ -746,8 +746,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         new_cmd = []
                         for i in range(6):
                             inc = 0.0
-                            if cmd[0, i*3].item() > 0: inc = -0.01
-                            if cmd[0, i*3+2].item() > 0: inc = 0.01
+                            if cmd[0, i*3].item() > 0: inc = -cmd_mag[i]#0.01
+                            if cmd[0, i*3+2].item() > 0: inc = cmd_mag[i]#0.01
                             new_cmd.append(inc)
                         cmd = torch.tensor(new_cmd).unsqueeze(0).to(self.device)
                         self.my_cmd = cmd.clone()

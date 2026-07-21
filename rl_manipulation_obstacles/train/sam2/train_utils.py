@@ -787,7 +787,15 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         # for i in range(len(dataset)):
         #     dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
-    # else:
+    else:
+        with open("action_preprocessing.pkl","rb") as f:
+            stats = pickle.load(f)
+
+
+        
+        print(stats.keys())
+        dataset.max_diff = stats["max_diff"]
+
 
     #     for i in range(len(dataset)):
     #         print("Calculating ", i, " max")
