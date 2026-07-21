@@ -643,7 +643,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if not self.cfg.test:
             if self.count < self.subs_limit:
                 my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = my_inc # self.target_pose_r_lie[:, :3]
+                self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
             else:
                 my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
                 self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
@@ -1112,7 +1112,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         action = self.trajectory_save[self.count].float().cpu().numpy()
 
         diff = (self.gripper_pose_r_lie - self.prev_pose)[0].float().cpu().numpy()
-        print("diff: ", np.round(diff, decimals=3))
 
         pc_w = self.pc_w.float().cpu().numpy()
         pc_ext = self.pc_ext.float().cpu().numpy()
@@ -1125,11 +1124,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pcd_net3 = torch.zeros((768)).float().cpu().numpy()
 
         # ---- Save step ----
-        self.writer.add_step(cam, cam_ext, cam_front, 
-                             cam_p, cam_p, cam_p,
-                             pcd_p, pcd_net,pcd_net2, pcd_net3,
-                             pc_w, pc_ext, pc_front, 
-                             target_pose, gripper_pose, action, diff, self.gripper_action)
+        if self.count != self.cfg.save_interval:
+            print("diff: ", np.round(diff, decimals=3))
+            print(self.count)
+            self.writer.add_step(cam, cam_ext, cam_front, 
+                                cam_p, cam_p, cam_p,
+                                pcd_p, pcd_net,pcd_net2, pcd_net3,
+                                pc_w, pc_ext, pc_front, 
+                                target_pose, gripper_pose, action, diff, self.gripper_action)
 
         self.prev_pose = self.gripper_pose_r_lie
 
@@ -1564,7 +1566,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.writer = HDF5EpisodeWriter(
                                             output_dir=os.path.join(self.current_path, "dataset"),
                                             episode_idx=self.episode_id,
-                                            max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval)
+                                            max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval) - 1
                                             )
         else:
 
