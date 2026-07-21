@@ -765,9 +765,6 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         actions_list = np.array(actions_list)
         actions_list = np.clip(actions_list, -0.5, 0.5)
-
-        print(np.max(np.abs(actions_list)))
-        raise
         
         dataset.max_diff = np.max(np.abs(actions_list)) 
         # pos_list = np.array(pos_list)
@@ -794,7 +791,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         with open("action_preprocessing.pkl","rb") as f:
             stats = pickle.load(f)
 
-        dataset.max_diff = stats["max_diff"]
+        dataset.max_diff = 0.5 # stats["max_diff"]
 
 
     #     for i in range(len(dataset)):

@@ -66,7 +66,7 @@ def test():
 
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=False, collate_fn = collate_fn)
     val_loader = DataLoader(val_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=1, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -84,9 +84,9 @@ def test():
                       hidden_dim=64).to(device)
     # criterion = nn.SmoothL1Loss()
     # criterion2 = nn.MSELoss()
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
     
-    model.load_state_dict(torch.load("best_model_BERT_cat2.pth"))
+    model.load_state_dict(torch.load("best_model.pth"))
     model.eval()
 
     sl1_loss = 0
@@ -96,14 +96,14 @@ def test():
     test_cat = 0
     test_mag = 0
 
-    dataset.max_action = 1.0
-    dataset.max_gripper = 1.0
 
-    with open("action_preprocessing_BERT_cat2.pkl","rb") as f:
+    with open("action_preprocessing.pkl","rb") as f:
         stats = pickle.load(f)
 
-    dataset.max_pc = stats["max_pc"]
-    dataset.min_pc = stats["min_pc"]
+    # dataset.max_action = 1.0
+    # dataset.max_gripper = 1.0
+    # dataset.max_pc = stats["max_pc"]
+    # dataset.min_pc = stats["min_pc"]
 
     config = EasyDict({
             'trans_dim':384,
@@ -135,20 +135,6 @@ def test():
                     k: v.to(device, non_blocking=True)
                     for k, v in b.items()
                 }
-
-            # pcds = b["pc_all_seq"][:,:,:,:3]
-
-            # B, T, N, a = pcds.shape
-            # pcds = pcds.view(B*T, N, -1)
-
-            # p_f = torch.zeros((B*T, 768))
-
-            # pc = pcds / curr_max
-            # p_f = preprocess_pcd_single_batch(pc, mode="BERT", model = backbone)
-            
-            # p_f = 2*(p_f - dataset.min_pc) / (dataset.max_pc - dataset.min_pc) - 1 
-            # p_f = p_f.view(B,T,768)
-            # p_f = torch.tensor(p_f).detach().clone().to(device)
 
             pc= b["pc_net3_seq"] # p_f
             traj=b["cat_diff"]
