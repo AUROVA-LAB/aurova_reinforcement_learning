@@ -473,7 +473,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     plan_chg_thres = 0.05
 
     test = False
-    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_BERT_cat2.pth"
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
     
     save_interval = 5
     mode = "seq" # "pcd", "img", "seq", "seq_raw"
