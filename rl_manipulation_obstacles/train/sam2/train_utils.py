@@ -769,8 +769,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                     flag = True
                     break
             if flag:
-                actions_list[i] = np.clip(actions_list[i], -0.01, 0.01)
-            
+                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)            
             actions_list[i] = np.round(actions_list[i], decimals=3)
             dataset.set_item(i, diff = actions_list[i])
 
@@ -817,7 +816,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                     flag = True
                     break
             if flag:
-                actions_list[i] = np.clip(actions_list[i], -0.01, 0.01)
+                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)
             
             actions_list[i] = np.round(actions_list[i], decimals=3)
             dataset.set_item(i, diff = actions_list[i])
