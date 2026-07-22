@@ -642,10 +642,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         if not self.cfg.test:
             if self.count < self.subs_limit:
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
+                if self.gripper_pose_r_lie[0,0].item() < 0 and self.target_pose_r_lie[0,0].item() > 0:
+                    self.gripper_pose_r_lie[:, :3] *= -1
+                elif self.gripper_pose_r_lie[0,0].item() > 0 and self.target_pose_r_lie[0,0].item() < 0:
+                    self.target_pose_r_lie[:, :3] *= -1
+                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
+                self.trajectory_save[self.count][:3] = my_inc #self.target_pose_r_lie[:, :3]
             else:
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.1*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
+                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
                 self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
             cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
             cmd = self.convert_to_Lab(self.exp(cmd_lie))
@@ -746,16 +750,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         new_cmd = []
                         for i in range(6):
                             inc = 0.0
-                            if cmd[0, i*3].item() > 0: inc = -cmd_mag[i]#0.01
-                            if cmd[0, i*3+2].item() > 0: inc = cmd_mag[i]#0.01
+                            if cmd[0, i*3].item() > 0: inc = -cmd_mag[0, i]# * 0.173#0.01
+                            if cmd[0, i*3+2].item() > 0: inc = cmd_mag[0, i]# * 0.173#0.01
                             new_cmd.append(inc)
                         cmd = torch.tensor(new_cmd).unsqueeze(0).to(self.device)
                         self.my_cmd = cmd.clone()
 
                         cmd += self.gripper_pose_r_lie
                     else:
-                        cmd = self.my_cmd.clone()
-                        cmd += self.gripper_pose_r_lie
+                        pass
+                        # cmd = self.my_cmd.clone()
+                        # cmd += self.gripper_pose_r_lie
 
             # actions = self._preprocess_actions(cmd)
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
