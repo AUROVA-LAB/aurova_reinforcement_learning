@@ -493,8 +493,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  0, 3, 0]
     # target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  3.1350, -0.1133, 2.2588]
 
-    target_poses_incs = [[-0.2,  0.2],
-                         [-0.2,   0.2],
+    target_poses_incs = [[-0.15,  0.15],
+                         [-0.15,  0.15],
                          [-0.1*0,   0.1*0],
                          [-2*pi/5*0,  2*pi/5*0],
                          [-2*pi/5*0,  2*pi/5*0],
