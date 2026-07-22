@@ -142,7 +142,7 @@ def train():
     )
 
     criterion = nn.BCEWithLogitsLoss()
-    criterion_mag = nn.MSELoss()
+    criterion_mag = nn.SmoothL1Loss()
 
     best_val=float("inf")
 
@@ -237,7 +237,8 @@ def train():
             # ).mean()
             loss_cat = criterion(pred, traj)
             loss_mag = criterion_mag(pred_mag, traj_mag)
-            loss = loss_cat + loss_mag
+            
+            loss = loss_cat + 16*loss_mag
             ##################################
 
             optimizer.zero_grad()
@@ -309,7 +310,7 @@ def train():
 
                 cat_loss = criterion(pred, traj)
                 mag_loss = criterion_mag(pred_mag, traj_mag)
-                loss = cat_loss + mag_loss
+                loss = cat_loss + 16*mag_loss
 
                 val_loss+=loss.item()
                 val_cat+=cat_loss.item()
