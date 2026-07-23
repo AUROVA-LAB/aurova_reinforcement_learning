@@ -779,7 +779,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         actions_list = np.array(actions_list)
         actions_list = np.clip(actions_list, -0.06, 0.06)
         
-        dataset.max_diff = np.max(np.abs(actions_list)) 
+        dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
+        dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:])) 
+
         # pos_list = np.array(pos_list)
 
 
@@ -925,7 +927,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                 "pc_std": pc_std,
                 "max_pc": max_pc,
                 "min_pc": min_pc,
-                "max_diff": dataset.max_diff,
+                "max_diff_rot": dataset.max_diff_rot,
+                "max_diff_trans": dataset.max_diff_trans,
                 # "actions_minmax": actions_minmax,
                 # "pos_minmax": pos_minmax,
             }

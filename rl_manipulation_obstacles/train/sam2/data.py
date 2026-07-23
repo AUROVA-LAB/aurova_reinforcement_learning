@@ -200,7 +200,8 @@ class HDF5LfDDataset(Dataset):
         self.max_gripper = 1.0
         self.max_action = 1.0
         
-        self.max_diff = 1.0
+        self.max_diff_rot = 1.0
+        self.max_diff_trans = 1.0
 
 
         # -------------------------------------------------
@@ -323,7 +324,10 @@ class HDF5LfDDataset(Dataset):
 
         # traj = f["actions"][t1:t2]                # [T_pred, 6]
         # diff_seq = f["diff"][t1:t2]
-        action = f["actions"][t1] 
+        action = f["actions"][t1]
+        mag =  diff
+        mag[:3] /= self.max_diff_rot
+        mag[3:] /= self.max_diff_trans
 
 
         
@@ -351,7 +355,7 @@ class HDF5LfDDataset(Dataset):
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
-            "mag": np.abs(diff) / self.max_diff,
+            "mag": mag,
             "diff": diff,
             "cat_diff": new_cat,
             # "prev_action": prev_action
