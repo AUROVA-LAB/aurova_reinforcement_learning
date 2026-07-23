@@ -373,12 +373,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # ----------- AUX --------------        
-        self.prim_action = torch.tensor([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).repeat(self.num_envs, 1).to(self.device)
-        self.correspondences = ['w','s','a','d','o','l']
-        self.gripper = ['0', '1']
-        self.gripper_inc = 5
-        self.prim_g_action = torch.tensor([0.0]).repeat(self.num_envs, 1).to(self.device)
-        self.inc = 0.01
 
         # Crear listener
         # listener = keyboard.Listener(on_press=self.on_press)
@@ -467,6 +461,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.my_cmd = torch.zeros((1,6)).to(self.device)
 
+        self.bert_features = torch.zeros((self.num_envs, 768)).to(self.device)
         
         
 
@@ -626,157 +621,19 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             - None
         '''
 
-        grip_action = actions[:, -1]
+        grip_action = actions[:, -1]*0
         # actions = actions[:, :-1]
 
-        # # Perform increment in the algebra and exponential map -> (plus operator)
-        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        # action_pose = self.normalize(action_pose)
+        # Perform increment in the algebra and exponential map -> (plus operator)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = self.normalize(action_pose)
 
-        # # Convert to IsaacLab representation (translation, quaternion)
-        # action_pose_lab = self.convert_to_Lab(action_pose)
+        # Convert to IsaacLab representation (translation, quaternion)
+        action_pose_lab = self.convert_to_Lab(action_pose)
         
-        cmd = self.gripper_pose_r_lie.clone()
 
-        
-        if not self.cfg.test:
-            if self.count < self.subs_limit:
-                if self.gripper_pose_r_lie[0,0].item() < 0 and self.target_pose_r_lie[0,0].item() > 0:
-                    self.gripper_pose_r_lie[:, :3] *= -1
-                elif self.gripper_pose_r_lie[0,0].item() > 0 and self.target_pose_r_lie[0,0].item() < 0:
-                    self.target_pose_r_lie[:, :3] *= -1
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = my_inc #self.target_pose_r_lie[:, :3]
-            else:
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
-            cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
-            cmd = self.convert_to_Lab(self.exp(cmd_lie))
-            
-            cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
-                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
-                                           
-
-
-            self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
-            
-            self.increment_condition = (self.count < self.trajectory_save.shape[0] and not self.gripper_action) or self.increment_condition
-
-            if self.increment_condition:
-                self.count += 1
-
-            grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
-        
-        else:
-            if self.cfg.mode == "img":
-
-                f1 = self.camera_w[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                f2 = self.camera_ext[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                f3 = self.camera_front[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                
-
-                f1 = self.transform(f1.cpu().numpy()).to(self.device).unsqueeze(0)
-                f2 = self.transform(f2.cpu().numpy()).to(self.device).unsqueeze(0)
-                f3 = self.transform(f3.cpu().numpy()).to(self.device).unsqueeze(0)
-
-                f = torch.cat((f1, f2, f3), dim = 0)
-
-                f = self.backbone(f)['backbone_fpn'][-1].mean(dim = 1).view(f.shape[0], -1)
-
-                
-                cmd = self.test_model(f[0].unsqueeze(0),
-                                    f[1].unsqueeze(0),
-                                    f[2].unsqueeze(0),
-                                    self.gripper_pose_r_lie)
-
-            elif self.cfg.mode == "pcd":
-
-                pc_all = np.concatenate([self.pc_w.float().cpu().numpy(),
-                                         self.pc_ext.float().cpu().numpy(),
-                                         self.pc_front.float().cpu().numpy()], axis=0)
-
-                # ============================================================
-                # 2. VOXEL DOWNSAMPLE
-                # ============================================================
-
-                voxel_size = 0.025
-
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-                pcd = pcd.voxel_down_sample(voxel_size)
-
-                pc_all = np.asarray(pcd.points)
-
-                # ============================================================
-                # 3. FILTERING (your original logic cleaned)
-                # ============================================================
-
-                pc_all = pc_all[pc_all[:, 2] > 0.025]
-                pc_all = pc_all[pc_all[:, 0] > -0.8]
-                pc_all = pc_all[pc_all[:, 0] < 0.1]
-                pc_all = pc_all[pc_all[:, 1] > -0.5]
-
-                # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
-
-                if pc_all.shape[0] != 0:
-
-                    sampled_pts, sampled_idx = farthest_point_sampling(
-                        pc_all,
-                        n_samples=512
-                    )
-
-
-                sampled_pts = torch.tensor(sampled_pts).float().unsqueeze(0).to(self.device)
-                cmd = self.test_model(sampled_pts, self.target_pose_r_lie - self.gripper_pose_r_lie)
-
-            elif "seq" in self.cfg.mode:
-                if self.count < self.cfg.save_interval * self.cfg.horizon:
-                    self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
-                    cmd = self.trajectory_save[self.count].unsqueeze(0)
-
-                else:
-                    if self.count % self.cfg.save_interval == 0:
-
-                        cmd, cmd_mag = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
-
-                        # cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
-                        # cmd = self.stats["qt_pc"].transform(cmd)
-
-                        cmd = torch.tensor(cmd).to(self.device)
-                        cmd = torch.clip(cmd, min = 0, max = 1)
-
-                        new_cmd = []
-                        for i in range(6):
-                            inc = 0.0
-                            if cmd[0, i*3].item() > 0: inc = -cmd_mag[0, i]# * 0.173#0.01
-                            if cmd[0, i*3+2].item() > 0: inc = cmd_mag[0, i]# * 0.173#0.01
-                            new_cmd.append(inc)
-                        cmd = torch.tensor(new_cmd).unsqueeze(0).to(self.device)
-                        self.my_cmd = cmd.clone()
-
-                        cmd += self.gripper_pose_r_lie
-                    else:
-                        pass
-                        # cmd = self.my_cmd.clone()
-                        # cmd += self.gripper_pose_r_lie
-
-            # actions = self._preprocess_actions(cmd)
-            # cmd[:,:3] = self.target_pose_r_lie[:, :3]
-
-            grip_action = cmd[:, -1].clone()*0
-            cmd_lie = cmd.clone()
-
-            cmd = self.convert_to_Lab(self.exp(cmd_lie))
-            
-            cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
-                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
-            
-            self.count += 1
-            
-
-        self.controller.set_command(torch.cat(cmd, dim = -1))
+        self.controller.set_command(action_pose_lab)
 
         # Set the command for the IKDifferentialController
         
@@ -810,7 +667,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # Preprocessing actions
-        # actions = self._preprocess_actions(actions)
+        actions = self._preprocess_actions(actions)
 
         # Obtains the increments and the poses
         self.perform_increment(actions = actions)
@@ -1161,7 +1018,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
         # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3], image), dim = -1)
-        obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3]), dim = -1)
+        # obs = torch.cat((self.robot_rot_ee_pose_r_lie_rel, self.hand_pose.unsqueeze(-1), self.contacts[:, :3]), dim = -1)
+
+        obs = self.bert_features
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -1439,12 +1298,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.scene.rigid_objects["object"].write_root_velocity_to_sim(root_velocity = torch.zeros((self.num_envs, 6), device=self.device)[env_ids], env_ids = env_ids)
 
 
+        self.bert_features[env_ids] = torch.zeros_like(self.bert_features).to(self.device)[env_ids]
 
         self.update_new_poses() 
+        self._get_PC
 
-        print("--- Episode: ", self.episode_id)
-        if self.episode_id >= 850:
-            raise
+
 
         
         self.trajectory = []
