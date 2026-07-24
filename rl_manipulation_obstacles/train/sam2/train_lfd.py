@@ -125,7 +125,7 @@ def train():
     sample=dataset[0]
 
     pose_dim=sample["gripper_pose"].shape[0]
-    action_dim=sample["cat_diff"].shape[0]
+    action_dim=sample["mag"].shape[0]
 
     model=CnnPolicy(
         pose_dim,
@@ -205,11 +205,11 @@ def train():
             # p_f = p_f.view(B,T,768)
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc= b["pc_net3_seq"] #  p_f
-            traj=b["cat_diff"]
+            pc= b["pc_net3"] #  p_f
+            # traj=b["cat_diff"]
             traj_mag = b["mag"]
 
-            pred, pred_mag = model(pc)
+            pred_mag = model(pc)
 
             ##################################
             # MAGNITUDE-WEIGHTED LOSS
@@ -235,10 +235,10 @@ def train():
             #     sample_mag*
             #     loss_per_sample
             # ).mean()
-            loss_cat = criterion(pred, traj)
+            # loss_cat = criterion(pred, traj)
             loss_mag = criterion_mag(pred_mag, traj_mag)
             
-            loss = loss_cat + 16*loss_mag
+            loss = loss_mag
             ##################################
 
             optimizer.zero_grad()
@@ -248,14 +248,14 @@ def train():
             optimizer.step()
 
             train_loss+=loss.item()
-            train_cat+=loss_cat.item()
+            # train_cat+=loss_cat.item()
             train_mag+=loss_mag.item()
 
             wandb.log({
                 "epoch":epoch,
                 "train/batch_loss":loss.item(),
                 "train/mag_loss":loss_mag.item(),
-                "train/cat_loss":loss_cat.item(),
+                # "train/cat_loss":loss_cat.item(),
                 # "sample_mag_mean":
                 #     sample_mag.mean().item()
             },
@@ -265,7 +265,7 @@ def train():
 
         train_loss/=len(train_loader)
         train_mag/=len(train_loader)
-        train_cat/=len(train_loader)
+        # train_cat/=len(train_loader)
 
         ########################################
         # VALIDATION
@@ -302,18 +302,18 @@ def train():
                 # p_f = p_f.view(B,T,768)
                 # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-                pc= b["pc_net3_seq"] # p_f
-                traj=b["cat_diff"]
+                pc= b["pc_net3"] # p_f
+                # traj=b["cat_diff"]
                 traj_mag=b["mag"]
 
-                pred, pred_mag = model(pc)
+                pred_mag = model(pc)
 
-                cat_loss = criterion(pred, traj)
+                # cat_loss = criterion(pred, traj)
                 mag_loss = criterion_mag(pred_mag, traj_mag)
-                loss = cat_loss + 16*mag_loss
+                loss = mag_loss
 
                 val_loss+=loss.item()
-                val_cat+=cat_loss.item()
+                # val_cat+=cat_loss.item()
                 val_mag+=mag_loss.item()
 
                 mae=torch.abs(
@@ -325,7 +325,7 @@ def train():
                 )
 
         val_loss/=len(val_loader)
-        val_cat/=len(val_loader)
+        # val_cat/=len(val_loader)
         val_mag/=len(val_loader)
 
         mae_per_dim=np.mean(
@@ -339,8 +339,8 @@ def train():
                 train_loss,
             "train/mag_loss":
                 train_mag,
-            "train/cat_loss":
-                train_cat,
+            # "train/cat_loss":
+            #     train_cat,
 
             "val/epoch_loss":
                 val_loss,
@@ -431,11 +431,11 @@ def train():
             # p_f = p_f.view(B,T,768)
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc=  b["pc_net3_seq"] # p_f
-            traj = b["cat_diff"]
+            pc=  b["pc_net3"] # p_f
+            # traj = b["cat_diff"]
             traj_mag = b["mag"]
 
-            pred, pred_mag = model(pc)
+            pred_mag = model(pc)
 
             #################################
             # LOSSES
@@ -456,14 +456,14 @@ def train():
             #     traj
             # )
 
-            loss_cat = criterion(pred,traj)
+            # loss_cat = criterion(pred,traj)
             loss_mag = criterion_mag(pred_mag,traj_mag)
-            loss = loss_cat + loss_mag
+            loss = loss_mag
 
 
 
             test_loss += loss.item()
-            test_cat += loss_cat.item()
+            # test_cat += loss_cat.item()
             test_mag += loss_mag.item()
             # test_loss += smooth.item()
             # test_mse += mse.item()
@@ -509,7 +509,7 @@ def train():
     #################################
 
     test_loss /= len(test_loader)
-    test_cat /= len(test_loader)
+    # test_cat /= len(test_loader)
     test_mag /= len(test_loader)
     # test_mse /= len(test_loader)
     # test_mae /= len(test_loader)
@@ -537,9 +537,9 @@ def train():
         f"MAG: {test_mag:.6f}"
     )
 
-    print(
-        f"CAT: {test_cat:.6f}"
-    )
+    # print(
+    #     f"CAT: {test_cat:.6f}"
+    # )
 
     # print(
     #     f"MSE: {test_mse:.6f}"
@@ -575,7 +575,7 @@ def train():
 
         "test/smooth_l1": test_loss,
         "test/mag": test_mag,
-        "test/cat": test_cat,
+        # "test/cat": test_cat,
         # "test/mse": test_mse,
         # "test/l1": test_mae,
 

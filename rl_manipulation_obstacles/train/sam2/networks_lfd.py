@@ -283,11 +283,13 @@ class CnnPolicy(nn.Module):
             nn.LayerNorm(64),
             # nn.Dropout(0.15),
             nn.Linear(hidden_dim, 6),
+            nn.Tanh(), 
         )
 
         # self.forward = self.forward_temporal_DCT
         # self.forward = self.forward_temporal_DCT_raw
-        self.forward = self.forward_temporal_DCT_BERT
+        # self.forward = self.forward_temporal_DCT_BERT
+        self.forward = self.forward_BERT
 
 
 
@@ -531,6 +533,55 @@ class CnnPolicy(nn.Module):
         # )
 
         return pred, pred_mag
+
+
+
+    def forward_BERT(self, pc_seq):
+
+        """
+        pc_seq   : [B,T,F]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, F = pc_seq.shape
+
+        # -----------------------------------------------------
+        # Pose encoding
+        # -----------------------------------------------------
+        # pose = pose_seq.reshape(B * T, -1)
+        # f_pose = self.pose_mlp(pose)
+        # f_pose = f_pose.reshape(B, T, -1)
+
+        # -----------------------------------------------------
+        # BERT encoding
+        # -----------------------------------------------------
+        f_scene = self.bert_mlp(pc_seq)
+
+        # -----------------------------------------------------
+        # Fusion per timestep
+        # -----------------------------------------------------
+        # x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+        x = f_scene
+
+        # -----------------------------------------------------
+        # Temporal transformer
+        # -----------------------------------------------------
+        # x = self.temporal_transformer(x)
+
+        # -----------------------------------------------------
+        # Use CLS output for prediction
+        # -----------------------------------------------------
+        # cls_out = x[:, 0]   # [B, d_model]
+        # pred = self.head(x)  # [B, action_dim]
+        pred_mag = self.head2(x)  # [B, action_dim]
+        
+        # pred = pred.reshape(
+        #     B,
+        #     self.pred_horizon,
+        #     self.action_dim
+        # )
+
+        return pred_mag
     
 
     def forward_temporal_DCT_raw(self, pc_seq, pose_seq):

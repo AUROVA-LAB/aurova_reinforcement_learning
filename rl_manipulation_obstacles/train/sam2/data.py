@@ -233,6 +233,17 @@ class HDF5LfDDataset(Dataset):
 
             for t in range(0, max_start, stride):
                 self.index.append((file_id, t))
+        # for file_id, f in enumerate(self.handles):
+        
+        #     if "actions" not in f:
+        #         continue
+
+        #     T = f["actions"].shape[0]
+
+        #     max_start = T
+
+        #     for t in range(0, max_start, stride):
+        #         self.index.append((file_id, t))
 
 
 
@@ -301,6 +312,9 @@ class HDF5LfDDataset(Dataset):
         pc_net_seq = f["/pc/pcd_net"][t0:t1]            # [T_obs, 512, 3]
         pc_net2_seq = f["/pc/pcd_net2"][t0:t1]            # [T_obs, 512, 128]
         pc_net3_seq = f["/pc/pcd_net3"][t0:t1]            # [T_obs, 768]
+
+        pc_net3 = f["/pc/pcd_net3"][t0]            # [768]
+
         pose_seq = f["/states/gripper_pose"][t0:t1]
         sym_seq = (f["/states/target_pose"][t0:t1]
                    - f["/states/gripper_pose"][t0:t1])
@@ -309,14 +323,14 @@ class HDF5LfDDataset(Dataset):
                                     f["/pc/pc_ext"][t0:t1], 
                                     f["/pc/pc_front"][t0:t1]), axis=1)
 
-        diff = f["diff"][t1] 
-        cat = np.clip(np.round(diff, decimals=2), a_min = -0.01, a_max=0.01) / 0.01
-        new_cat = np.zeros(6*3)
-        for j in range(len(cat)):
-            idx = 1
-            if cat[j] > 0: idx = 2
-            if cat[j] < 0: idx = 0
-            new_cat[idx + j*3] = 1
+        # diff = f["diff"][t1] 
+        # cat = np.clip(np.round(diff, decimals=2), a_min = -0.01, a_max=0.01) / 0.01
+        # new_cat = np.zeros(6*3)
+        # for j in range(len(cat)):
+        #     idx = 1
+        #     if cat[j] > 0: idx = 2
+        #     if cat[j] < 0: idx = 0
+        #     new_cat[idx + j*3] = 1
 
         # -------------------------------------------------
         # ACTION TRAJECTORY (TARGET)
@@ -324,7 +338,8 @@ class HDF5LfDDataset(Dataset):
 
         # traj = f["actions"][t1:t2]                # [T_pred, 6]
         # diff_seq = f["diff"][t1:t2]
-        action = f["actions"][t1]
+        action = f["actions"][t0] # [t1]
+        diff = f["diff"][t0+1]
         mag =  diff
         mag[:3] /= self.max_diff_rot
         mag[3:] /= self.max_diff_trans
@@ -357,7 +372,7 @@ class HDF5LfDDataset(Dataset):
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "mag": mag,
             "diff": diff,
-            "cat_diff": new_cat,
+            # "cat_diff": new_cat,
             # "prev_action": prev_action
             "sym": (target_pose - gripper_pose),
 
@@ -367,6 +382,7 @@ class HDF5LfDDataset(Dataset):
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
             "pc_net2_seq": 2*(torch.tensor(pc_net2_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             "pc_net3_seq": torch.tensor(pc_net3_seq, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            "pc_net3": torch.tensor(pc_net3, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions Interval
