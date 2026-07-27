@@ -825,7 +825,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         with open("action_preprocessing.pkl","rb") as f:
             stats = pickle.load(f)
-        dataset.max_diff = stats["max_diff"]
+        dataset.max_diff_rot = stats["max_diff_rot"]
+        dataset.max_diff_trans = stats["max_diff_trans"]
 
 
     #     for i in range(len(dataset)):

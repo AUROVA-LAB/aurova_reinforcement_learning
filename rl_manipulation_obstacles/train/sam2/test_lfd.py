@@ -66,7 +66,7 @@ def test():
 
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=False, collate_fn = collate_fn)
     val_loader = DataLoader(val_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle = False, collate_fn = collate_fn)
+    test_loader = DataLoader(test_ds, batch_size=1, shuffle = False, collate_fn = collate_fn)
 
     # Get dimensions
     sample = dataset[0]
@@ -78,7 +78,7 @@ def test():
 
 
     
-    model = CnnPolicy(pose_dim, action_dim*3, 
+    model = CnnPolicy(pose_dim, action_dim, 
                       in_channels = 3,
                       pc=True,
                       hidden_dim=64).to(device)
@@ -125,7 +125,7 @@ def test():
     backbone.cuda()
 
     criterion = nn.BCEWithLogitsLoss()
-    criterion_mag = nn.MSELoss()
+    criterion_mag = nn.SmoothL1Loss()
 
 
     with torch.no_grad():
@@ -136,11 +136,11 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc= b["pc_net3_seq"] # p_f
-            traj=b["cat_diff"]
+            pc= b["pc_net3"] # p_f
+            # traj=b["cat_diff"]
             traj_mag = b["mag"]
 
-            pred, pred_mag = model(pc)
+            pred_mag = model(pc)
 
             #################################
             # LOSSES
@@ -163,14 +163,17 @@ def test():
 
             
 
-            loss_cat = criterion(pred, traj)
+            # loss_cat = criterion(pred, traj)
             loss_mag = criterion_mag(pred_mag, traj_mag)
-            loss = loss_cat + loss_mag
+            print(torch.round(pred_mag, decimals=3).cpu().numpy())
+            print(torch.round(traj_mag, decimals=3).cpu().numpy())
+            print("-------")
+            # loss = loss_cat + loss_mag
 
 
 
-            test_loss += loss.item()
-            test_cat += loss_cat.item()
+            # test_loss += loss.item()
+            # test_cat += loss_cat.item()
             test_mag += loss_mag.item()
             # test_loss += smooth.item()
             # test_mse += mse.item()
