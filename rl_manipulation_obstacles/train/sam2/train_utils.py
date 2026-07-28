@@ -567,7 +567,7 @@ def normalize_pc(pc):
 
         return pc_norm, centroid, scale
 
-def preprocess_pcd_single(pc_all, model, mode="BERT"):
+def preprocess_pcd_single(pc_all, model, mode="BERT", return_pc = False):
 
     # ============================================================
     # 2. VOXEL DOWNSAMPLE
@@ -603,10 +603,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
     # 4. OPEN3D POINT CLOUD + NORMALS
     # ============================================================
 
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-    # o3d.visualization.draw_geometries([cloud])
-
 
     # ============================================================
     # 5. POINTNET FEATURES (conv1 output)
@@ -639,10 +635,18 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
         
         xyz_sample = sampled_pts
 
-        cloud = o3d.geometry.PointCloud()
-        cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
-
+        # cloud = o3d.geometry.PointCloud()
+        # cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
         # o3d.visualization.draw_geometries([cloud])
+
+
+
+        if return_pc:
+            return torch.tensor(
+                        xyz_sample,
+                        dtype=torch.float32
+                    ).cuda()
+
 
     
 
