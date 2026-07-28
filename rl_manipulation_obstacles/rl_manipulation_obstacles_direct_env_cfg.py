@@ -85,13 +85,13 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = 7             # Number of actions per environment (overridden)
-    observation_space = 6 + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
+    action_space = 6             # Number of actions per environment (overridden)
+    observation_space = 768 # 6 + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
+    debug_markers = True        # Activate marker visualization
     save_imgs = False           # Activate image saving from cameras
     render_steps = 6            # Render images every certain amount of steps
 
@@ -403,7 +403,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                     [0.05,  0.05]]
     
     # Which robot apply the sampling poses
-    apply_range = [False, False, False, False]  # [False, False, True, False]
+    apply_range = [False, False, True, False]  # [False, False, True, False]
 
     ee_translation = [0.0, 0.0, 0.25]
     ee_rotation = [1.0, 0.0, 0.0, 0.0]

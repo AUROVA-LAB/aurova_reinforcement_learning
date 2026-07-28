@@ -22,7 +22,7 @@ parser.add_argument("--video", action="store_true", default=False, help="Record 
 parser.add_argument("--video_length", type=int, default=600, help="Length of the recorded video (in steps).")
 parser.add_argument("--video_interval", type=int, default=1000, help="Interval between video recordings (in steps).")
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--train", type=bool, default=False, help="Number of environments to simulate.")
+parser.add_argument("--train", type=bool, default=True, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--agent", type=str, default="sb3_cfg_entry_point", help="Name of the RL agent configuration entry point."
@@ -251,8 +251,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         obs = env.reset()
                              
-        action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size+1))
-        action = torch.tensor([[0,0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
+        action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
+        action = torch.tensor([[0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
 
         # Simulate physics
         while True:

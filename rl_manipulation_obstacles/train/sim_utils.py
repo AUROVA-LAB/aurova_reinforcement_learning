@@ -90,12 +90,13 @@ def depth_to_pointcloud(rgbd, fx, fy, cx, cy):
     returns: (N, 3) points in camera frame
     """
 
-    depth = rgbd[-1]
-    rgb = rgbd[:-1]
+    depth = rgbd[:, -1]
+    rgb = rgbd[:, :-1]
 
     device = depth.device
 
-    H, W = depth.shape
+    
+    B, H, W = depth.shape
 
     u = torch.arange(W, device=device)
     v = torch.arange(H, device=device)
@@ -109,8 +110,8 @@ def depth_to_pointcloud(rgbd, fx, fy, cx, cy):
     points = torch.stack((x, y, z), dim=-1)
 
     # Flatten
-    points = points.reshape(-1, 3)
-    colors = rgb.reshape(-1, 3)
+    points = points.reshape(B, -1, 3)
+    colors = rgb.reshape(B, -1, 3)
 
     # Optional: normalize RGB to [0,1]
     colors = colors.float() / 255.0
@@ -122,37 +123,51 @@ def depth_to_pointcloud(rgbd, fx, fy, cx, cy):
 
 def quat_to_rotmat(q):
     """
-    q = (w, x, y, z)
+    q: (B,4) in (w,x,y,z) order
     """
-    w, x, y, z = q
 
-    R = torch.tensor([
-        [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
-        [2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w],
-        [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y]
-    ], device=q.device)
+    # Normalize just in case
+    q = q / q.norm(dim=1, keepdim=True)
+
+    w = q[:, 0]
+    x = q[:, 1]
+    y = q[:, 2]
+    z = q[:, 3]
+
+    R = torch.empty(q.shape[0], 3, 3, device=q.device, dtype=q.dtype)
+
+    R[:, 0, 0] = 1 - 2*(y*y + z*z)
+    R[:, 0, 1] = 2*(x*y - z*w)
+    R[:, 0, 2] = 2*(x*z + y*w)
+
+    R[:, 1, 0] = 2*(x*y + z*w)
+    R[:, 1, 1] = 1 - 2*(x*x + z*z)
+    R[:, 1, 2] = 2*(y*z - x*w)
+
+    R[:, 2, 0] = 2*(x*z - y*w)
+    R[:, 2, 1] = 2*(y*z + x*w)
+    R[:, 2, 2] = 1 - 2*(x*x + y*y)
 
     return R
 
 
 def transform_points(points, translation, quaternion):
     """
-    points: (N, 3)
-    translation: (3,)
-    quaternion: (4,)  [w,x,y,z]
+    points:      (B, N, C), first 3 channels are XYZ
+    translation: (B, 3)
+    quaternion:  (B, 4)  [w, x, y, z]
     """
 
-    # R = matrix_from_quat(quaternion)
-
-
-
+    # (B, 3, 3)
     R = quat_to_rotmat(quaternion)
 
-    points_world = (R @ points[:,:3].T).T + translation
-    # points_world = (R.T @ (points + translation).T).T
-    # points_world = (points - translation)@R.T  
+    # Rotate
+    # points[..., :3] -> (B, N, 3)
+    # R.transpose(1, 2) because points are row vectors
+    points_world = torch.bmm(points[..., :3], R.transpose(1, 2))
 
-    points_world = torch.cat((points_world, points[:, 3:]), dim = -1)
+    # Translate
+    points_world = points_world + translation[:, None, :]
 
     return points_world
 
