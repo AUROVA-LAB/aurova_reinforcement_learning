@@ -468,10 +468,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.my_cmd = torch.zeros((1,6)).to(self.device)
 
         
-        
-
-
-
     def on_press(self, key):
         try:
             if key.char in self.correspondences:
@@ -1047,6 +1043,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                  filename = os.path.join(output_dir, "rgb", f"{self.count:04d}.jpg"))
                     
 
+
     def _get_PC(self):
         intrinsics = self.scene.sensors["camera"].data.intrinsic_matrices[0]
         intrinsics_ext = self.scene.sensors["camera_ext"].data.intrinsic_matrices[0]
@@ -1105,6 +1102,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     self.pc_seq.enqueue(self.processed_pc)        
 
 
+
     def save_step(self):
         
         cam = self.camera_w.cpu().numpy().astype(np.uint8)
@@ -1130,7 +1128,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # ---- Save step ----
         if self.count != self.cfg.save_interval:
-            print("diff: ", np.round(diff, decimals=3))
+            print("diff: ", np.round(diff, decimals=2))
             print(self.count)
             self.writer.add_step(cam, cam_ext, cam_front, 
                                 cam_p, cam_p, cam_p,
@@ -1138,7 +1136,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                 pc_w, pc_ext, pc_front, 
                                 target_pose, gripper_pose, action, diff, self.gripper_action)
 
-        self.prev_pose = self.gripper_pose_r_lie
+            self.prev_pose = self.gripper_pose_r_lie
 
 
     # Getter for the observations of the environment --> Overrides method of DirectRLEnv
@@ -1571,7 +1569,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.writer = HDF5EpisodeWriter(
                                             output_dir=os.path.join(self.current_path, "dataset"),
                                             episode_idx=self.episode_id,
-                                            max_steps=int(self.trajectory_save.shape[0] / self.cfg.save_interval) - 1
+                                            max_steps=self.trajectory_save.shape[0]
                                             )
         else:
 
