@@ -73,7 +73,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     distance = 1
 
     # Scalings for each action
-    scalings = [[[0.01, 0.001], [0.03,  0.006], [0.01, 0.007]],
+    scalings = [[[0.01, 0.001], [0.05,  0.004], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006]]]
@@ -395,12 +395,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     ee_init_pose = torch.cat((torch.tensor(ee_init_pose_quat)[:,:3], torch.tensor(euler)), dim = -1).numpy().tolist()
 
     # Increments in the original poses for sampling random values on each axis
-    ee_pose_incs = [[-0.3,  0.3],
+    ee_pose_incs = [[-0.3,  0.1],
                     [-0.3,  0.3],
-                    [-0.05,  0.05],
-                    [0.05,  0.05],
-                    [0.05,  0.05],
-                    [0.05,  0.05]]
+                    [-0.0,  0.0],
+                    [-0.15,  0.15],
+                    [-0.15,  0.15],
+                    [-0.15,  0.15]]
     
     # Which robot apply the sampling poses
     apply_range = [False, False, True, False]  # [False, False, True, False]
@@ -536,7 +536,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
