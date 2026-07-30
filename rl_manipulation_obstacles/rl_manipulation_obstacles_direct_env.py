@@ -805,8 +805,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
 
         # Fix double cover
-        # neg_idx = target_quat_r[:, 0] < 0.0
-        # target_quat_r[neg_idx] *= -1
+        neg_idx = target_quat_r[:, 0] < 0.0
+        target_quat_r[neg_idx] *= -1
+
+        neg_idx2 = target_quat_r2[:, 0] < 0.0
+        target_quat_r2[neg_idx2] *= -1
 
         self.target_pose_r = torch.cat((target_pos_r, target_quat_r), dim = -1)
         self.target_pose_r_group = self.convert_to_group(target_pos_r, target_quat_r)
@@ -841,12 +844,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         dist2 = self.dist_function(self.pose_group_r, self.target_pose_r_group2, self.log, self.diff_operator)
 
 
-        # dist_mask = (dist > dist2).unsqueeze(-1)
-        # not_dist_mask = torch.logical_not(dist_mask)
+        dist_mask = (dist > dist2).unsqueeze(-1)
+        not_dist_mask = torch.logical_not(dist_mask)
 
-        # self.target_pose_r *= dist_mask + not_dist_mask * torch.cat((target_pos_r2, target_quat_r2), dim = -1)
-        # self.target_pose_r_group *= dist_mask + not_dist_mask * self.convert_to_group(target_pos_r2, target_quat_r2)
-        # self.target_pose_r_lie *= dist_mask + not_dist_mask * self.log(self.target_pose_r_group2)
+        self.target_pose_r =self.target_pose_r * not_dist_mask + dist_mask * torch.cat((target_pos_r2, target_quat_r2), dim = -1)
+        self.target_pose_r_group = self.target_pose_r_group * not_dist_mask + dist_mask * self.convert_to_group(target_pos_r2, target_quat_r2)
+        self.target_pose_r_lie = self.target_pose_r_lie * not_dist_mask + dist_mask * self.log(self.target_pose_r_group2)
 
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
         self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
