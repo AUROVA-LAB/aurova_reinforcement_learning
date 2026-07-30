@@ -81,12 +81,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     action_scaling = scalings[representation][mapping]
     grip_scaling = 5*2
 
-    img_width, img_height = 128, 128# 640, 480
+    img_width, img_height = 64, 64# 640, 480
 
 
     # --- Action / observation space ---
     action_space = 6             # Number of actions per environment (overridden)
-    observation_space = 768 # 6 + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
+    observation_space = 768 # + 1 + 3#  + img_height*img_width*3       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)
