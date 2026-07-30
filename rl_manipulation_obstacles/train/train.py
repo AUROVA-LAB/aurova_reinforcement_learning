@@ -220,6 +220,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         )
 
     # create agent from stable baselines
+    '''
+    IMPORTANTE: 
+        si quiero cambiar la arquitectura, cambiar "policy_arch" por "CustomActorCriticPolicy",
+      y modificar la clase esa si es necesario
+    '''
     agent = PPO(policy_arch, env, verbose=1, tensorboard_log=log_dir, **agent_cfg)
     if args_cli.checkpoint is not None:
         agent = agent.load(args_cli.checkpoint, env, print_system_info=True)
