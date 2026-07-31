@@ -20,36 +20,38 @@ class ImageFeatureExtractor(th.nn.Module):
     def __init__(self, in_features: int, arch: list[int], n_cameras: int):
         super().__init__()
 
-        list_cnn = [
-            th.nn.Conv2d(in_features, arch[0], kernel_size = 3),
-            th.nn.BatchNorm2d(arch[0]),
-            th.nn.Tanh()]
+        self.pc_net = th.nn.Sequential(
+            self.Linear(768, 256),
+            self.Tanh(),
+            self.LayerNorm(256),
+
+            self.Linear(256, 128),
+            self.Tanh(),
+            self.LayerNorm(128),
+        )
+
+        self.lie_net = th.nn.Sequential(
+                    self.Linear(6, 32),
+                    self.Tanh(),
+                    self.LayerNorm(32),
         
-        for idx, layer in enumerate(arch[1:-1]):
-            list_cnn += [
-                th.nn.Conv2d(arch[idx], layer, kernel_size = 3),
-                th.nn.BatchNorm2d(layer),
-                th.nn.Tanh()]
+                    self.Linear(32, 64),
+                    self.Tanh(),
+                    self.LayerNorm(64),
 
-
-        list_cnn.append(th.nn.Flatten())
-
-        self.cnn_1 = th.nn.Sequential(*list_cnn)
-        self.cnn_2 = copy.deepcopy(self.cnn_1)
-        self.cnn_3 = copy.deepcopy(self.cnn_1)
-        self.n_cameras = n_cameras
+                    self.Linear(64, 128),
+                    self.Tanh(),
+                    self.LayerNorm(128),
+                )
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
-        obs = obs.reshape(obs.shape[0], 1, 80 * self.n_cameras, 80)
-        obs_1 = obs[:, :, :80, :]
-        obs_2 = obs[:, :, 80  :80*2, :]
-        obs_3 = obs[:, :, 80*2:80*3, :]
+        obs_pc = obs[:, :768]
+        obs_lie = obs[:, 768:]
 
-        feat_1 = self.cnn_1(obs_1)
-        feat_2 = self.cnn_1(obs_2)
-        feat_3 = self.cnn_1(obs_3)
+        feat_1 = self.pc_net(obs_pc)
+        feat_2 = self.lie_net(obs_lie)
 
-        return th.cat((feat_1, feat_2, feat_3), dim = -1)
+        return th.cat((feat_1, feat_2), dim = -1)
 
 
 
@@ -91,23 +93,32 @@ class customMlpExtractor(MlpExtractor):
 
 
         self.policy_net_img = th.nn.Sequential(
-            ImageFeatureExtractor(1, [16, 32, 64], 3),
+            nn.Linear(768, 256),
+            nn.Tanh(),
+            nn.LayerNorm(256),
 
-            # th.nn.Linear(1051392, 256),
-            th.nn.Linear(554496, 256),
-            th.nn.LayerNorm(256),
-            th.nn.Tanh(),
+            nn.Linear(256, 128),
+            nn.Tanh(),
+            nn.LayerNorm(128),
         )
 
         self.value_net_img = copy.deepcopy(self.policy_net_img)
 
-        self.linear_obs = 6 + 1 + 3
+        self.linear_obs = 6
         
         self.policy_net = th.nn.Sequential(
-                th.nn.Linear(self.linear_obs, 128),
-                th.nn.LayerNorm(128),
-                th.nn.Tanh(),
-            )
+                            nn.Linear(self.linear_obs, 32),
+                            nn.Tanh(),
+                            nn.LayerNorm(32),
+                
+                            nn.Linear(32, 64),
+                            nn.Tanh(),
+                            nn.LayerNorm(64),
+        
+                            nn.Linear(64, 128),
+                            nn.Tanh(),
+                            nn.LayerNorm(128),
+                        )
         self.value_net = copy.deepcopy(self.policy_net)
 
         # Save dim, used to create the distributions
@@ -130,8 +141,8 @@ class customMlpExtractor(MlpExtractor):
     
 
     def extract_features(self, features:th.Tensor) -> th.Tensor:
-        geom_obs = features[:, :self.linear_obs]
-        img_obs = features[:, self.linear_obs:].reshape(-1, 1, 80*3, 80)
+        geom_obs = features[:, 768:]
+        img_obs = features[:, :768]
 
         return geom_obs, img_obs
 
@@ -141,8 +152,8 @@ class customMlpExtractor(MlpExtractor):
         latent_pi_geom = self.policy_net(geom_obs)
         latent_pi_img = self.policy_net_img(img_obs)
 
-
         return th.cat((latent_pi_geom, latent_pi_img), dim = 1)
+
 
     def forward_critic(self, features: th.Tensor) -> th.Tensor:
         
@@ -171,18 +182,18 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             **kwargs,
         )
 
-        self.mlp_extractor = customMlpExtractor(feature_dim = 256 + 128,
+        features = 256
+        self.mlp_extractor = customMlpExtractor(feature_dim = features,
                                                 net_arch=net_arch,
                                                 activation_fn=nn.Tanh,
                                                 device = self.device)
 
 
         # Determine the number of input features
-        features = 256+128
 
         # Replace the actor with your custom network
         self.action_net = th.nn.Sequential(
-            th.nn.Linear(features, 7),
+            th.nn.Linear(features, 6),
             th.nn.Tanh())
         
         # Replace the actor with your custom network
