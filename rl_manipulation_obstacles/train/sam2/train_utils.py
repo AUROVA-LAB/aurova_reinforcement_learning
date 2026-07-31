@@ -1,6 +1,8 @@
 import gymnasium as gym
 import numpy as np
 import torch
+from pytorch3d.ops import sample_farthest_points
+import time
 
 from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
 import torch
@@ -553,19 +555,17 @@ def normalize_pc_batch(pc):
 
 
 def normalize_pc(pc):
-        centroid = pc.mean(dim=1, keepdim=True)
+    # pc: (B, N, 3)
 
-        pc_centered = pc - centroid
-        scale = (
-            torch.linalg.norm(pc_centered, dim=1)
-            .max(dim=0, keepdim=True)
-            .values
-            .unsqueeze(-1)
-        )  # (B,1,1)
+    centroid = pc.mean(dim=1, keepdim=True)      # (B,1,3)
+    pc_centered = pc - centroid                  # (B,N,3)
 
-        pc_norm = pc_centered / scale.squeeze(-1)
+    scale = torch.linalg.norm(pc_centered, dim=2).max(dim=1, keepdim=True).values
+    # scale: (B,1)
 
-        return pc_norm, centroid, scale
+    pc_norm = pc_centered / scale.unsqueeze(-1)  # (B,N,3)
+
+    return pc_norm, centroid, scale
 
 def preprocess_pcd_single(pc_all, model, mode="BERT", return_pc = False):
 
@@ -627,13 +627,10 @@ def preprocess_pcd_single(pc_all, model, mode="BERT", return_pc = False):
         if pc_xyz.shape[1] == 0:
             print("None")
             return None
-        
-        sampled_pts = farthest_point_sampling_BERT(
-                torch.tensor(pc_xyz),
-                1024
-            ).cpu().numpy()
-        
-        xyz_sample = sampled_pts
+
+        pc_xyz, idx = sample_farthest_points(torch.tensor(pc_xyz), K=1024)
+                
+        xyz_sample = pc_xyz
 
         # cloud = o3d.geometry.PointCloud()
         # cloud.points = o3d.utility.Vector3dVector(xyz_sample[0, :, :3])
