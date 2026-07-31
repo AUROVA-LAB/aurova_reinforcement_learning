@@ -5,6 +5,7 @@ import os
 import torch
 from collections.abc import Sequence
 import copy
+import time
 
 from .rl_manipulation_obstacles_direct_env_cfg import RLManipulationObstaclesDirectCfg, update_cfg, update_collisions
 
@@ -1143,7 +1144,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Save sampled pose
         self.reset_robot_poses_r[env_ids] = ee_init_pose[env_ids]
-        self.reset_robot_poses_group_r[env_ids] = self.convert_to_group(ee_init_pose[:, :3], ee_init_pose[:, 3:])
+        self.reset_robot_poses_group_r[env_ids] = self.convert_to_group(ee_init_pose[:, :3], ee_init_pose[:, 3:])[env_ids]
 
         # Sets the command to the DifferentialIKController
         self.controller.set_command(ee_init_pose)
