@@ -39,7 +39,7 @@ import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
-from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
+# from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
 
@@ -1130,11 +1130,33 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if self.count != self.cfg.save_interval:
             print("diff: ", np.round(diff, decimals=2))
             print(self.count)
-            self.writer.add_step(cam, cam_ext, cam_front, 
-                                cam_p, cam_p, cam_p,
-                                pcd_p, pcd_net,pcd_net2, pcd_net3,
-                                pc_w, pc_ext, pc_front, 
-                                target_pose, gripper_pose, action, diff, self.gripper_action)
+
+            if self.cfg.hdf5:
+                self.writer.add_step(cam, cam_ext, cam_front, 
+                                    cam_p, cam_p, cam_p,
+                                    pcd_p, pcd_net,pcd_net2, pcd_net3,
+                                    pc_w, pc_ext, pc_front, 
+                                    target_pose, gripper_pose, action, diff, self.gripper_action)
+            else:
+                self.s_cam.append(cam)
+                self.s_cam_ext.append(cam_ext)
+                self.s_cam_front.append(cam_front)
+
+                self.s_target_pose.append(target_pose)
+                self.s_gripper_pose.append(gripper_pose)
+                self.s_action.append(action)
+
+                self.s_diff.append(diff)
+
+                self.s_pc_w.append(pc_w)
+                self.s_pc_ext.append(pc_ext)
+                self.s_pc_front.append(pc_front)
+
+                self.s_cam_p.append(cam_p)
+                self.s_pcd_p.append(pcd_p)
+                self.s_pcd_net.append(pcd_net)
+                self.s_pcd_net2.append(pcd_net2)
+                self.s_pcd_net3.append(pcd_net3)
 
             self.prev_pose = self.gripper_pose_r_lie
 
@@ -1227,7 +1249,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Computes time out indicators
         if not self.cfg.test:
             time_out = torch.tensor(self.count >= self.trajectory_save.shape[0] - 1).bool().to(self.device)  # self.episode_length_buf >= self.max_episode_length - 1
-            if time_out.item():
+            if time_out.item() and self.cfg.hdf5:
                 self.writer.close()
         else:
             time_out = self.episode_length_buf >= self.max_episode_length - 1
@@ -1566,11 +1588,65 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
         if not self.cfg.test:
-            self.writer = HDF5EpisodeWriter(
-                                            output_dir=os.path.join(self.current_path, "dataset"),
-                                            episode_idx=self.episode_id,
-                                            max_steps=self.trajectory_save.shape[0]
-                                            )
+            if self.cfg.hdf5:
+                self.writer = HDF5EpisodeWriter(
+                                                output_dir=os.path.join(self.current_path, "dataset"),
+                                                episode_idx=self.episode_id,
+                                                max_steps=self.trajectory_save.shape[0]
+                                                )
+            else:
+                if self.episode_id > 1:
+                    episode_dict = {
+                        "s_cam": self.s_cam,
+                        "s_cam_ext": self.s_cam_ext,
+                        "s_cam_front": self.s_cam_front,
+
+                        "s_target_pose": self.s_target_pose,
+                        "s_gripper_pose": self.s_gripper_pose,
+                        "s_action": self.s_action,
+
+                        "s_diff": self.s_diff,
+
+                        "s_pc_w": self.s_pc_w,
+                        "s_pc_ext": self.s_pc_ext,
+                        "s_pc_front": self.s_pc_front,
+
+                        "s_cam_p": self.s_cam_p,
+                        "s_pcd_p": self.s_pcd_p,
+                        "s_pcd_net": self.s_pcd_net,
+                        "s_pcd_net2": self.s_pcd_net2,
+                        "s_pcd_net3": self.s_pcd_net3
+                    }
+
+                    # print(os.path.join(self.current_path, "dataset","ep_"+str(self.episode_id-1)+".pkl"))
+                    # raise
+
+                    # Save
+                    with open(os.path.join(self.current_path, "dataset", "ep_" + str(self.episode_id - 1) + ".pkl"), "wb") as f:
+                        pickle.dump(episode_dict, f)
+
+
+                self.s_cam = []
+                self.s_cam_ext = []
+                self.s_cam_front = []
+
+                self.s_target_pose = []
+                self.s_gripper_pose = []
+                self.s_action = []
+
+                self.s_diff = []
+
+                self.s_pc_w = []
+                self.s_pc_ext = []
+                self.s_pc_front = []
+
+                self.s_cam_p = []
+                self.s_pcd_p = []
+                self.s_pcd_net = []
+                self.s_pcd_net2 = []
+                self.s_pcd_net3 = []
+            
+
         else:
 
             self.dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
