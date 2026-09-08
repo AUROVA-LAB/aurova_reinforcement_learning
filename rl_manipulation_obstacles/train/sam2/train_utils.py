@@ -28,7 +28,7 @@ from Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 import open3d as o3d
 
 from networks_lfd import FastDCTFeatureReducer
-# from Point_BERT.models.Point_BERT import PointTransformer
+from Point_BERT.models.Point_BERT import PointTransformer
 from easydict import EasyDict
 from sklearn.preprocessing import QuantileTransformer, RobustScaler, MinMaxScaler, MaxAbsScaler
 import pickle
@@ -769,8 +769,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                     flag = True
                     break
             if flag:
-                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)            
+                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005) 
             actions_list[i] = np.round(actions_list[i], decimals=3)
+
             dataset.set_item(i, diff = actions_list[i])
 
             

@@ -1,9 +1,11 @@
 import h5py
 import numpy as np
 import os
+import pickle
 
 import torch
 from torch.utils.data import Dataset
+
 
 
 class HDF5EpisodeWriter:
@@ -193,6 +195,8 @@ class HDF5LfDDataset(Dataset):
 
         self.obs_horizon = obs_horizon
         self.pred_horizon = pred_horizon
+        self.stride = stride
+
         self.stride = 5
         
         self.max_pc = 1.0
@@ -203,10 +207,35 @@ class HDF5LfDDataset(Dataset):
         self.max_diff_rot = 1.0
         self.max_diff_trans = 1.0
 
+        # -------------------------------------------------
+        # Convert PKL -> HDF5 if necessary
+        # -------------------------------------------------
+
+        pkl_files = sorted([
+            os.path.join(dataset_dir, f)
+            for f in os.listdir(dataset_dir)
+            if f.endswith(".pkl")
+        ])
+
+        for pkl_path in pkl_files:
+
+            h5_path = pkl_path.replace(".pkl", ".h5")
+
+            print(h5_path)
+            if not os.path.exists(h5_path):
+
+                print(f"Converting {pkl_path} -> {h5_path}")
+                print(pkl_path)
+                
+                self.pkl_to_hdf5(
+                    pkl_path,
+                    h5_path
+                )
 
         # -------------------------------------------------
-        # Load files
+        # Load HDF5 files
         # -------------------------------------------------
+
         self.files = sorted([
             os.path.join(dataset_dir, f)
             for f in os.listdir(dataset_dir)
@@ -217,9 +246,11 @@ class HDF5LfDDataset(Dataset):
             h5py.File(path, "r+")
             for path in self.files
         ]
+
         # -------------------------------------------------
-        # Build index of valid windows
+        # Build index
         # -------------------------------------------------
+
         self.index = []
 
         for file_id, f in enumerate(self.handles):
@@ -229,21 +260,10 @@ class HDF5LfDDataset(Dataset):
 
             T = f["actions"].shape[0]
 
-            max_start = T - (obs_horizon)
+            max_start = T - self.obs_horizon
 
-            for t in range(0, max_start, stride):
+            for t in range(0, max_start, self.stride):
                 self.index.append((file_id, t))
-        # for file_id, f in enumerate(self.handles):
-        
-        #     if "actions" not in f:
-        #         continue
-
-        #     T = f["actions"].shape[0]
-
-        #     max_start = T
-
-        #     for t in range(0, max_start, stride):
-        #         self.index.append((file_id, t))
 
 
 
@@ -265,6 +285,123 @@ class HDF5LfDDataset(Dataset):
 
     def __len__(self):
         return len(self.index)
+
+    # =====================================================
+    # PKL to HDF5
+    # =====================================================
+
+    def pkl_to_hdf5(self,pkl_path, h5_path):
+        # --------------------------------------------------
+        # Load pickle
+        # --------------------------------------------------
+        with open(pkl_path, "rb") as f:
+            episode = pickle.load(f)
+
+        print(f"Loaded: {pkl_path}")
+
+        # --------------------------------------------------
+        # Create HDF5
+        # --------------------------------------------------
+        with h5py.File(h5_path, "w") as h5:
+
+            # Create groups
+            images = h5.create_group("images")
+            pc = h5.create_group("pc")
+            states = h5.create_group("states")
+
+            # --------------------------------------------------
+            # Images
+            # --------------------------------------------------
+            if episode["s_cam"] is not None:
+                images.create_dataset(
+                    "cam",
+                    data=np.asarray(episode["s_cam"])
+                )
+
+            if episode["s_cam_ext"] is not None:
+                images.create_dataset(
+                    "cam_ext",
+                    data=np.asarray(episode["s_cam_ext"])
+                )
+
+            if episode["s_cam_front"] is not None:
+                images.create_dataset(
+                    "cam_front",
+                    data=np.asarray(episode["s_cam_front"])
+                )
+
+            if episode["s_cam_p"] is not None:
+                images.create_dataset(
+                    "cam_p",
+                    data=np.asarray(episode["s_cam_p"])
+                )
+
+            # --------------------------------------------------
+            # Point clouds
+            # --------------------------------------------------
+            pc.create_dataset(
+                "pc",
+                data=np.asarray(episode["s_pc_w"])
+            )
+
+            pc.create_dataset(
+                "pc_ext",
+                data=np.asarray(episode["s_pc_ext"])
+            )
+
+            pc.create_dataset(
+                "pc_front",
+                data=np.asarray(episode["s_pc_front"])
+            )
+
+            pc.create_dataset(
+                "pcd_p",
+                data=np.asarray(episode["s_pcd_p"])
+            )
+
+            pc.create_dataset(
+                "pcd_net",
+                data=np.asarray(episode["s_pcd_net"])
+            )
+
+            pc.create_dataset(
+                "pcd_net2",
+                data=np.asarray(episode["s_pcd_net2"])
+            )
+
+            pc.create_dataset(
+                "pcd_net3",
+                data=np.asarray(episode["s_pcd_net3"])
+            )
+
+            # --------------------------------------------------
+            # States
+            # --------------------------------------------------
+            states.create_dataset(
+                "target_pose",
+                data=np.asarray(episode["s_target_pose"])
+            )
+
+            states.create_dataset(
+                "gripper_pose",
+                data=np.asarray(episode["s_gripper_pose"])
+            )
+
+            # --------------------------------------------------
+            # Actions
+            # --------------------------------------------------
+            h5.create_dataset(
+                "actions",
+                data=np.asarray(episode["s_action"])
+            )
+
+            h5.create_dataset(
+                "diff",
+                data=np.asarray(episode["s_diff"])
+            )
+            h5.flush()
+
+            print(f"Saved: {h5_path}")
 
     # =====================================================
     # GET ITEM
@@ -293,7 +430,7 @@ class HDF5LfDDataset(Dataset):
         gripper_pose = f["/states/gripper_pose"][t0] 
 
         # prev_action = f["actions"][t - 1]  if t > 0 else np.zeros_like(action)
-        gripper_action = f["gripper_action"][t0]
+        # gripper_action = f["gripper_action"][t0]
 
 
 
