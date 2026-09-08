@@ -1077,6 +1077,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_all = np.concatenate([self.pc_w[:, :3].cpu().numpy(), self.pc_ext[:, :3].cpu().numpy(), self.pc_front[:, :3].cpu().numpy()], axis=0)
         pc_all_color = np.concatenate([self.pc_w.cpu().numpy(), self.pc_ext.cpu().numpy(), self.pc_front.cpu().numpy()], axis=0)
 
+
+        print(self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0))
+        raise
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
@@ -1101,6 +1104,247 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     self.pose_seq.enqueue(self.gripper_pose_r_lie)
                     self.pc_seq.enqueue(self.processed_pc)        
 
+
+
+    def get_3d_bboxes_from_instances(
+        self,
+        camera,
+        env_id: int,
+    ):
+        """
+        Get 3D axis-aligned bounding boxes for:
+            1. the object
+            2. the entire UR5e robot
+
+        The bounding boxes are computed from the camera's
+        depth image + instance segmentation.
+
+        Returns
+        -------
+        object_bbox_min : torch.Tensor [3]
+            Minimum XYZ of object BB in camera frame.
+
+        object_bbox_max : torch.Tensor [3]
+            Maximum XYZ of object BB in camera frame.
+
+        robot_bbox_min : torch.Tensor [3]
+            Minimum XYZ of robot BB in camera frame.
+
+        robot_bbox_max : torch.Tensor [3]
+            Maximum XYZ of robot BB in camera frame.
+
+        object_points : torch.Tensor [N,3]
+            Reconstructed object points in camera frame.
+
+        robot_points : torch.Tensor [M,3]
+            Reconstructed robot points in camera frame.
+        """
+
+        device = camera.device
+
+        # =========================================================
+        # 1. DEPTH
+        # =========================================================
+
+        depth = camera.data.output[
+            "distance_to_image_plane"
+        ][env_id, ..., 0]
+
+        # =========================================================
+        # 2. INSTANCE SEGMENTATION
+        # =========================================================
+
+        segmentation = camera.data.output[
+            "instance_id_segmentation_fast"
+        ][env_id]
+
+        # IMPORTANT:
+        # Do NOT use [..., 0] here.
+        #
+        # We need the complete segmentation value.
+        #
+        # Expected shape is typically:
+        #     [H, W, 4]
+        #
+        # because your idToLabels contains RGBA values such as:
+        #
+        # (226, 25, 54, 255)
+        #
+        # =========================================================
+
+        # =========================================================
+        # 3. GET INSTANCE COLORS
+        # =========================================================
+
+        id_to_labels = camera.data.info[
+            "instance_id_segmentation_fast"
+        ]["idToLabels"]
+
+        object_colors = []
+        robot_colors = []
+
+        for color, prim_path in id_to_labels.items():
+
+            # -----------------------------------------------------
+            # Object
+            # -----------------------------------------------------
+
+            if "/object/" in prim_path:
+                object_colors.append(color)
+
+            # -----------------------------------------------------
+            # Entire UR5e
+            # -----------------------------------------------------
+
+            if "/UR5e_3f/" in prim_path:
+                robot_colors.append(color)
+
+        # =========================================================
+        # 4. CREATE MASKS
+        # =========================================================
+
+        object_mask = torch.zeros(
+            segmentation.shape[:2],
+            dtype=torch.bool,
+            device=device,
+        )
+
+        robot_mask = torch.zeros(
+            segmentation.shape[:2],
+            dtype=torch.bool,
+            device=device,
+        )
+
+        # ---------------------------------------------------------
+        # Object mask
+        # ---------------------------------------------------------
+
+        for color in object_colors:
+
+            color_tensor = torch.tensor(
+                color,
+                device=device,
+                dtype=segmentation.dtype,
+            )
+
+            object_mask |= torch.all(
+                segmentation == color_tensor,
+                dim=-1,
+            )
+
+        # ---------------------------------------------------------
+        # Robot mask
+        # ---------------------------------------------------------
+
+        for color in robot_colors:
+
+            color_tensor = torch.tensor(
+                color,
+                device=device,
+                dtype=segmentation.dtype,
+            )
+
+            robot_mask |= torch.all(
+                segmentation == color_tensor,
+                dim=-1,
+            )
+
+        # =========================================================
+        # 5. VALID DEPTH
+        # =========================================================
+
+        valid_depth = (
+            torch.isfinite(depth)
+            & (depth > 0.0)
+        )
+
+        object_mask &= valid_depth
+        robot_mask &= valid_depth
+
+        # =========================================================
+        # 6. CAMERA INTRINSICS
+        # =========================================================
+
+        K = camera.data.intrinsic_matrices[env_id]
+
+        fx = K[0, 0]
+        fy = K[1, 1]
+
+        cx = K[0, 2]
+        cy = K[1, 2]
+
+        # =========================================================
+        # 7. HELPER: MASK -> 3D POINTS -> AABB
+        # =========================================================
+
+        def mask_to_bbox(mask):
+
+            v, u = torch.where(mask)
+
+            if u.numel() == 0:
+                return None, None, None
+
+            z = depth[v, u]
+
+            x = (
+                (u.float() - cx)
+                * z
+                / fx
+            )
+
+            y = (
+                (v.float() - cy)
+                * z
+                / fy
+            )
+
+            points = torch.stack(
+                [x, y, z],
+                dim=-1,
+            )
+
+            bbox_min = points.min(
+                dim=0
+            ).values
+
+            bbox_max = points.max(
+                dim=0
+            ).values
+
+            return bbox_min, bbox_max, points
+
+        # =========================================================
+        # 8. COMPUTE OBJECT BB
+        # =========================================================
+
+        (
+            object_bbox_min,
+            object_bbox_max,
+            object_points,
+        ) = mask_to_bbox(object_mask)
+
+        # =========================================================
+        # 9. COMPUTE ROBOT BB
+        # =========================================================
+
+        (
+            robot_bbox_min,
+            robot_bbox_max,
+            robot_points,
+        ) = mask_to_bbox(robot_mask)
+
+        # =========================================================
+        # 10. RETURN
+        # =========================================================
+
+        return (
+            object_bbox_min,
+            object_bbox_max,
+            robot_bbox_min,
+            robot_bbox_max,
+            object_points,
+            robot_points,
+        )
 
 
     def save_step(self):
