@@ -877,66 +877,82 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
 
     if True:
-        pc_data = []
+        pc_data_robot = []
+        pc_data_object = []
 
         for i in range(len(dataset)):
             print("--- Image ", i / len(dataset))
 
             # Preprocess PCs
-            pc = dataset[i]["pc"].astype(np.float32)  / curr_max
-            pc_ext = dataset[i]["pc_ext"].astype(np.float32)  / curr_max
-            pc_front = dataset[i]["pc_front"].astype(np.float32)  / curr_max
+            # pc = dataset[i]["pc"].astype(np.float32)  / curr_max
+            # pc_ext = dataset[i]["pc_ext"].astype(np.float32)  / curr_max
+            # pc_front = dataset[i]["pc_front"].astype(np.float32)  / curr_max
 
-            pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+            # pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
+            pc_robot = dataset[i]["robot_points"]
+            pc_object = dataset[i]["object_points"]
 
-            point_features, centroid, scale = preprocess_pcd_single(pc_all, model, mode = mode)
+            cloud = o3d.geometry.PointCloud()
+            cloud.points = o3d.utility.Vector3dVector(pc_robot)
+            o3d.visualization.draw_geometries([cloud])
+
+            cloud = o3d.geometry.PointCloud()
+            cloud.points = o3d.utility.Vector3dVector(pc_object)
+            o3d.visualization.draw_geometries([cloud])
+
+            point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
+            point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
+
             
             # action = dataset[i]["action"]
             # action[3:] = (action[3:] - centroid.squeeze(0).squeeze(0).cpu().numpy())
             # action /= scale.squeeze(0).squeeze(0).squeeze(-1).repeat(2).cpu().numpy()
 
-            if point_features is None:
+            if point_features_robot is None or point_features_object is None:
                 continue
 
-            point_features = point_features.cpu().numpy()
+            point_features_robot = point_features_robot.cpu().numpy()
+            point_features_object = point_features_object.cpu().numpy()
 
-            pc_data.append(point_features)
+            pc_data_robot.append(point_features_robot)
+            pc_data_object.append(point_features_object)
 
             if mode == "PointNet2":
-                dataset.set_item(i, pcd_net2 = point_features)
+                dataset.set_item(i, pcd_net2 = point_features_object)
             elif mode == "BERT":
-                dataset.set_item(i, pcd_net3 = point_features)
+                dataset.set_item(i, pcd_net3_object = point_features_object)
+                dataset.set_item(i, pcd_net3_robot = point_features_robot)
 
 
 
 
-        pc_data = np.array(pc_data)
+        # pc_data = np.array(pc_data)
 
-        if not test:
-            pc_mean = np.mean(pc_data, axis = 0)
-            pc_std = np.std(pc_data, axis = 0)
+        # if not test:
+        #     pc_mean = np.mean(pc_data, axis = 0)
+        #     pc_std = np.std(pc_data, axis = 0)
 
-        # pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
+        # # pc_data = (pc_data - pc_mean)/(pc_std + 1e-8)
         
-        if not test:
-            max_pc = np.max(point_features, axis = -1)
-            min_pc = np.min(point_features, axis = -1)
+        # if not test:
+        #     max_pc = np.max(point_features, axis = -1)
+        #     min_pc = np.min(point_features, axis = -1)
             
-            stats = {
-                # "qt_pc": qt,
-                # "qt_pos": qt_pos,
-                "pc_mean": pc_mean,
-                "pc_std": pc_std,
-                "max_pc": max_pc,
-                "min_pc": min_pc,
-                "max_diff_rot": dataset.max_diff_rot,
-                "max_diff_trans": dataset.max_diff_trans,
-                # "actions_minmax": actions_minmax,
-                # "pos_minmax": pos_minmax,
-            }
+        #     stats = {
+        #         # "qt_pc": qt,
+        #         # "qt_pos": qt_pos,
+        #         "pc_mean": pc_mean,
+        #         "pc_std": pc_std,
+        #         "max_pc": max_pc,
+        #         "min_pc": min_pc,
+        #         "max_diff_rot": dataset.max_diff_rot,
+        #         "max_diff_trans": dataset.max_diff_trans,
+        #         # "actions_minmax": actions_minmax,
+        #         # "pos_minmax": pos_minmax,
+        #     }
 
-            with open("action_preprocessing.pkl","wb") as f:
-                pickle.dump(stats,f)
+        #     with open("action_preprocessing.pkl","wb") as f:
+        #         pickle.dump(stats,f)
 
             # with open("action_preprocessing.pkl","rb") as f:
             #     stats = pickle.load(f)
