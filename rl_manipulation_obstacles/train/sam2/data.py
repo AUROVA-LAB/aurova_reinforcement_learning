@@ -197,7 +197,7 @@ class HDF5LfDDataset(Dataset):
         self.pred_horizon = pred_horizon
         self.stride = stride
 
-        self.stride = 5
+        self.stride = 1
         
         self.max_pc = 1.0
         self.min_pc = 0.0
@@ -221,7 +221,6 @@ class HDF5LfDDataset(Dataset):
 
             h5_path = pkl_path.replace(".pkl", ".h5")
 
-            print(h5_path)
             if not os.path.exists(h5_path):
 
                 print(f"Converting {pkl_path} -> {h5_path}")
@@ -374,6 +373,25 @@ class HDF5LfDDataset(Dataset):
                 data=np.asarray(episode["s_pcd_net3"])
             )
 
+            pc.create_dataset(
+                "pcd_net3_object",
+                data=np.asarray(episode["s_pcd_net3_object"])
+            )
+            pc.create_dataset(
+                "pcd_net3_robot",
+                data=np.asarray(episode["s_pcd_net3_robot"])
+            )
+
+
+            h5.create_dataset(
+                "object_points",
+                data=np.asarray(episode["s_object_points"])
+            )
+            h5.create_dataset(
+                "robot_points",
+                data=np.asarray(episode["s_robot_points"])
+            )
+
             # --------------------------------------------------
             # States
             # --------------------------------------------------
@@ -423,6 +441,8 @@ class HDF5LfDDataset(Dataset):
         pc = f["/pc/pc"][t0]
         pc_ext = f["/pc/pc_ext"][t0]
         pc_front = f["/pc/pc_front"][t0]
+        object_points = f["/object_points"][t0]
+        robot_points = f["/robot_points"][t0]
 
         pcd_p = f["/pc/pcd_p"][t0]
 
@@ -445,10 +465,13 @@ class HDF5LfDDataset(Dataset):
         # OBSERVATIONS (SEQUENCE)
         # -------------------------------------------------
 
+
         pc_seq = f["/pc/pcd_p"][t0:t1]            # [T_obs, 512, 3]
         pc_net_seq = f["/pc/pcd_net"][t0:t1]            # [T_obs, 512, 3]
         pc_net2_seq = f["/pc/pcd_net2"][t0:t1]            # [T_obs, 512, 128]
         pc_net3_seq = f["/pc/pcd_net3"][t0:t1]            # [T_obs, 768]
+        pc_net3_object_seq = f["/pc/pcd_net3_object"][t0:t1]            # [T_obs, 768]
+        pc_net3_robot_seq = f["/pc/pcd_net3_robot"][t0:t1]            # [T_obs, 768]
 
         pc_net3 = f["/pc/pcd_net3"][t0]            # [768]
 
@@ -499,6 +522,8 @@ class HDF5LfDDataset(Dataset):
             "pc": pc,
             "pc_ext": pc_ext,
             "pc_front": pc_front,
+            "object_points": object_points,
+            "robot_points": robot_points,
 
             "pc_all_seq": pc_all_seq,
 
@@ -519,6 +544,10 @@ class HDF5LfDDataset(Dataset):
             "pc_net_seq": torch.tensor(pc_net_seq, dtype=torch.float32),
             "pc_net2_seq": 2*(torch.tensor(pc_net2_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             "pc_net3_seq": torch.tensor(pc_net3_seq, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            
+            "pc_net3_object_seq": torch.tensor(pc_net3_object_seq, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            "pc_net3_robot_seq": torch.tensor(pc_net3_robot_seq, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            
             "pc_net3": torch.tensor(pc_net3, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
@@ -544,6 +573,8 @@ class HDF5LfDDataset(Dataset):
         pcd_net = None,
         pcd_net2 = None,
         pcd_net3 = None,
+        pcd_net3_object = None,
+        pcd_net3_robot = None,
         pc_raw = None,
         target_pose=None,
         gripper_pose=None,
@@ -682,6 +713,26 @@ class HDF5LfDDataset(Dataset):
             if pcd_net3.ndim == 1 and pcd_net3.shape == (768,):
                 f["/pc/pcd_net3"][t] = pcd_net3
                 print("Setting NET3...")
+
+
+
+        if pcd_net3_object is not None:
+            if torch.is_tensor(pcd_net3_object):
+                pcd_net3_object = pcd_net3_object.detach().cpu().numpy()
+
+            if pcd_net3_object.ndim == 1 and pcd_net3_object.shape == (768,):
+                f["/pc/pcd_net3_object"][t] = pcd_net3_object
+                print("Setting NET3 OBJECT...")
+
+        if pcd_net3_robot is not None:
+            if torch.is_tensor(pcd_net3_robot):
+                pcd_net3_robot = pcd_net3_robot.detach().cpu().numpy()
+
+            if pcd_net3_robot.ndim == 1 and pcd_net3_robot.shape == (768,):
+                f["/pc/pcd_net3_robot"][t] = pcd_net3_robot
+                print("Setting NET3 ROBOT...")
+
+
 
         if action is not None:
             if torch.is_tensor(action):
