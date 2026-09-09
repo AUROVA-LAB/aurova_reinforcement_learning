@@ -234,7 +234,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             rot=(1.0, 0.0, 0.0, 0.0),
         ),
 
-        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
 
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
@@ -257,7 +257,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             rot=(1.0, 0.0, 0.0, 0.0),
         ),
 
-        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
 
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
@@ -280,7 +280,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
             rot=(1.0, 0.0, 0.0, 0.0),
         ),
 
-        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
 
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed

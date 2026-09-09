@@ -38,7 +38,7 @@ import matplotlib.pyplot as plt
 import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
-from .train.sam2.train_utils import farthest_point_sampling, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
+from .train.sam2.train_utils import farthest_point_sampling, farthest_point_sampling_BERT, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
 # from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
@@ -1078,8 +1078,41 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_all_color = np.concatenate([self.pc_w.cpu().numpy(), self.pc_ext.cpu().numpy(), self.pc_front.cpu().numpy()], axis=0)
 
 
-        print(self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0))
-        raise
+        object_bbox_min, object_bbox_max, robot_bbox_min, robot_bbox_max, object_points, robot_points = self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0)
+        object_bbox_min_ext, object_bbox_max_ext, robot_bbox_min_ext, robot_bbox_max_ext, object_points_ext, robot_points_ext = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext"], 0)
+        object_bbox_min_front, object_bbox_max_front, robot_bbox_min_front, robot_bbox_max_front, object_points_front, robot_points_front = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_front"], 0)
+
+        if robot_points is not None and robot_points_ext is not None and robot_points_front is not None:
+
+            robot_points = transform_points(robot_points, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
+            robot_points_ext = transform_points(robot_points_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
+            robot_points_front = transform_points(robot_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+
+            robot_points = torch.cat((robot_points, robot_points_ext, robot_points_front), dim = 0)
+
+            object_points = transform_points(object_points, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
+            object_points_ext = transform_points(object_points_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
+            object_points_front = transform_points(object_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+
+            object_points = torch.cat((object_points, object_points_ext, object_points_front), dim = 0)
+
+            self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
+            self.robot_points = farthest_point_sampling_BERT(robot_points.unsqueeze(0), 1024).squeeze(0)
+
+                # print("Robot points shape: ", robot_points.shape)
+                # print("Object points shape: ", object_points.shape)
+                                
+                
+        
+                # cloud = o3d.geometry.PointCloud()
+                # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
+                # o3d.visualization.draw_geometries([cloud])
+    
+                # cloud = o3d.geometry.PointCloud()
+                # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
+                # o3d.visualization.draw_geometries([cloud])
+
+         
         
         if self.cfg.test:
             if self.cfg.mode == "seq":
@@ -1196,7 +1229,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # Entire UR5e
             # -----------------------------------------------------
 
-            if "/UR5e_3f/" in prim_path:
+            if "/UR5e_3f/robotiq" in prim_path or "/UR5e_3f/wrist" in prim_path or "UR5e_3f/forearm" in prim_path:
                 robot_colors.append(color)
 
         # =========================================================
@@ -1370,10 +1403,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pcd_net2 = torch.zeros((512,128)).float().cpu().numpy()
         pcd_net3 = torch.zeros((768)).float().cpu().numpy()
 
+        pcd_net3_robot = torch.zeros((768)).float().cpu().numpy()
+        pcd_net3_object = torch.zeros((768)).float().cpu().numpy()
+
+        object_points = self.object_points.float().cpu().numpy()
+        robot_points = self.robot_points.float().cpu().numpy()
+
         # ---- Save step ----
         if self.count != self.cfg.save_interval:
-            print("diff: ", np.round(diff, decimals=2))
-            print(self.count)
+            # print("diff: ", np.round(diff, decimals=2))
+            # print(self.count)
 
             if self.cfg.hdf5:
                 self.writer.add_step(cam, cam_ext, cam_front, 
@@ -1401,6 +1440,12 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.s_pcd_net.append(pcd_net)
                 self.s_pcd_net2.append(pcd_net2)
                 self.s_pcd_net3.append(pcd_net3)
+
+                self.s_pcd_net3_robot.append(pcd_net3_robot)
+                self.s_pcd_net3_object.append(pcd_net3_object)
+
+                self.s_object_points.append(object_points)
+                self.s_robot_points.append(robot_points)
 
             self.prev_pose = self.gripper_pose_r_lie
 
@@ -1840,6 +1885,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                 )
             else:
                 if self.episode_id > 1:
+                    print(len(self.s_diff))
+                    
                     episode_dict = {
                         "s_cam": self.s_cam,
                         "s_cam_ext": self.s_cam_ext,
@@ -1859,7 +1906,15 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         "s_pcd_p": self.s_pcd_p,
                         "s_pcd_net": self.s_pcd_net,
                         "s_pcd_net2": self.s_pcd_net2,
-                        "s_pcd_net3": self.s_pcd_net3
+                        "s_pcd_net3": self.s_pcd_net3,
+
+                        "s_pcd_net3_object": self.s_pcd_net3_object,
+                        "s_pcd_net3_robot": self.s_pcd_net3_robot,
+
+
+                        "s_object_points": self.s_object_points,
+                        "s_robot_points": self.s_robot_points,
+
                     }
 
                     # print(os.path.join(self.current_path, "dataset","ep_"+str(self.episode_id-1)+".pkl"))
@@ -1889,6 +1944,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.s_pcd_net = []
                 self.s_pcd_net2 = []
                 self.s_pcd_net3 = []
+
+                self.s_pcd_net3_object = []
+                self.s_pcd_net3_robot = []
+
+
+                self.s_object_points = []
+                self.s_robot_points = []
             
 
         else:
