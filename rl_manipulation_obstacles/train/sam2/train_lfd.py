@@ -205,11 +205,16 @@ def train():
             # p_f = p_f.view(B,T,768)
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc= b["pc_net3"] #  p_f
+            pc_obj= b["pc_net3_object"] #  p_f
+            pc_robot = b["pc_net3_robot"]
+            pos_robot = b["gripper_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:]
+            
             # traj=b["cat_diff"]
             traj_mag = b["mag"]
+            
 
-            pred_mag = model(pc)
+            pred_mag = model(pc_obj, pc_robot, pos_robot, pos_obj)
 
             ##################################
             # MAGNITUDE-WEIGHTED LOSS
@@ -302,11 +307,16 @@ def train():
                 # p_f = p_f.view(B,T,768)
                 # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-                pc= b["pc_net3"] # p_f
+                pc_obj= b["pc_net3_object"] #  p_f
+                pc_robot = b["pc_net3_robot"]
+                pos_robot = b["gripper_pose"][:, 3:]
+                pos_obj = b["target_pose"][:, 3:]
+                
                 # traj=b["cat_diff"]
-                traj_mag=b["mag"]
-
-                pred_mag = model(pc)
+                traj_mag = b["mag"]
+                
+    
+                pred_mag = model(pc_obj, pc_robot, pos_robot, pos_obj)
 
                 # cat_loss = criterion(pred, traj)
                 mag_loss = criterion_mag(pred_mag, traj_mag)
@@ -431,11 +441,16 @@ def train():
             # p_f = p_f.view(B,T,768)
             # p_f = torch.tensor(p_f).detach().clone().to(device)
 
-            pc=  b["pc_net3"] # p_f
-            # traj = b["cat_diff"]
+            pc_obj= b["pc_net3_object"] #  p_f
+            pc_robot = b["pc_net3_robot"]
+            pos_robot = b["gripper_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:]
+            
+            # traj=b["cat_diff"]
             traj_mag = b["mag"]
+            
 
-            pred_mag = model(pc)
+            pred_mag = model(pc_obj, pc_robot, pos_robot, pos_obj)
 
             #################################
             # LOSSES

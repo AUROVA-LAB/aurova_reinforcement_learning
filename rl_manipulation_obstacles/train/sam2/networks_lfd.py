@@ -269,12 +269,38 @@ class CnnPolicy(nn.Module):
         # # Optional novelty: gating
         # self.gate = nn.Linear(inc * hidden_dim, hidden_dim)
 
+        self.pc_obj = nn.Sequential(nn.Linear(768, 256), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(256), 
+                                    nn.Linear(256, hidden_dim), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(hidden_dim))
+        self.pc_robot = nn.Sequential(nn.Linear(768, 256), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(256), 
+                                    nn.Linear(256, hidden_dim), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(hidden_dim))
+
+        self.fuse_pc = nn.Sequential(nn.Linear(hidden_dim*2, hidden_dim),
+                                     nn.GELU(), 
+                                     nn.LayerNorm(hidden_dim))
+
+        self.pos = nn.Sequential(nn.Linear(6, 32), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(32), 
+                                    nn.Linear(32, hidden_dim), 
+                                    nn.GELU(), 
+                                    nn.LayerNorm(hidden_dim))
+
         self.head = nn.Sequential(
-            nn.Linear(128, 64),
+            nn.Linear(hidden_dim*2, 64),
             nn.GELU(),
             nn.LayerNorm(64),
             # nn.Dropout(0.15),
             nn.Linear(hidden_dim, action_dim),
+            nn.LayerNorm(action_dim),
+            nn.Tanh()
         )
 
         self.head2 = nn.Sequential(
@@ -289,7 +315,8 @@ class CnnPolicy(nn.Module):
         # self.forward = self.forward_temporal_DCT
         # self.forward = self.forward_temporal_DCT_raw
         # self.forward = self.forward_temporal_DCT_BERT
-        self.forward = self.forward_BERT
+        # self.forward = self.forward_BERT
+        self.forward = self.forward_BERT_sep
 
 
 
@@ -582,7 +609,56 @@ class CnnPolicy(nn.Module):
         # )
 
         return pred_mag
+
     
+    def forward_BERT_sep(self, pc_obj, pc_robot, pos_rob, pos_obj):
+
+        """
+        pc_seq   : [B,T,F]
+        pose_seq : [B,T,pose_dim]
+        """
+
+        B, F = pc_obj.shape
+        pos = torch.cat((pos_rob, pos_obj), dim = -1)
+
+        # -----------------------------------------------------
+        # Pose encoding
+        # -----------------------------------------------------
+        # pose = pose_seq.reshape(B * T, -1)
+        # f_pose = self.pose_mlp(pose)
+        # f_pose = f_pose.reshape(B, T, -1)
+
+        f_pos = self.pos(pos)
+
+        # -----------------------------------------------------
+        # Fusion per timestep
+        # -----------------------------------------------------
+        # x = torch.cat([f_scene, f_pose], dim=-1)  # [B,T,F]
+        x_robot = self.pc_robot(pc_robot)
+        x_obj = self.pc_obj(pc_obj)
+        x_fuse = self.fuse_pc(torch.cat((x_robot, x_obj), dim = -1))
+
+        # -----------------------------------------------------
+        # Temporal transformer
+        # -----------------------------------------------------
+        # x = self.temporal_transformer(x)
+
+        # -----------------------------------------------------
+        # Use CLS output for prediction
+        # -----------------------------------------------------
+        # cls_out = x[:, 0]   # [B, d_model]
+        # pred = self.head(x)  # [B, action_dim]
+        pred_mag = self.head(torch.cat((x_fuse, f_pos), dim = -1))  # [B, action_dim]
+        
+        # pred = pred.reshape(
+        #     B,
+        #     self.pred_horizon,
+        #     self.action_dim
+        # )
+
+        return pred_mag
+    
+
 
     def forward_temporal_DCT_raw(self, pc_seq, pose_seq):
 
