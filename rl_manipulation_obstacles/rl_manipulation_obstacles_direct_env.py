@@ -1874,6 +1874,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.episode_id += 1
 
+        if self.episode_id > 600:
+            raise
+
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
         if not self.cfg.test:
