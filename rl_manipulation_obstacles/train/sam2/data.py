@@ -474,6 +474,8 @@ class HDF5LfDDataset(Dataset):
         pc_net3_robot_seq = f["/pc/pcd_net3_robot"][t0:t1]            # [T_obs, 768]
 
         pc_net3 = f["/pc/pcd_net3"][t0]            # [768]
+        pc_net3_object = f["/pc/pcd_net3_object"][t0]            # [768]
+        pc_net3_robot = f["/pc/pcd_net3_robot"][t0]            # [768]
 
         pose_seq = f["/states/gripper_pose"][t0:t1]
         sym_seq = (f["/states/target_pose"][t0:t1]
@@ -531,6 +533,7 @@ class HDF5LfDDataset(Dataset):
 
             # "target_pose": target_pose,
             "gripper_pose": gripper_pose,
+            "target_pose": target_pose,
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
             "mag": mag,
             "diff": diff,
@@ -549,6 +552,8 @@ class HDF5LfDDataset(Dataset):
             "pc_net3_robot_seq": torch.tensor(pc_net3_robot_seq, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
             
             "pc_net3": torch.tensor(pc_net3, dtype=torch.float32), # 2*(torch.tensor(pc_net3_seq, dtype=torch.float32) - self.min_pc) / (self.max_pc - self.min_pc) - 1,
+            "pc_net3_object": torch.tensor(pc_net3_object, dtype=torch.float32), 
+            "pc_net3_robot": torch.tensor(pc_net3_robot, dtype=torch.float32), 
             "pose_seq": torch.tensor(pose_seq, dtype=torch.float32) / self.max_gripper,
             "sym_seq": torch.tensor(sym_seq, dtype=torch.float32),
             # Actions Interval
