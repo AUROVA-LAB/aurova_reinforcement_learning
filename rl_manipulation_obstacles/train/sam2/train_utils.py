@@ -688,15 +688,17 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
             # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
 
-        # Check for NaNs
-        print(torch.isnan(point_features).any())
+            # Check for NaNs
+            print(torch.isnan(point_features).any())
 
-        # Check for infinities too
-        print(torch.isinf(point_features).any())
+            
 
-        # Check for NaN OR Inf
-        print(torch.isfinite(point_features).all())
-        print("\n\n")
+            # Check for infinities too
+            print(torch.isinf(point_features).any())
+
+            # Check for NaN OR Inf
+            print(torch.isfinite(point_features).all())
+            print("\n\n")
 
     point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
 
@@ -759,38 +761,38 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     actions_list = []
     pos_list = []
 
-    # if test_curr_max is None:
-    #     for i in range(len(dataset)):
-    #         print("Calculating ", i, " max")
-    #         # pc = dataset[i]["pc"].astype(np.float32)
-    #         # pc_ext = dataset[i]["pc_ext"].astype(np.float32)
-    #         # pc_front = dataset[i]["pc_front"].astype(np.float32)
-    #         # pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
-    #         # new_max_pc = torch.max(torch.abs(pc_all)).item()
+    if test_curr_max is None:
+        for i in range(len(dataset)):
+            print("Calculating ", i, " max")
+            # pc = dataset[i]["pc"].astype(np.float32)
+            # pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+            # pc_front = dataset[i]["pc_front"].astype(np.float32)
+            # pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
+            # new_max_pc = torch.max(torch.abs(pc_all)).item()
 
-    #         # if new_max_pc > curr_max:
-    #         #     curr_max = new_max_pc
+            # if new_max_pc > curr_max:
+            #     curr_max = new_max_pc
 
-    #         actions_list.append(dataset[i]["diff"])
+            actions_list.append(dataset[i]["diff"])
 
-    #         flag = False
-    #         for j in actions_list[i]:
-    #             if abs(j) > 1.0:
-    #                 flag = True
-    #                 break
-    #         if flag:
-    #             actions_list[i] = np.clip(actions_list[i], -0.005, 0.005) 
-    #         actions_list[i] = np.round(actions_list[i], decimals=3)
+            flag = False
+            for j in actions_list[i]:
+                if abs(j) > 1.0:
+                    flag = True
+                    break
+            if flag:
+                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005) 
+            actions_list[i] = np.round(actions_list[i], decimals=3)
 
-    #         dataset.set_item(i, diff = actions_list[i])
+            dataset.set_item(i, diff = actions_list[i])
             
-    #         # pos_list.append(dataset[i]["gripper_pose"])
+            # pos_list.append(dataset[i]["gripper_pose"])
 
-    #     actions_list = np.array(actions_list)
-    #     actions_list = np.clip(actions_list, -0.06, 0.06)
+        actions_list = np.array(actions_list)
+        actions_list = np.clip(actions_list, -0.06, 0.06)
 
-    #     dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
-    #     dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
+        dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
+        dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
 
         # pos_list = np.array(pos_list)
 
@@ -812,31 +814,31 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         # for i in range(len(dataset)):
         #     dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
-    # else:
+    else:
 
-    #     for i in range(len(dataset)):
-    #         print("Calculating ", i, " max")
+        for i in range(len(dataset)):
+            print("Calculating ", i, " max")
 
-    #         # if new_max_pc > curr_max:
-    #         #     curr_max = new_max_pc
+            # if new_max_pc > curr_max:
+            #     curr_max = new_max_pc
 
-    #         actions_list.append(dataset[i]["diff"])
+            actions_list.append(dataset[i]["diff"])
 
-    #         flag = False
-    #         for j in actions_list[i]:
-    #             if abs(j) > 1.0:
-    #                 flag = True
-    #                 break
-    #         if flag:
-    #             actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)
+            flag = False
+            for j in actions_list[i]:
+                if abs(j) > 1.0:
+                    flag = True
+                    break
+            if flag:
+                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)
             
-    #         actions_list[i] = np.round(actions_list[i], decimals=3)
-    #         dataset.set_item(i, diff = actions_list[i])
+            actions_list[i] = np.round(actions_list[i], decimals=3)
+            dataset.set_item(i, diff = actions_list[i])
 
-    #     with open("action_preprocessing.pkl","rb") as f:
-    #         stats = pickle.load(f)
-    #     dataset.max_diff_rot = stats["max_diff_rot"]
-    #     dataset.max_diff_trans = stats["max_diff_trans"]
+        with open("action_preprocessing.pkl","rb") as f:
+            stats = pickle.load(f)
+        dataset.max_diff_rot = stats["max_diff_rot"]
+        dataset.max_diff_trans = stats["max_diff_trans"]
 
 
     #     for i in range(len(dataset)):
@@ -909,11 +911,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # cloud.points = o3d.utility.Vector3dVector(pc_object)
             # o3d.visualization.draw_geometries([cloud])
 
-
             point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
             point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
-            print(point_features_robot)
-            print(point_features_object)
 
             
             # action = dataset[i]["action"]
