@@ -761,84 +761,84 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     actions_list = []
     pos_list = []
 
-    if test_curr_max is None:
-        for i in range(len(dataset)):
-            print("Calculating ", i, " max")
-            # pc = dataset[i]["pc"].astype(np.float32)
-            # pc_ext = dataset[i]["pc_ext"].astype(np.float32)
-            # pc_front = dataset[i]["pc_front"].astype(np.float32)
-            # pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
-            # new_max_pc = torch.max(torch.abs(pc_all)).item()
+    # if test_curr_max is None:
+    #     for i in range(len(dataset)):
+    #         print("Calculating ", i, " max")
+    #         # pc = dataset[i]["pc"].astype(np.float32)
+    #         # pc_ext = dataset[i]["pc_ext"].astype(np.float32)
+    #         # pc_front = dataset[i]["pc_front"].astype(np.float32)
+    #         # pc_all = torch.Tensor(np.concatenate([pc, pc_ext, pc_front], axis=0))
+    #         # new_max_pc = torch.max(torch.abs(pc_all)).item()
 
-            # if new_max_pc > curr_max:
-            #     curr_max = new_max_pc
+    #         # if new_max_pc > curr_max:
+    #         #     curr_max = new_max_pc
 
-            actions_list.append(dataset[i]["diff"])
+    #         actions_list.append(dataset[i]["diff"])
 
-            flag = False
-            for j in actions_list[i]:
-                if abs(j) > 1.0:
-                    flag = True
-                    break
-            if flag:
-                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005) 
-            actions_list[i] = np.round(actions_list[i], decimals=3)
+    #         flag = False
+    #         for j in actions_list[i]:
+    #             if abs(j) > 1.0:
+    #                 flag = True
+    #                 break
+    #         if flag:
+    #             actions_list[i] = np.clip(actions_list[i], -0.005, 0.005) 
+    #         actions_list[i] = np.round(actions_list[i], decimals=3)
 
-            dataset.set_item(i, diff = actions_list[i])
+    #         dataset.set_item(i, diff = actions_list[i])
             
-            # pos_list.append(dataset[i]["gripper_pose"])
+    #         # pos_list.append(dataset[i]["gripper_pose"])
 
-        actions_list = np.array(actions_list)
-        actions_list = np.clip(actions_list, -0.06, 0.06)
+    #     actions_list = np.array(actions_list)
+    #     actions_list = np.clip(actions_list, -0.06, 0.06)
 
-        dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
-        dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
+    #     dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
+    #     dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
 
-        # pos_list = np.array(pos_list)
+    #     # pos_list = np.array(pos_list)
 
 
-        # qt = RobustScaler()
-        # actions_norm = qt.fit_transform(actions_list)
+    #     # qt = RobustScaler()
+    #     # actions_norm = qt.fit_transform(actions_list)
 
-        # qt_pos = RobustScaler()
-        # pos_norm = qt_pos.fit_transform(pos_list)
+    #     # qt_pos = RobustScaler()
+    #     # pos_norm = qt_pos.fit_transform(pos_list)
 
-        #  ----- NO HACER ESTO -----
-        # - Escalar según la esfera unidad
-        # actions_minmax = MinMaxScaler(feature_range=(-1,1))
-        # actions_norm = actions_minmax.fit_transform(actions_list)
+    #     #  ----- NO HACER ESTO -----
+    #     # - Escalar según la esfera unidad
+    #     # actions_minmax = MinMaxScaler(feature_range=(-1,1))
+    #     # actions_norm = actions_minmax.fit_transform(actions_list)
 
-        # pos_minmax = MinMaxScaler(feature_range=(-1,1))
-        # pos_norm = pos_minmax.fit_transform(pos_list)
+    #     # pos_minmax = MinMaxScaler(feature_range=(-1,1))
+    #     # pos_norm = pos_minmax.fit_transform(pos_list)
 
-        # for i in range(len(dataset)):
-        #     dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
+    #     # for i in range(len(dataset)):
+    #     #     dataset.set_item(i, diff = actions_norm[i], gripper_pose = pos_norm[i])
 
-    else:
+    # else:
 
-        for i in range(len(dataset)):
-            print("Calculating ", i, " max")
+    #     for i in range(len(dataset)):
+    #         print("Calculating ", i, " max")
 
-            # if new_max_pc > curr_max:
-            #     curr_max = new_max_pc
+    #         # if new_max_pc > curr_max:
+    #         #     curr_max = new_max_pc
 
-            actions_list.append(dataset[i]["diff"])
+    #         actions_list.append(dataset[i]["diff"])
 
-            flag = False
-            for j in actions_list[i]:
-                if abs(j) > 1.0:
-                    flag = True
-                    break
-            if flag:
-                actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)
+    #         flag = False
+    #         for j in actions_list[i]:
+    #             if abs(j) > 1.0:
+    #                 flag = True
+    #                 break
+    #         if flag:
+    #             actions_list[i] = np.clip(actions_list[i], -0.005, 0.005)
             
-            actions_list[i] = np.round(actions_list[i], decimals=3)
-            dataset.set_item(i, diff = actions_list[i])
+    #         actions_list[i] = np.round(actions_list[i], decimals=3)
+    #         dataset.set_item(i, diff = actions_list[i])
 
-        with open("action_preprocessing.pkl","rb") as f:
-            stats = pickle.load(f)
-        dataset.max_diff_rot = stats["max_diff_rot"]
-        dataset.max_diff_trans = stats["max_diff_trans"]
+    #     with open("action_preprocessing.pkl","rb") as f:
+    #         stats = pickle.load(f)
+    #     dataset.max_diff_rot = stats["max_diff_rot"]
+    #     dataset.max_diff_trans = stats["max_diff_trans"]
 
 
     #     for i in range(len(dataset)):
@@ -902,6 +902,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
             pc_robot = dataset[i]["robot_points"]
             pc_object = dataset[i]["object_points"]
+            raise
 
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(pc_robot)
