@@ -878,6 +878,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     if True:
         pc_data_robot = []
         pc_data_object = []
+        rmv_idx = []
 
         for i in range(len(dataset)):
             print("--- Image ", i / len(dataset))
@@ -904,7 +905,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
             if torch.isinf(point_features_object).any().item() or torch.isnan(point_features_object).any().item() or \
                 torch.isinf(point_features_robot).any().item() or torch.isnan(point_features_robot).any().item():
-                dataset.remove_idx(i)
+                rmv_idx.append(i)
                 continue 
                 
             # print(torch.isfinite(point_features_object).all())
@@ -966,6 +967,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
         # dataset.max_pc = max_pc
         # dataset.min_pc = min_pc
+
+    for i in reversed(rmv_idx):
+        dataset.remove_idx(i)
 
     return dataset, curr_max
         
