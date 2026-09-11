@@ -904,12 +904,14 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             print(torch.isnan(point_features_robot).any())
             print(torch.isinf(point_features_robot).any())
             # print(torch.isfinite(point_features_robot).all())
-            print(torch.isnan(point_features_object))
+            print(torch.isnan(point_features_object).any())
             print(dataset[i]["diff"])
             print(torch.isinf(point_features_object).any())
             if torch.isinf(point_features_object).any().item() or torch.isnan(point_features_object).any().item() or \
                 torch.isinf(point_features_robot).any().item() or torch.isnan(point_features_robot).any().item():
-                raise 
+                dataset.remove_idx(i) 
+                
+                input("NaN or Inf detected, press key to continue...")
             # print(torch.isfinite(point_features_object).all())
             
 
