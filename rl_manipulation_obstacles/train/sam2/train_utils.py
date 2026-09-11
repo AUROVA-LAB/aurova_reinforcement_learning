@@ -907,7 +907,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             print(torch.isnan(point_features_object).any())
             print(torch.isinf(point_features_object).any())
             print(torch.isfinite(point_features_object).all())
-            raise
+            
 
             
             # action = dataset[i]["action"]
