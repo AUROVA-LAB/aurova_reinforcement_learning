@@ -902,7 +902,6 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # pc_all = np.concatenate([pc, pc_ext, pc_front], axis=0)
             pc_robot = dataset[i]["robot_points"]
             pc_object = dataset[i]["object_points"]
-            raise
 
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(pc_robot)
@@ -914,6 +913,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
             point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
             point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
+            raise
 
             
             # action = dataset[i]["action"]
