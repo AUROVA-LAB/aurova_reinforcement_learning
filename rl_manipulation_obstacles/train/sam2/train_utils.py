@@ -688,15 +688,15 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
             # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
 
-            # Check for NaNs
-            print(torch.isnan(point_features).any())
+        # Check for NaNs
+        print(torch.isnan(point_features).any())
 
-            # Check for infinities too
-            print(torch.isinf(point_features).any())
+        # Check for infinities too
+        print(torch.isinf(point_features).any())
 
-            # Check for NaN OR Inf
-            print(torch.isfinite(point_features).all())
-            print("\n\n")
+        # Check for NaN OR Inf
+        print(torch.isfinite(point_features).all())
+        print("\n\n")
 
 
     point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
@@ -909,6 +909,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # cloud = o3d.geometry.PointCloud()
             # cloud.points = o3d.utility.Vector3dVector(pc_object)
             # o3d.visualization.draw_geometries([cloud])
+
+            print("sdfasdfasfdsdfsa")
 
             point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
             point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
