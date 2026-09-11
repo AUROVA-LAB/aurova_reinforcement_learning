@@ -1082,30 +1082,42 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         object_bbox_min_ext, object_bbox_max_ext, robot_bbox_min_ext, robot_bbox_max_ext, object_points_ext, robot_points_ext = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext"], 0)
         object_bbox_min_front, object_bbox_max_front, robot_bbox_min_front, robot_bbox_max_front, object_points_front, robot_points_front = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_front"], 0)
 
-        robot_points = torch.zeros((1,3)).to(self.device)
         if robot_points is not None:
             robot_points = transform_points(robot_points, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
+        else:
+            robot_points = torch.zeros((1,3)).to(self.device)
+            robot_bbox_min, robot_bbox_max = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if robot_points_ext is not None:
             robot_points_ext = transform_points(robot_points_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
             robot_points = torch.cat((robot_points, robot_points_ext), dim = 0)
+        else:
+            robot_bbox_min_ext, robot_bbox_max_ext = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if robot_points_front is not None:
             robot_points_front = transform_points(robot_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
             robot_points = torch.cat((robot_points, robot_points_front), dim = 0)
+        else:
+            robot_bbox_min_front, robot_bbox_max_front = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
 
-        object_points = torch.zeros((1,3)).to(self.device)
         if object_points is not None:
             object_points = transform_points(object_points, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
+        else:
+            object_points = torch.zeros((1,3)).to(self.device)
+            object_bbox_min, object_bbox_max = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if object_points_ext is not None:
             object_points_ext = transform_points(object_points_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
             object_points = torch.cat((object_points, object_points_ext), dim = 0)
+        else:
+            object_bbox_min_ext, object_bbox_max_ext = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if object_points_front is not None:
             object_points_front = transform_points(object_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
             object_points = torch.cat((object_points, object_points_front), dim = 0)
+        else:
+            object_bbox_min_front, object_bbox_max_front = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
 
         self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
@@ -1458,6 +1470,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 self.s_object_points.append(object_points)
                 self.s_robot_points.append(robot_points)
+
+                self.s_bb_object.append(np.concatenate((self.object_bbox_min.float().cpu().numpy(), self.object_bbox_max.float().cpu().numpy()), axis=0))
+                self.s_bb_robot.append(np.concatenate((self.robot_bbox_min.float().cpu().numpy(), self.robot_bbox_max.float().cpu().numpy()), axis=0))
 
             self.prev_pose = self.gripper_pose_r_lie
 
@@ -1892,6 +1907,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.object_points = torch.zeros((1024, 3)).to(self.device)
         self.robot_points = torch.zeros((1024, 3)).to(self.device)
 
+        self.object_bbox_min, self.object_bbox_max, self.robot_bbox_min, self.robot_bbox_max = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
+        self.object_bbox_min_ext, self.object_bbox_max_ext, self.robot_bbox_min_ext, self.robot_bbox_max_ext = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
+        self.object_bbox_min_front, self.object_bbox_max_front, self.robot_bbox_min_front, self.robot_bbox_max_front = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
+        
+
         # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
         # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
         if not self.cfg.test:
@@ -1969,6 +1989,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
                 self.s_object_points = []
                 self.s_robot_points = []
+
+                self.s_bb_object = []
+                self.s_bb_robot = []
             
 
         else:
