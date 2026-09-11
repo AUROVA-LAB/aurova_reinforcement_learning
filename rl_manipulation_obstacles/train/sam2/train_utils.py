@@ -688,6 +688,17 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
             # point_features = dct_reducer.encode(point_features[0]).permute(1,0)
             # point_features = (point_features - torch.mean(point_features)) / torch.std(point_features)
 
+            # Check for NaNs
+            print(torch.isnan(point_features).any())
+
+            # Check for infinities too
+            print(torch.isinf(point_features).any())
+
+            # Check for NaN OR Inf
+            print(torch.isfinite(point_features).all())
+            print("\n\n")
+
+
     point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
 
     # point_features = point_features.cpu().numpy()
@@ -773,9 +784,6 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             actions_list[i] = np.round(actions_list[i], decimals=3)
 
             dataset.set_item(i, diff = actions_list[i])
-
-            print(dataset[i]["diff"]) 
-            print("\n\n")
             
             # pos_list.append(dataset[i]["gripper_pose"])
 
