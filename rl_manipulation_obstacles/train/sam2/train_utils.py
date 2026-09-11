@@ -697,8 +697,6 @@ def preprocess_pcd_single(pc_all, model, mode="BERT"):
         # Check for NaN OR Inf
         print(torch.isfinite(point_features).all())
         print("\n\n")
-        raise
-
 
     point_features = (point_features - point_features.mean()) / (point_features.std() + 1e-8)
 
@@ -914,6 +912,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
             point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
             point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
+            print(point_features_robot)
+            print(point_features_object)
 
             
             # action = dataset[i]["action"]
