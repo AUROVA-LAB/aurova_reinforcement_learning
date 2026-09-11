@@ -561,6 +561,10 @@ class HDF5LfDDataset(Dataset):
             # "diff_seq": torch.tensor(diff_seq, dtype=torch.float32)
         }
 
+
+    def remove_idx(self, idx):
+        del self.index[idx]
+
     # =====================================================
     # MODIFY ELEMENTS
     # =====================================================
