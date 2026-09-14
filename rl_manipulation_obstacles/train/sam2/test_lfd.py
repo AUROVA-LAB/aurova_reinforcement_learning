@@ -58,7 +58,7 @@ def test():
         dataset = preprocess_img_sam2(dataset)
 
     elif MODE == "pcd":
-        dataset, curr_max = preprocess_pcd(dataset, test_curr_max=1.11878, test = True)
+        dataset, curr_max = preprocess_pcd(dataset, test_curr_max=None, test = True)
 
 
 
@@ -127,8 +127,8 @@ def test():
     criterion = nn.BCEWithLogitsLoss()
     criterion_mag = nn.SmoothL1Loss()
 
-    dataset.max_diff_rot = stats[""] 
-    dataset.max_diff_trans = stats[""]
+    dataset.max_diff_rot = stats["max_diff_rot"] 
+    dataset.max_diff_trans = stats["max_diff_trans"]
 
 
     with torch.no_grad():

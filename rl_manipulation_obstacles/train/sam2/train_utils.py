@@ -749,7 +749,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     actions_list = []
     pos_list = []
 
-    if test_curr_max is None:
+    if True:
         for i in range(len(dataset)):
             print("Calculating ", i, " max")
             # pc = dataset[i]["pc"].astype(np.float32)
@@ -779,8 +779,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         actions_list = np.array(actions_list)
         actions_list = np.clip(actions_list, -0.06, 0.06)
 
-        dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
-        dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
+        if not test:
+            dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
+            dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
 
         # pos_list = np.array(pos_list)
 
@@ -945,16 +946,16 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         # if not test:
         #     max_pc = np.max(point_features, axis = -1)
         #     min_pc = np.min(point_features, axis = -1)
-            
-    stats = {
-        "max_diff_rot": dataset.max_diff_rot,
-        "max_diff_trans": dataset.max_diff_trans,
-        # "actions_minmax": actions_minmax,
-        # "pos_minmax": pos_minmax,
-    }
+    if not test:     
+        stats = {
+            "max_diff_rot": dataset.max_diff_rot,
+            "max_diff_rot": dataset.max_diff_trans,
+            # "actions_minmax": actions_minmax,
+            # "pos_minmax": pos_minmax,
+        }
 
-    with open("action_preprocessing.pkl","wb") as f:
-        pickle.dump(stats,f)
+        with open("action_preprocessing.pkl","wb") as f:
+            pickle.dump(stats,f)
 
             # with open("action_preprocessing.pkl","rb") as f:
             #     stats = pickle.load(f)
