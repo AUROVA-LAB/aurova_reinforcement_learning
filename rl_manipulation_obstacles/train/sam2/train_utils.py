@@ -946,15 +946,15 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         #     max_pc = np.max(point_features, axis = -1)
         #     min_pc = np.min(point_features, axis = -1)
             
-            stats = {
-                "max_diff_rot": dataset.max_diff_rot,
-                "max_diff_trans": dataset.max_diff_trans,
-                # "actions_minmax": actions_minmax,
-                # "pos_minmax": pos_minmax,
-            }
+    stats = {
+        "max_diff_rot": dataset.max_diff_rot,
+        "max_diff_trans": dataset.max_diff_trans,
+        # "actions_minmax": actions_minmax,
+        # "pos_minmax": pos_minmax,
+    }
 
-            with open("action_preprocessing.pkl","wb") as f:
-                pickle.dump(stats,f)
+    with open("action_preprocessing.pkl","wb") as f:
+        pickle.dump(stats,f)
 
             # with open("action_preprocessing.pkl","rb") as f:
             #     stats = pickle.load(f)
