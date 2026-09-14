@@ -127,6 +127,9 @@ def test():
     criterion = nn.BCEWithLogitsLoss()
     criterion_mag = nn.SmoothL1Loss()
 
+    dataset.max_diff_rot = stats[""] 
+    dataset.max_diff_trans = stats[""]
+
 
     with torch.no_grad():
         for b in test_loader:
@@ -136,11 +139,16 @@ def test():
                     for k, v in b.items()
                 }
 
-            pc= b["pc_net3"] # p_f
+            pc_obj= b["pc_net3_object"] #  p_f
+            pc_robot = b["pc_net3_robot"]
+            pos_robot = b["gripper_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:]
+            
             # traj=b["cat_diff"]
             traj_mag = b["mag"]
+            
 
-            pred_mag = model(pc)
+            pred_mag = model(pc_obj, pc_robot, pos_robot, pos_obj)
 
             #################################
             # LOSSES
