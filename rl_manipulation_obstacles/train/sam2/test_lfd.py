@@ -20,13 +20,6 @@ def test():
 
     dataset = HDF5LfDDataset(os.path.join(os.getcwd(), "../../dataset"))
 
-    # Split dataset
-    train_size = int(0.05 * len(dataset))
-    val_size = int(0.05 * len(dataset))
-    test_size = len(dataset) - train_size - val_size
-
-
-
     MODE = "pcd"
 
     YOLO_MODEL = "yolov8n.pt"
@@ -59,6 +52,13 @@ def test():
 
     elif MODE == "pcd":
         dataset, curr_max = preprocess_pcd(dataset, test_curr_max=None, test = True)
+
+    
+    # Split dataset
+    train_size = int(0.05 * len(dataset))
+    val_size = int(0.05 * len(dataset))
+    test_size = len(dataset) - train_size - val_size
+
 
 
 
