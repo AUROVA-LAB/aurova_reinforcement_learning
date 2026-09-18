@@ -207,6 +207,14 @@ class HDF5LfDDataset(Dataset):
         self.max_diff_rot = 1.0
         self.max_diff_trans = 1.0
 
+
+        self.max_gripper_rot = 1.0
+        self.max_gripper_trans = 1.0
+
+
+        self.max_obj_rot = 1.0
+        self.max_obj_trans = 1.0
+
         # -------------------------------------------------
         # Convert PKL -> HDF5 if necessary
         # -------------------------------------------------
@@ -506,6 +514,12 @@ class HDF5LfDDataset(Dataset):
         mag[:3] /= self.max_diff_rot
         mag[3:] /= self.max_diff_trans
 
+        gripper_pose[:3] /= self.max_gripper_rot
+        gripper_pose[3:] /= self.max_gripper_trans
+
+        target_pose[:3] /= self.max_obj_rot 
+        target_pose[3:] /= self.max_obj_trans
+
 
         
         return {
@@ -532,11 +546,11 @@ class HDF5LfDDataset(Dataset):
             "pcd_p": pcd_p,
 
             # "target_pose": target_pose,
-            "gripper_pose": gripper_pose,
-            "target_pose": target_pose,
+            "gripper_pose": np.round(gripper_pose, decimals=3),
+            "target_pose": np.round(target_pose, decimals=3),
             "action": action,#/ self.max_action, #np.concatenate([action, gripper_action], axis=-1),
-            "mag": mag,
-            "diff": diff,
+            "mag": np.round(mag, decimals=3),
+            "diff": np.round(diff, decimals=3),
             # "cat_diff": new_cat,
             # "prev_action": prev_action
             "sym": (target_pose - gripper_pose),
