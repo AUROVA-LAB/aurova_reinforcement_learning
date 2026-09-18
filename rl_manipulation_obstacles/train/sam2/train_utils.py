@@ -747,7 +747,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         model.cuda()
 
     actions_list = []
-    pos_list = []
+    gripper_list = []
+    obj_list = []
 
     if True:
         for i in range(len(dataset)):
@@ -762,6 +763,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             #     curr_max = new_max_pc
 
             actions_list.append(dataset[i]["diff"])
+            gripper_list.append(dataset[i]["gripper_pose"])
+            obj_list.append(dataset[i]["target_pose"])
 
             flag = False
             for j in actions_list[i]:
@@ -777,11 +780,19 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             # pos_list.append(dataset[i]["gripper_pose"])
 
         actions_list = np.array(actions_list)
+        gripper_list = np.array(gripper_list)
+        obj_list = np.array(obj_list)
         actions_list = np.clip(actions_list, -0.06, 0.06)
 
         if not test:
             dataset.max_diff_rot = np.max(np.abs(actions_list[:, :3])) 
             dataset.max_diff_trans = np.max(np.abs(actions_list[:, 3:]))
+
+            dataset.max_gripper_rot = np.max(np.abs(gripper_list[:, :3])) 
+            dataset.max_gripper_trans = np.max(np.abs(gripper_list[:, 3:]))
+
+            dataset.max_obj_rot = np.max(np.abs(obj_list[:, :3])) 
+            dataset.max_obj_trans = np.max(np.abs(obj_list[:, 3:]))
 
         # pos_list = np.array(pos_list)
 
