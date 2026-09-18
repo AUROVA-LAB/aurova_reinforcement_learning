@@ -216,7 +216,6 @@ class CnnPolicy(nn.Module):
             self.forward = self.forward_cnn
 
 
-        # self.dct = FastDCTFeatureReducer(input_dim=1024, output_dim=hidden_dim) # 128
 
 
         self.att_pool = AttentionPool(F = 128)
@@ -272,34 +271,47 @@ class CnnPolicy(nn.Module):
         self.pc_obj = nn.Sequential(nn.Linear(768, 256), 
                                     nn.GELU(), 
                                     nn.LayerNorm(256), 
-                                    nn.Linear(256, hidden_dim), 
+                                    nn.Linear(256, 64), 
                                     nn.GELU(), 
-                                    nn.LayerNorm(hidden_dim))
+                                    nn.LayerNorm(64))
         self.pc_robot = nn.Sequential(nn.Linear(768, 256), 
                                     nn.GELU(), 
                                     nn.LayerNorm(256), 
-                                    nn.Linear(256, hidden_dim), 
+                                    nn.Linear(256, 64), 
                                     nn.GELU(), 
-                                    nn.LayerNorm(hidden_dim))
+                                    nn.LayerNorm(64))
+        self.dct = FastDCTFeatureReducer(input_dim=768, output_dim=32)
+        '''
+         - Reducir la dimensionalidad de las features
 
-        self.fuse_pc = nn.Sequential(nn.Linear(hidden_dim*2, hidden_dim),
+        '''
+
+        self.fuse_robot = nn.Sequential(nn.Linear(35, 16),
                                      nn.GELU(), 
-                                     nn.LayerNorm(hidden_dim))
+                                     nn.LayerNorm(16))
+        self.fuse_obj = nn.Sequential(nn.Linear(34, 16),
+                                             nn.GELU(), 
+                                             nn.LayerNorm(16))
+        
+        '''
+         - fusionar las features cada PC con su posicion
+         - Mirar el rango para normalizar que esten en el mismo rango de las F con la pose
+        '''
 
-        self.pos = nn.Sequential(nn.Linear(6, 32), 
-                                    nn.GELU(), 
-                                    nn.LayerNorm(32), 
-                                    nn.Linear(32, hidden_dim), 
-                                    nn.GELU(), 
-                                    nn.LayerNorm(hidden_dim))
+        # self.pos = nn.Sequential(nn.Linear(6, 32), # 3+3
+        #                             nn.GELU(), 
+        #                             nn.LayerNorm(32), 
+        #                             nn.Linear(32, 64), 
+        #                             nn.GELU(), 
+        #                             nn.LayerNorm(64))
 
         self.head = nn.Sequential(
-            nn.Linear(hidden_dim*2, 64),
+            nn.Linear(32, 16),
             nn.GELU(),
-            nn.LayerNorm(64),
+            nn.LayerNorm(16),
             # nn.Dropout(0.15),
-            nn.Linear(hidden_dim, action_dim),
-            nn.LayerNorm(action_dim),
+            nn.Linear(16, 6),
+            nn.LayerNorm(6),
             nn.Tanh()
         )
 
@@ -316,7 +328,8 @@ class CnnPolicy(nn.Module):
         # self.forward = self.forward_temporal_DCT_raw
         # self.forward = self.forward_temporal_DCT_BERT
         # self.forward = self.forward_BERT
-        self.forward = self.forward_BERT_sep
+        # self.forward = self.forward_BERT_sep
+        self.forward = self.forward_BERT_dct
 
 
 
@@ -657,7 +670,35 @@ class CnnPolicy(nn.Module):
         # )
 
         return pred_mag
-    
+
+    def forward_BERT_dct(self, pc_obj, pc_robot, pos_rob, pos_obj):
+        """
+        pc_obj: [B,F]
+        pc_robot: [B,F]
+        pos_rob: [B,3]
+        pos_obj: [B,3]
+        """
+
+        dct_obj = self.dct.encode(pc_obj)
+        dct_robot = self.dct.encode(pc_robot)
+
+        dct_obj = torch.cat((dct_obj, pos_obj), dim = -1)
+        dct_robot = torch.cat((dct_robot, pos_rob), dim = -1)
+
+        fuse_obj = self.fuse_obj(dct_obj)
+        fuse_robot = self.fuse_robot(dct_robot)
+
+        fuse = torch.cat((fuse_robot, fuse_obj), dim = -1)
+
+        return self.head(fuse)
+        
+
+
+
+        
+
+        
+
 
 
     def forward_temporal_DCT_raw(self, pc_seq, pose_seq):
