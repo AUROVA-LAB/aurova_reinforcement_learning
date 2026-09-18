@@ -208,7 +208,7 @@ def train():
             pc_obj= b["pc_net3_object"] #  p_f
             pc_robot = b["pc_net3_robot"]
             pos_robot = b["gripper_pose"][:, 3:]
-            pos_obj = b["target_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:-1]
             
             # traj=b["cat_diff"]
             traj_mag = b["mag"]
@@ -310,12 +310,11 @@ def train():
                 pc_obj= b["pc_net3_object"] #  p_f
                 pc_robot = b["pc_net3_robot"]
                 pos_robot = b["gripper_pose"][:, 3:]
-                pos_obj = b["target_pose"][:, 3:]
+                pos_obj = b["target_pose"][:, 3:-1]
                 
                 # traj=b["cat_diff"]
                 traj_mag = b["mag"]
-                
-    
+
                 pred_mag = model(pc_obj, pc_robot, pos_robot, pos_obj)
 
                 # cat_loss = criterion(pred, traj)
@@ -444,7 +443,7 @@ def train():
             pc_obj= b["pc_net3_object"] #  p_f
             pc_robot = b["pc_net3_robot"]
             pos_robot = b["gripper_pose"][:, 3:]
-            pos_obj = b["target_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:-1]
             
             # traj=b["cat_diff"]
             traj_mag = b["mag"]
