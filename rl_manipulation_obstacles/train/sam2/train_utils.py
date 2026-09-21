@@ -958,6 +958,14 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         #     max_pc = np.max(point_features, axis = -1)
         #     min_pc = np.min(point_features, axis = -1)
     if not test:     
+        print("dataset.max_diff_rot: ", dataset.max_diff_rot)
+        print("dataset.max_diff_trans: ", dataset.max_diff_trans)
+        # "actions_minmax": actions_minmax,
+        # "pos_minmax": pos_minmax,
+        print("dataset.max_gripper_rot: ", dataset.max_gripper_rot) 
+        print("dataset.max_gripper_trans: ", dataset.max_gripper_trans)
+        print("dataset.max_obj_rot: ", dataset.max_obj_rot) 
+        print("dataset.max_obj_trans: ", dataset.max_obj_trans)
         stats = {
             "max_diff_rot": dataset.max_diff_rot,
             "max_diff_trans": dataset.max_diff_trans,
