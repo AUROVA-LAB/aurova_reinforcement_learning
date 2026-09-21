@@ -960,10 +960,13 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
     if not test:     
         stats = {
             "max_diff_rot": dataset.max_diff_rot,
-            "max_diff_rot": dataset.max_diff_trans,
+            "max_diff_trans": dataset.max_diff_trans,
             # "actions_minmax": actions_minmax,
             # "pos_minmax": pos_minmax,
-        }
+            "max_gripper_rot":dataset.max_gripper_rot, 
+            "max_gripper_trans":dataset.max_gripper_trans,
+            "max_obj_rot":dataset.max_obj_rot, 
+            "max_obj_trans":dataset.max_obj_trans,}
 
         with open("action_preprocessing.pkl","wb") as f:
             pickle.dump(stats,f)
