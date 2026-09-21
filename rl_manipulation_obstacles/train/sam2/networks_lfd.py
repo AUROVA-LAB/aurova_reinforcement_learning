@@ -331,6 +331,9 @@ class CnnPolicy(nn.Module):
         # self.forward = self.forward_BERT_sep
         self.forward = self.forward_BERT_dct
 
+        self.max_dct_obj = 1.0
+        self.max_dct_rob = 1.0
+
 
 
 
@@ -679,8 +682,11 @@ class CnnPolicy(nn.Module):
         pos_obj: [B,3]
         """
 
-        dct_obj = self.dct.encode(pc_obj)
-        dct_robot = self.dct.encode(pc_robot)
+        dct_obj = self.dct.encode(pc_obj) / self.max_dct_obj
+        dct_robot = self.dct.encode(pc_robot) / self.max_dct_rob
+
+        print(torch.max(dct_obj))
+        print(torch.max(dct_robot))
 
         dct_obj = torch.cat((dct_obj, pos_obj), dim = -1)
         dct_robot = torch.cat((dct_robot, pos_rob), dim = -1)

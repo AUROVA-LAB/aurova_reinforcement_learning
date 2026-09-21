@@ -417,6 +417,9 @@ def train():
     pred_mag_all = []
     target_mag_all = []
 
+    model.max_dct_obj = dataset.max_red_obj
+    model.max_dct_rob = dataset.max_red_rob
+
     with torch.no_grad():
 
         for b in test_loader:

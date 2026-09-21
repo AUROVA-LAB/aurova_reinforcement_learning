@@ -892,6 +892,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         pc_data_object = []
         rmv_idx = []
 
+        red_obj = FastDCTFeatureReducer(768, 16)
+        red_rob = FastDCTFeatureReducer(768, 16)
+
         for i in range(len(dataset)):
             print("--- Image ", i / len(dataset))
 
@@ -915,6 +918,8 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             point_features_robot, centroid, scale = preprocess_pcd_single(pc_robot, model, mode = mode)
             point_features_object, centroid, scale = preprocess_pcd_single(pc_object, model, mode = mode)
 
+
+
             if torch.isinf(point_features_object).any().item() or torch.isnan(point_features_object).any().item() or \
                 torch.isinf(point_features_robot).any().item() or torch.isnan(point_features_robot).any().item():
                 rmv_idx.append(i)
@@ -931,11 +936,11 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             if point_features_robot is None or point_features_object is None:
                 continue
 
-            point_features_robot = point_features_robot.cpu().numpy()
-            point_features_object = point_features_object.cpu().numpy()
+            pc_data_robot.append(red_rob.encode(point_features_robot.unsqueeze(0)).cpu().numpy())
+            pc_data_object.append(red_obj.encode(point_features_object.unsqueeze(0)).cpu().numpy())
+            # point_features_robot = point_features_robot.cpu().numpy()
+            # point_features_object = point_features_object.cpu().numpy()
 
-            pc_data_robot.append(point_features_robot)
-            pc_data_object.append(point_features_object)
 
             if mode == "PointNet2":
                 dataset.set_item(i, pcd_net2 = point_features_object)
@@ -944,7 +949,10 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                 dataset.set_item(i, pcd_net3_robot = point_features_robot)
 
 
+        dataset.max_pc_obj = np.max(np.abs(pc_data_object)) 
+        dataset.max_pc_rob = np.max(np.abs(pc_data_robot))
 
+        
 
         # pc_data = np.array(pc_data)
 
@@ -958,14 +966,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
         #     max_pc = np.max(point_features, axis = -1)
         #     min_pc = np.min(point_features, axis = -1)
     if not test:     
-        print("dataset.max_diff_rot: ", dataset.max_diff_rot)
-        print("dataset.max_diff_trans: ", dataset.max_diff_trans)
-        # "actions_minmax": actions_minmax,
-        # "pos_minmax": pos_minmax,
-        print("dataset.max_gripper_rot: ", dataset.max_gripper_rot) 
-        print("dataset.max_gripper_trans: ", dataset.max_gripper_trans)
-        print("dataset.max_obj_rot: ", dataset.max_obj_rot) 
-        print("dataset.max_obj_trans: ", dataset.max_obj_trans)
+        
         stats = {
             "max_diff_rot": dataset.max_diff_rot,
             "max_diff_trans": dataset.max_diff_trans,
@@ -974,7 +975,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
             "max_gripper_rot":dataset.max_gripper_rot, 
             "max_gripper_trans":dataset.max_gripper_trans,
             "max_obj_rot":dataset.max_obj_rot, 
-            "max_obj_trans":dataset.max_obj_trans,}
+            "max_obj_trans":dataset.max_obj_trans,
+            "max_pc_obj": dataset.max_pc_obj,
+            "max_pc_rob": dataset.max_pc_rob}
 
         with open("action_preprocessing.pkl","wb") as f:
             pickle.dump(stats,f)
@@ -987,7 +990,7 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
 
     for i in reversed(rmv_idx):
         dataset.remove_idx(i)
-    raise
+    
     return dataset, curr_max
         
 

@@ -130,6 +130,17 @@ def test():
     dataset.max_diff_rot = stats["max_diff_rot"] 
     dataset.max_diff_trans = stats["max_diff_trans"]
 
+    
+    
+    dataset.max_gripper_rot = stats["max_gripper_rot"] 
+    dataset.max_gripper_trans = stats["max_gripper_trans"]
+    dataset.max_obj_rot = stats["max_obj_rot"] 
+    dataset.max_obj_trans = stats["max_obj_trans"]
+
+
+    model.max_dct_obj = stats["max_pc_obj"]
+    model.max_dct_rob = stats["max_pc_rob"]
+
 
     with torch.no_grad():
         for b in test_loader:
@@ -142,7 +153,7 @@ def test():
             pc_obj= b["pc_net3_object"] #  p_f
             pc_robot = b["pc_net3_robot"]
             pos_robot = b["gripper_pose"][:, 3:]
-            pos_obj = b["target_pose"][:, 3:]
+            pos_obj = b["target_pose"][:, 3:-1]
             
             # traj=b["cat_diff"]
             traj_mag = b["mag"]
