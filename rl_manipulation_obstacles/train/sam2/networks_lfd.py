@@ -685,9 +685,6 @@ class CnnPolicy(nn.Module):
         dct_obj = self.dct.encode(pc_obj) / self.max_dct_obj
         dct_robot = self.dct.encode(pc_robot) / self.max_dct_rob
 
-        print(torch.max(dct_obj))
-        print(torch.max(dct_robot))
-
         dct_obj = torch.cat((dct_obj, pos_obj), dim = -1)
         dct_robot = torch.cat((dct_robot, pos_rob), dim = -1)
 
