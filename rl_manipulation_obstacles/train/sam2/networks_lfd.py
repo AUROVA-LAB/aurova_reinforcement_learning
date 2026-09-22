@@ -306,7 +306,7 @@ class CnnPolicy(nn.Module):
         #                             nn.LayerNorm(64))
 
         self.head = nn.Sequential(
-            nn.Linear(32, 16),
+            nn.Linear(64, 16),
             nn.GELU(),
             nn.LayerNorm(16),
             # nn.Dropout(0.15),
@@ -329,7 +329,17 @@ class CnnPolicy(nn.Module):
         # self.forward = self.forward_temporal_DCT_BERT
         # self.forward = self.forward_BERT
         # self.forward = self.forward_BERT_sep
-        self.forward = self.forward_BERT_dct
+        # self.forward = self.forward_BERT_dct
+        self.forward = self.forward_BERT_dct_2
+
+        
+
+        # Trainable parameters
+        self.W_rob = nn.Parameter(torch.randn(3))
+
+        self.W_obj = nn.Parameter(torch.randn(2))
+
+    
 
         self.max_dct_obj = 1.0
         self.max_dct_rob = 1.0
@@ -694,6 +704,43 @@ class CnnPolicy(nn.Module):
         fuse = torch.cat((fuse_robot, fuse_obj), dim = -1)
 
         return self.head(fuse)
+        
+
+    def forward_BERT_dct_2(self, pc_obj, pc_robot, pos_rob, pos_obj):
+        """
+        pc_obj: [B,F]
+        pc_robot: [B,F]
+        pos_rob: [B,3]
+        pos_obj: [B,3]
+        """
+
+        dct_obj = self.dct.encode(pc_obj) / self.max_dct_obj
+        dct_robot = self.dct.encode(pc_robot) / self.max_dct_rob
+
+        wx_rob = (pos_rob[:, 0] * self.W_rob[0]).unsqueeze(-1)
+        wy_rob = (pos_rob[:, 1] * self.W_rob[1]).unsqueeze(-1)
+        wz_rob = (pos_rob[:, 2] * self.W_rob[2]).unsqueeze(-1)
+
+        W_rob = torch.cat((wx_rob, wy_rob, wz_rob), dim = -1)
+
+        w = W_rob.sum(dim=1, keepdim=True)  # (B, 1)
+
+        features_robot = dct_robot * w
+
+
+        wx_obj = (pos_obj[:, 0] * self.W_obj[0]).unsqueeze(-1)
+        wy_obj = (pos_obj[:, 1] * self.W_obj[1]).unsqueeze(-1)
+
+        W_obj = torch.cat((wx_obj, wy_obj), dim = -1)
+
+        w = W_obj.sum(dim=1, keepdim=True)  # (B, 1)
+
+        features_obj = dct_obj * w
+
+        features = torch.cat((features_robot, features_obj), dim = -1)
+
+        
+        return self.head(features)
         
 
 
