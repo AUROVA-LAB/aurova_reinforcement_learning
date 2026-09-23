@@ -39,7 +39,7 @@ import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 from .train.sam2.train_utils import farthest_point_sampling, farthest_point_sampling_BERT, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
-# from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
+from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
 
@@ -758,6 +758,28 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                         # cmd = self.my_cmd.clone()
                         # cmd += self.gripper_pose_r_lie
 
+            else:
+                pc_rob = self.processed_pc_robot / self.stats["max_pc_rob"]
+                pc_obj = self.processed_pc_object / self.stats["max_pc_obj"]
+
+
+                dataset.max_diff_rot = stats["max_diff_rot"] 
+                dataset.max_diff_trans = stats["max_diff_trans"]   
+
+
+                target_pose = copy.deepcopy(self.target_pose_r_lie[0].float().cpu().numpy())
+                target_pose[:, :3] /= self.stats["max_obj_rot"]
+                target_pose[:, 3:] /= self.stats["max_obj_trans"]
+
+                gripper_pose = copy.deepcopy(self.gripper_pose_r_lie[0].float().cpu().numpy())
+                gripper_pose [:, :3] /= self.stats["max_gripper_rot"]
+                gripper_pose [:, 3:] /= self.stats["max_gripper_trans"]
+
+                cmd = self.test_model()
+
+                cmd[:, :3] *= self.stats["max_diff_rot"] 
+                cmd[:, 3:] *= self.stats["max_diff_trans"] 
+
             # actions = self._preprocess_actions(cmd)
             # cmd[:,:3] = self.target_pose_r_lie[:, :3]
 
@@ -1136,6 +1158,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
                 # o3d.visualization.draw_geometries([cloud])
 
+        self.processed_pc_object = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
+        self.processed_pc_robot = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
          
         
         if self.cfg.test:
@@ -1150,6 +1174,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
             self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
+
+
+
 
             if False:
                 for _ in range(self.cfg.horizon):
@@ -2084,6 +2111,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.pcd_model.eval()
                 self.pcd_model.cuda()
 
-                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing_BERT_cat2.pkl","rb") as f:
+                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing_santiago2.pkl","rb") as f:
                     self.stats = pickle.load(f)
 
+
+                self.test_model.max_dct_obj = self.stats["max_pc_obj"]
+                self.test_model.max_dct_rob = self.stats["max_pc_rob"]
