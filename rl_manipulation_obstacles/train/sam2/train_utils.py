@@ -948,9 +948,9 @@ def preprocess_pcd(dataset, mode = "BERT", test_curr_max = None, test = False):
                 dataset.set_item(i, pcd_net3_object = point_features_object)
                 dataset.set_item(i, pcd_net3_robot = point_features_robot)
 
-
-        dataset.max_pc_obj = np.max(np.abs(pc_data_object)) 
-        dataset.max_pc_rob = np.max(np.abs(pc_data_robot))
+        if not test:
+            dataset.max_pc_obj = np.max(np.abs(pc_data_object)) 
+            dataset.max_pc_rob = np.max(np.abs(pc_data_robot))
 
         
 
