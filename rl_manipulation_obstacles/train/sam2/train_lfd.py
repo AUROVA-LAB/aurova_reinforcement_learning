@@ -169,6 +169,12 @@ def train():
     backbone.eval()
     backbone.cuda()
 
+    with open("action_preprocessing.pkl","rb") as f:
+        stats = pickle.load(f)
+
+    model.max_dct_obj = stats["max_pc_obj"]
+    model.max_dct_rob = stats["max_pc_rob"]
+
     for epoch in range(200):
 
         ########################################
@@ -417,8 +423,8 @@ def train():
     pred_mag_all = []
     target_mag_all = []
 
-    model.max_dct_obj = dataset.max_red_obj
-    model.max_dct_rob = dataset.max_red_rob
+    model.max_dct_obj = stats["max_pc_obj"]
+    model.max_dct_rob = stats["max_pc_rob"]
 
     with torch.no_grad():
 
