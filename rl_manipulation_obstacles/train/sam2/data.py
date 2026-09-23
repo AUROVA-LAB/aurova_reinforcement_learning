@@ -514,11 +514,11 @@ class HDF5LfDDataset(Dataset):
         mag[:3] /= self.max_diff_rot
         mag[3:] /= self.max_diff_trans
 
-        gripper_pose[:3] /= self.max_gripper_rot
-        gripper_pose[3:] /= self.max_gripper_trans
+        gripper_pose[:3] /= self.max_gripper_rot * 5
+        gripper_pose[3:] /= self.max_gripper_trans * 5
 
-        target_pose[:3] /= self.max_obj_rot 
-        target_pose[3:] /= self.max_obj_trans
+        target_pose[:3] /= self.max_obj_rot * 5 
+        target_pose[3:] /= self.max_obj_trans * 5
 
 
         
