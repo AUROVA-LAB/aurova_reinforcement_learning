@@ -280,18 +280,18 @@ class CnnPolicy(nn.Module):
                                     nn.Linear(256, 64), 
                                     nn.GELU(), 
                                     nn.LayerNorm(64))
-        self.dct = FastDCTFeatureReducer(input_dim=768, output_dim=32)
+        self.dct = FastDCTFeatureReducer(input_dim=768, output_dim=16)
         '''
          - Reducir la dimensionalidad de las features
 
         '''
 
-        self.fuse_robot = nn.Sequential(nn.Linear(35, 16),
+        self.fuse_robot = nn.Sequential(nn.Linear(16+3, 8),
                                      nn.GELU(), 
-                                     nn.LayerNorm(16))
-        self.fuse_obj = nn.Sequential(nn.Linear(34, 16),
+                                     nn.LayerNorm(8))
+        self.fuse_obj = nn.Sequential(nn.Linear(16+2, 8),
                                              nn.GELU(), 
-                                             nn.LayerNorm(16))
+                                             nn.LayerNorm(8))
         
         '''
          - fusionar las features cada PC con su posicion
@@ -306,10 +306,7 @@ class CnnPolicy(nn.Module):
         #                             nn.LayerNorm(64))
 
         self.head = nn.Sequential(
-            nn.Linear(64, 16),
-            nn.GELU(),
-            nn.LayerNorm(16),
-            # nn.Dropout(0.15),
+            
             nn.Linear(16, 6),
             nn.LayerNorm(6),
             nn.Tanh()
@@ -329,8 +326,8 @@ class CnnPolicy(nn.Module):
         # self.forward = self.forward_temporal_DCT_BERT
         # self.forward = self.forward_BERT
         # self.forward = self.forward_BERT_sep
-        # self.forward = self.forward_BERT_dct
-        self.forward = self.forward_BERT_dct_2
+        self.forward = self.forward_BERT_dct
+        # self.forward = self.forward_BERT_dct_2
 
         
 
