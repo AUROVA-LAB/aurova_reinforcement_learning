@@ -763,19 +763,19 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 pc_obj = self.processed_pc_object / self.stats["max_pc_obj"]
 
 
-                dataset.max_diff_rot = stats["max_diff_rot"] 
-                dataset.max_diff_trans = stats["max_diff_trans"]   
+                self.test_model.max_diff_rot = self.stats["max_diff_rot"] 
+                self.test_model.max_diff_trans = self.stats["max_diff_trans"]   
 
 
-                target_pose = copy.deepcopy(self.target_pose_r_lie[0].float().cpu().numpy())
+                target_pose = copy.deepcopy(self.target_pose_r_lie.float())
                 target_pose[:, :3] /= self.stats["max_obj_rot"]
                 target_pose[:, 3:] /= self.stats["max_obj_trans"]
 
-                gripper_pose = copy.deepcopy(self.gripper_pose_r_lie[0].float().cpu().numpy())
-                gripper_pose [:, :3] /= self.stats["max_gripper_rot"]
-                gripper_pose [:, 3:] /= self.stats["max_gripper_trans"]
+                gripper_pose = copy.deepcopy(self.gripper_pose_r_lie.float())
+                gripper_pose[:, :3] /= self.stats["max_gripper_rot"]
+                gripper_pose[:, 3:] /= self.stats["max_gripper_trans"]
 
-                cmd = self.test_model()
+                cmd = self.test_model(pc_obj.unsqueeze(0), pc_rob.unsqueeze(0), gripper_pose[:, 3:], target_pose[:, 3:-1])
 
                 cmd[:, :3] *= self.stats["max_diff_rot"] 
                 cmd[:, 3:] *= self.stats["max_diff_trans"] 
@@ -1158,8 +1158,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
                 # o3d.visualization.draw_geometries([cloud])
 
-        self.processed_pc_object = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
-        self.processed_pc_robot = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
+        self.processed_pc_object, _, _ = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
+        self.processed_pc_robot, _, _ = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
          
         
         if self.cfg.test:
@@ -1173,7 +1173,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             elif self.cfg.mode == "seq_raw":
                 self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
 
-            self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
+            # self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
 
 
 
@@ -1183,10 +1183,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                     self.pose_seq.enqueue(self.gripper_pose_r_lie)
                     self.pc_seq.enqueue(self.processed_pc)
 
-            else:
-                if self.count % self.cfg.save_interval == 0:
-                    self.pose_seq.enqueue(self.gripper_pose_r_lie)
-                    self.pc_seq.enqueue(self.processed_pc)        
+            # else:
+            #     if self.count % self.cfg.save_interval == 0:
+            #         self.pose_seq.enqueue(self.gripper_pose_r_lie)
+            #         self.pc_seq.enqueue(self.processed_pc)        
 
 
 

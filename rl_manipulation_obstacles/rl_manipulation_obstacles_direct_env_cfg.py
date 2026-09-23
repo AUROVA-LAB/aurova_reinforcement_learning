@@ -474,7 +474,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     test = True
     hdf5 = False
-    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_santiago2.pth"
+    model_path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model.pth"
     
     save_interval = 5
     mode = "other" # "pcd", "img", "seq", "seq_raw"
@@ -485,6 +485,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         pc_shape = (768,)# (512,128)
     elif mode == "seq_raw":
         pc_shape = (512, 3)
+    else:
+        pc_shape = (768,)# (512,128)
 
 
 
