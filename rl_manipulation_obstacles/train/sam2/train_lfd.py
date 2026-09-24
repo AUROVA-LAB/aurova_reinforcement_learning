@@ -373,8 +373,8 @@ def train():
 
         print(
             f"Epoch {epoch}"
-            f" Train {train_loss:.4f}"
-            f" Val {val_loss:.4f}"
+            f" Train {train_loss:.3f}"
+            f" Val {val_loss:.3f}"
         )
 
         # print(
@@ -382,7 +382,7 @@ def train():
         #     mae_per_dim
         # )
 
-        if val_loss<best_val - 0.005:
+        if round(val_loss, 3)<round(best_val, 3):
 
             best_val=val_loss
 
