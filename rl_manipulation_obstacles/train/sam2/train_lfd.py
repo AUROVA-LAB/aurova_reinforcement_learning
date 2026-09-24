@@ -382,7 +382,7 @@ def train():
         #     mae_per_dim
         # )
 
-        if val_loss<best_val:
+        if val_loss<best_val - 0.005:
 
             best_val=val_loss
 
