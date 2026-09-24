@@ -786,7 +786,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             grip_action = cmd[:, -1].clone()*0
             cmd_lie = cmd.clone()
 
-            cmd = self.convert_to_Lab(self.exp(cmd_lie))
+            cmd = self.convert_to_Lab(self.exp(cmd_lie + self.gripper_pose_r_lie))
             
             cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
                                         t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
@@ -2111,7 +2111,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 self.pcd_model.eval()
                 self.pcd_model.cuda()
 
-                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing_santiago2.pkl","rb") as f:
+                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing.pkl","rb") as f:
                     self.stats = pickle.load(f)
 
 

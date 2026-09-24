@@ -54,8 +54,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 2.0      # Length of the episode in seconds
-    max_steps = 400             # Maximum steps in an episode
+    episode_length_s = 1.0      # Length of the episode in seconds
+    max_steps = 100             # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
