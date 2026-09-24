@@ -286,10 +286,10 @@ class CnnPolicy(nn.Module):
 
         '''
 
-        self.fuse_robot = nn.Sequential(nn.Linear(16+3, 8),
+        self.fuse_robot = nn.Sequential(nn.Linear(16+6, 8),
                                      nn.GELU(), 
                                      nn.LayerNorm(8))
-        self.fuse_obj = nn.Sequential(nn.Linear(16+2, 8),
+        self.fuse_obj = nn.Sequential(nn.Linear(16+6, 8),
                                              nn.GELU(), 
                                              nn.LayerNorm(8))
         
