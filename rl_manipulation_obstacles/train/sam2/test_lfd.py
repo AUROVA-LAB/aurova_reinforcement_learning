@@ -152,8 +152,8 @@ def test():
 
             pc_obj= b["pc_net3_object"] #  p_f
             pc_robot = b["pc_net3_robot"]
-            pos_robot = b["gripper_pose"][:, 3:]
-            pos_obj = b["target_pose"][:, 3:-1]
+            pos_robot = b["gripper_pose"]
+            pos_obj = b["target_pose"]
             
             # traj=b["cat_diff"]
             traj_mag = b["mag"]

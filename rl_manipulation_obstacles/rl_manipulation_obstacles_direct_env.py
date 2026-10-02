@@ -775,7 +775,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 gripper_pose[:, :3] /= self.stats["max_gripper_rot"]
                 gripper_pose[:, 3:] /= self.stats["max_gripper_trans"]
 
-                cmd = self.test_model(pc_obj.unsqueeze(0), pc_rob.unsqueeze(0), gripper_pose[:, 3:], target_pose[:, 3:-1])
+                cmd = self.test_model(pc_obj.unsqueeze(0), pc_rob.unsqueeze(0), gripper_pose, target_pose)
 
                 cmd[:, :3] *= self.stats["max_diff_rot"] 
                 cmd[:, 3:] *= self.stats["max_diff_trans"] 
