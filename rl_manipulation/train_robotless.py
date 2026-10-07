@@ -88,7 +88,7 @@ model = PPO(
     clip_range=0.2,
 
     verbose=1,
-    device="auto",
+    device="cpu",
 )
 
 
