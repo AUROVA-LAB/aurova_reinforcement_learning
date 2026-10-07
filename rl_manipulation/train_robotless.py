@@ -60,7 +60,6 @@ policy_kwargs = dict(
         pi=[128, 64],
         vf=[128, 64],
     ),
-    share_feature_extractor=True
 )
 
 
