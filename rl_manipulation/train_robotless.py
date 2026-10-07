@@ -97,6 +97,6 @@ model = PPO(
 # ---------------------------------------------------------
 
 model.learn(
-    total_timesteps=100_000,
+    total_timesteps=100_000_000,
     callback=callback
 )
