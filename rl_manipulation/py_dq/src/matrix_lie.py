@@ -186,8 +186,6 @@ def exp_se3(xi: torch.Tensor, so3 = False):
                     + ((th-torch.sin(th))/th**3).view(-1,1,1)*A2[mask]
 
         # Maps the translation
-        print(J.shape)
-        print(rho.shape)
         t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
 
         # Rounds the result
