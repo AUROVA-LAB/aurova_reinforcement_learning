@@ -97,7 +97,7 @@ def log_se3(T: torch.Tensor, so3 = False):
     K = 0.5 * (R - R.transpose(-1,-2))
     phi = vee(K)  # = (sinθ/θ)*ω
     scale = torch.ones_like(theta)
-    scale[~is_small] = theta[~is_small] / torch.sin(theta[~is_small])
+    # scale[~is_small] = theta[~is_small] / torch.sin(theta[~is_small])
     phi = phi * scale.unsqueeze(-1)
 
     # "so3=True" -> only map rotation
@@ -186,6 +186,8 @@ def exp_se3(xi: torch.Tensor, so3 = False):
                     + ((th-torch.sin(th))/th**3).view(-1,1,1)*A2[mask]
 
         # Maps the translation
+        print(J.shape)
+        print(rho.shape)
         t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
 
         # Rounds the result
