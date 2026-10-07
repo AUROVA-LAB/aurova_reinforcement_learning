@@ -37,17 +37,13 @@ env = make_vec_env(
 checkpoint_callback = CheckpointCallback(
     save_freq=10_000 // n_envs,
     save_path="./checkpoints/",
-    name_prefix="ppo_robotless",
+    name_prefix="rl_manipulation_reach",
 )
 
 callback = CallbackList([
     checkpoint_callback,
 
-    WandbCallback(
-        gradient_save_freq=1000,
-        model_save_path=None,
-        verbose=2,
-    ),
+    WandbCallback(),
 ])
 
 
@@ -64,6 +60,7 @@ policy_kwargs = dict(
         pi=[128, 64],
         vf=[128, 64],
     ),
+    share_feature_extractor=True
 )
 
 
@@ -77,10 +74,12 @@ model = PPO(
 
     policy_kwargs=policy_kwargs,
 
-    n_steps=256,
-    batch_size=1024,
+    n_steps=16,
+    batch_size=512,
 
-    learning_rate=3e-4,
+    n_epochs=20,
+
+    learning_rate=1e-4,
     gamma=0.99,
     gae_lambda=0.95,
 
