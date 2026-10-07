@@ -27,7 +27,7 @@ def make_env():
     return BasicPoseEnv()
 
 
-n_envs = 1 # 64
+n_envs = 64
 
 env = make_vec_env(
     make_env,
