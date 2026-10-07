@@ -134,6 +134,7 @@ def compute_reward(
     goal,
     log,
     to_group,
+    action,
     position_weight=1.0,
     rotation_weight=1.0,
 ):
@@ -149,6 +150,7 @@ def compute_reward(
     reward = -(
         position_weight * position_distance
         + rotation_weight * rotation_distance
+        + np.linalg.norm(action)
     )
 
     return reward

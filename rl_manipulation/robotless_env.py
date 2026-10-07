@@ -104,6 +104,8 @@ class BasicPoseEnv(gym.Env):
         self.goal_group = np.zeros(size_group, dtype=np.float32)
         self.goal_map = np.zeros(size, dtype=np.float32)
 
+        self.action = np.zeros(size, dtype=np.float32)
+
         self.step_count = 0
         self.end_episode = 100
 
@@ -197,6 +199,7 @@ class BasicPoseEnv(gym.Env):
             self.goal,
             self.log_dist,
             self.to_group_dist,
+            self.action,
             position_weight=self.position_weight,
             rotation_weight=self.rotation_weight,
         )
@@ -318,6 +321,8 @@ class BasicPoseEnv(gym.Env):
             action,
             dtype=np.float32,
         )
+
+        self.action = action
         
 
         # --------------------------------------------------
