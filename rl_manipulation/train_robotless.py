@@ -35,7 +35,7 @@ env = make_vec_env(
 )
 
 checkpoint_callback = CheckpointCallback(
-    save_freq=10_000 // n_envs,
+    save_freq=100_000 // n_envs,
     save_path="./checkpoints/",
     name_prefix="rl_manipulation_reach",
 )
@@ -87,6 +87,8 @@ model = PPO(
 
     verbose=1,
     device="cpu",
+
+    tensorboard_log=log_dir,    
 )
 
 
