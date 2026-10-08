@@ -86,7 +86,7 @@ model = PPO(
     clip_range=0.2,
 
     verbose=1,
-    device="cpu",
+    device="cuda",
 
     tensorboard_log=log_dir,    
 )
