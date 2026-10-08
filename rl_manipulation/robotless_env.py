@@ -341,7 +341,7 @@ class BasicPoseEnv(gym.Env):
         # Keep pose inside workspace / Normalise
         # --------------------------------------------------
 
-        self.visualize_pose_evolution(show=False, save_path="./evo")
+        # self.visualize_pose_evolution(show=False, save_path="./evo")
         
 
         self.step_count += 1
