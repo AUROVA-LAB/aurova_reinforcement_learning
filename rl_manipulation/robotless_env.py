@@ -2,6 +2,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 import torch
+import matplotlib.pyplot as plt
+
 
 
 from utils_robotless import * 
@@ -210,14 +212,10 @@ class BasicPoseEnv(gym.Env):
         """
 
         position_distance, rotation_distance = self.compute_distance()
-        out_bounds = np.any(self.pose[:3].cpu().numpy() <= self.pos_low) and np.any(self.pose[:3].cpu().numpy() >= self.pos_high)
-        time_out = self.step_count >= self.end_episode
         
         return (
             position_distance < self.goal_threshold
             and rotation_distance < self.goal_threshold 
-            and out_bounds
-            and time_out
         )
 
     def reset(self, *, seed=None, options=None):
@@ -230,6 +228,7 @@ class BasicPoseEnv(gym.Env):
         super().reset(seed=seed)
 
         self.step_count = 0
+        self.pose_map_history = []
 
         # Random initial pose
         self.pose = self.sample_pose()
@@ -241,6 +240,8 @@ class BasicPoseEnv(gym.Env):
 
         observation = self.get_observation()
 
+        self.pose_map_history = [self.pose_map]
+
         info = {
             "pose": self.pose,
             "goal": self.goal,
@@ -251,7 +252,6 @@ class BasicPoseEnv(gym.Env):
         }
 
         return observation, info
-
 
     def preprocess_action(self, action):
         if symmetry:
@@ -270,7 +270,6 @@ class BasicPoseEnv(gym.Env):
                 
 
         return action
-
 
     def increase_pose(self, delta):
 
@@ -310,8 +309,6 @@ class BasicPoseEnv(gym.Env):
         self.pose_group = self.pose_group.squeeze(0).cpu().numpy()
         self.pose_map = self.pose_map.squeeze(0).cpu().numpy()
 
-        
-
     def step(self, action):
         """
         Apply one pose increment.
@@ -335,12 +332,14 @@ class BasicPoseEnv(gym.Env):
         # --------------------------------------------------
         self.increase_pose(delta_pose)
 
+        self.pose_map_history.append(self.pose_map)
 
         # TODO: normalise
         # --------------------------------------------------
         # Keep pose inside workspace / Normalise
         # --------------------------------------------------
 
+        self.visualize_pose_evolution(show=False, save_path="./evo")
         
 
         self.step_count += 1
@@ -357,7 +356,10 @@ class BasicPoseEnv(gym.Env):
 
         terminated = self.check_goal()
 
-        truncated = self.step_count >= self.max_steps
+        out_bounds = np.any(self.pose[:3].cpu().numpy() <= self.pos_low) and np.any(self.pose[:3].cpu().numpy() >= self.pos_high)
+        time_out = self.step_count >= self.end_episode
+
+        truncated = self.step_count >= self.max_steps and out_bounds and time_out
 
         # Optional terminal bonus
         if terminated:
@@ -385,3 +387,251 @@ class BasicPoseEnv(gym.Env):
             truncated,
             info,
         )
+
+    def visualize_pose_evolution(self, show=True, save_path=None):
+        """
+        Visualize the evolution of the pose in Lie algebra coordinates.
+
+        pose_map convention:
+            pose_map[:3] -> rotational Lie algebra coordinates
+            pose_map[3:] -> translational Lie algebra coordinates
+
+        The trajectory stored in self.pose_map_history is plotted together
+        with the goal pose.
+        """
+
+        if len(self.pose_map_history) == 0:
+            print("No pose history available.")
+            return
+
+        trajectory = np.asarray(self.pose_map_history)
+
+        # Goal in Lie algebra
+        goal = np.asarray(self.goal_map)
+
+        # ------------------------------------------------------------
+        # Create figure
+        # ------------------------------------------------------------
+
+        fig = plt.figure(figsize=(15, 10))
+
+        # ============================================================
+        # 1. 3D POSITION TRAJECTORY
+        # ============================================================
+
+        ax1 = fig.add_subplot(221, projection="3d")
+
+        x = trajectory[:, 3]
+        y = trajectory[:, 4]
+        z = trajectory[:, 5]
+
+        gx, gy, gz = goal[3], goal[4], goal[5]
+
+        ax1.plot(
+            x,
+            y,
+            z,
+            linewidth=2,
+            label="Pose trajectory",
+        )
+
+        ax1.scatter(
+            x[0],
+            y[0],
+            z[0],
+            s=80,
+            marker="o",
+            label="Start",
+        )
+
+        ax1.scatter(
+            gx,
+            gy,
+            gz,
+            s=120,
+            marker="*",
+            label="Goal",
+        )
+
+        ax1.set_xlabel(r"$\xi_4$")
+        ax1.set_ylabel(r"$\xi_5$")
+        ax1.set_zlabel(r"$\xi_6$")
+
+        ax1.set_title("Translation trajectory in Lie algebra")
+
+        ax1.legend()
+
+        # ============================================================
+        # 2. ROTATION LIE ALGEBRA
+        # ============================================================
+
+        ax2 = fig.add_subplot(222)
+
+        steps = np.arange(len(trajectory))
+
+        ax2.plot(
+            steps,
+            trajectory[:, 0],
+            label=r"$\omega_x$",
+        )
+
+        ax2.plot(
+            steps,
+            trajectory[:, 1],
+            label=r"$\omega_y$",
+        )
+
+        ax2.plot(
+            steps,
+            trajectory[:, 2],
+            label=r"$\omega_z$",
+        )
+
+        ax2.axhline(
+            goal[0],
+            linestyle="--",
+            label=r"Goal $\omega_x$",
+        )
+
+        ax2.axhline(
+            goal[1],
+            linestyle="--",
+            label=r"Goal $\omega_y$",
+        )
+
+        ax2.axhline(
+            goal[2],
+            linestyle="--",
+            label=r"Goal $\omega_z$",
+        )
+
+        ax2.set_xlabel("Step")
+        ax2.set_ylabel("Lie algebra coordinate")
+
+        ax2.set_title("Rotation evolution")
+
+        ax2.grid(True)
+        ax2.legend()
+
+        # ============================================================
+        # 3. TRANSLATION LIE ALGEBRA
+        # ============================================================
+
+        ax3 = fig.add_subplot(223)
+
+        ax3.plot(
+            steps,
+            trajectory[:, 3],
+            label=r"$v_x$",
+        )
+
+        ax3.plot(
+            steps,
+            trajectory[:, 4],
+            label=r"$v_y$",
+        )
+
+        ax3.plot(
+            steps,
+            trajectory[:, 5],
+            label=r"$v_z$",
+        )
+
+        ax3.axhline(
+            goal[3],
+            linestyle="--",
+            label=r"Goal $v_x$",
+        )
+
+        ax3.axhline(
+            goal[4],
+            linestyle="--",
+            label=r"Goal $v_y$",
+        )
+
+        ax3.axhline(
+            goal[5],
+            linestyle="--",
+            label=r"Goal $v_z$",
+        )
+
+        ax3.set_xlabel("Step")
+        ax3.set_ylabel("Lie algebra coordinate")
+
+        ax3.set_title("Translation evolution")
+
+        ax3.grid(True)
+        ax3.legend()
+
+        # ============================================================
+        # 4. DISTANCE TO GOAL IN LIE ALGEBRA
+        # ============================================================
+
+        ax4 = fig.add_subplot(224)
+
+        diff = trajectory - goal
+
+        rotation_error = np.linalg.norm(
+            diff[:, :3],
+            axis=1,
+        )
+
+        translation_error = np.linalg.norm(
+            diff[:, 3:],
+            axis=1,
+        )
+
+        total_error = np.linalg.norm(
+            diff,
+            axis=1,
+        )
+
+        ax4.plot(
+            steps,
+            rotation_error,
+            label="Rotation error",
+        )
+
+        ax4.plot(
+            steps,
+            translation_error,
+            label="Translation error",
+        )
+
+        ax4.plot(
+            steps,
+            total_error,
+            linewidth=2,
+            label="Total Lie error",
+        )
+
+        ax4.set_xlabel("Step")
+        ax4.set_ylabel("Distance")
+
+        ax4.set_title("Distance to goal in Lie algebra")
+
+        ax4.grid(True)
+        ax4.legend()
+
+        # ------------------------------------------------------------
+        # Final formatting
+        # ------------------------------------------------------------
+
+        fig.suptitle(
+            "Pose evolution in Lie algebra",
+            fontsize=16,
+        )
+
+        plt.tight_layout()
+
+        if save_path is not None:
+            plt.savefig(
+                save_path,
+                dpi=200,
+                bbox_inches="tight",
+            )
+
+        if show:
+            plt.show()
+
+        return fig
