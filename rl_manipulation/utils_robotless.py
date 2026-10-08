@@ -135,6 +135,7 @@ def compute_reward(
     log,
     to_group,
     action,
+    prev_dist,
     position_weight=1.0,
     rotation_weight=1.0,
 ):
@@ -147,10 +148,8 @@ def compute_reward(
         pose, goal, log, to_group, rotation_weight, position_weight
     )
 
-    reward = -(
-        position_weight * position_distance
-        + rotation_weight * rotation_distance
-        + np.linalg.norm(action)
-    )
+    dist =  position_weight * position_distance + rotation_weight * rotation_distance
 
-    return reward
+    reward = (dist) * (2*int(dist < prev_dist) - 1)
+
+    return reward, dist

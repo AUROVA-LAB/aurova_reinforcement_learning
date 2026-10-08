@@ -202,6 +202,7 @@ class BasicPoseEnv(gym.Env):
             self.log_dist,
             self.to_group_dist,
             self.action,
+            self.prev_dist,
             position_weight=self.position_weight,
             rotation_weight=self.rotation_weight,
         )
@@ -229,6 +230,7 @@ class BasicPoseEnv(gym.Env):
 
         self.step_count = 0
         self.pose_map_history = []
+        self.prev_dist = 0
 
         # Random initial pose
         self.pose = self.sample_pose()
@@ -348,7 +350,7 @@ class BasicPoseEnv(gym.Env):
         # Reward
         # --------------------------------------------------
 
-        reward = self.compute_reward()
+        reward, self.prev_dist = self.compute_reward()
 
         # --------------------------------------------------
         # Termination
