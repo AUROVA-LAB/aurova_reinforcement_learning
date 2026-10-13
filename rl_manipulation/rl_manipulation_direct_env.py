@@ -395,7 +395,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        obs = self.robot_rot_ee_pose_r_lie_rel
+        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
         obs[:, :3] /= 1.25
         obs[:, 3:] /= 0.74
 
