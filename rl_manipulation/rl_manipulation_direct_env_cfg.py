@@ -5,6 +5,7 @@ import torch
 import copy
 import numpy as np
 from scipy.spatial.transform import Rotation
+import gymnasium as gym
 
 from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation.robots_cfg import *
 
@@ -41,23 +42,29 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 2
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
+    se3_dist = True
 
     # Scalings for each action
-    scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
+    scalings = [[[0.01, 0.001], [0.05, 0.025], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006], [0.02, 0.004]]]
+
+    # scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
+    #                 [[0.007, 0.02]],
+    #                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
+    #                 [[0.02,  0.004], [0.03,  0.006], [0.02, 0.004]]]
 
     action_scaling = scalings[representation][mapping]
 
 
     # --- Action / observation space ---
-    action_space = 6             # Number of actions per environment (overridden)
-    observation_space = 6        # Number of observations per environment (overridden)
+    action_space = gym.spaces.Box(-1.0, 1.0, (6,), dtype=np.float32)             # Number of actions per environment (overridden)
+    observation_space = gym.spaces.Box(-1.0, 1.0, (6,), dtype=np.float32)        # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)

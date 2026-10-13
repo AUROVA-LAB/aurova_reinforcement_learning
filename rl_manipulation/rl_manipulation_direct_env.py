@@ -143,7 +143,18 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
+        
+        self.log_dist = log_se3
+        self.to_group_dist = homo_from_mat_trans_LAB
+        self.diff_operator_dist = mat_diff
 
+        self.max_obs_rot = -100000
+        self.max_obs_pos = -100000
+
+        self.min_obs_rot =  100000
+        self.min_obs_pos =  100000
+
+        self.actions_ee = torch.zeros(6).to(self.device).repeat(self.num_envs, 1).float()
     
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
@@ -195,6 +206,8 @@ class RLManipulationDirect(DirectRLEnv):
             - actions - torch.Tensor: preprocessed actions.
         '''
 
+        self.actions_ee = actions
+
         # Clamp actions
         if self.cfg.representation == self.cfg.MAT and self.cfg.mapping == 0:
             actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
@@ -206,8 +219,11 @@ class RLManipulationDirect(DirectRLEnv):
             actions[:, 11] = torch.clamp(actions[:, 11], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
 
         else:
-            actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
-            actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+            # actions[:, :3] = torch.clamp(actions[:, :3], -self.cfg.action_scaling[0], self.cfg.action_scaling[0])
+            # actions[:, 3:] = torch.clamp(actions[:, 3:], -self.cfg.action_scaling[1], self.cfg.action_scaling[1])
+
+            actions[:, :3] *= self.cfg.action_scaling[0]
+            actions[:, 3:] *= self.cfg.action_scaling[1]
 
         return actions
     
@@ -380,6 +396,20 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = self.robot_rot_ee_pose_r_lie_rel
+        obs[:, :3] /= 1.25
+        obs[:, 3:] /= 0.74
+
+        self.max_obs_rot = max(self.max_obs_rot, obs[:, :3].max().item())
+        self.max_obs_pos = max(self.max_obs_pos, obs[:, 3:].max().item())
+
+        self.min_obs_rot = min(self.min_obs_rot, obs[:, :3].min().item())
+        self.min_obs_pos = min(self.min_obs_pos, obs[:, 3:].min().item())
+
+        # print("MAX ROT: ", self.max_obs_rot)
+        # print("MAX POS: ", self.max_obs_pos)
+        # print("MIN ROT: ", self.min_obs_rot)
+        # print("MIN POS: ", self.min_obs_pos)
+        # print("-----------")
 
         # Builds the dictionary
         observations = {"policy": obs}
@@ -402,7 +432,15 @@ class RLManipulationDirect(DirectRLEnv):
         '''  
 
         # ---- Distance computation ----
-        dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)                                                                   
+        if not self.cfg.se3_dist:
+            dist = self.dist_function(self.pose_group_r, self.target_pose_r_group, self.log, self.diff_operator)                                                                   
+        else:
+            pose_lab = self.convert_to_Lab(self.pose_group_r)
+
+            pose_se3 = self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:])
+            tgt_se3  = self.to_group_dist(t = self.target_pose_r[:, :3], r = self.target_pose_r[:, 3:])
+
+            dist = self.dist_function(pose_se3, tgt_se3, self.log_dist, self.diff_operator_dist)                                                                   
 
         # Obtains wether the agent is approaching or not
         mod = (2*(dist < self.prev_dist).int() - 1).float()
@@ -416,7 +454,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached
+        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached - torch.norm(self.actions_ee, dim = -1) / 5
 
         # Update previous distances
         self.prev_dist = dist
@@ -569,6 +607,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset previous distances
         self.prev_dist[env_ids] = torch.tensor(torch.inf).repeat(self.num_envs).to(self.device)[env_ids]
         self.target_reached[env_ids] = torch.zeros(self.num_envs).bool().to(self.device)[env_ids]
+        self.actions[env_ids] = torch.zeros(self.num_envs, 6).to(self.device)[env_ids]
         
         # Updates the poses 
         self.update_new_poses()  
