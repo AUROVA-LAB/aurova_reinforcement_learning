@@ -363,8 +363,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
 
         # Fix double cover
-        # neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
-        # robot_rot_ee_quat_r[neg_idx] *= -1
+        neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
+        robot_rot_ee_quat_r[neg_idx] *= -1
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
