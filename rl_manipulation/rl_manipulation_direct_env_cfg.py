@@ -49,7 +49,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     se3_dist = True
 
     # Scalings for each action
-    scalings = [[[0.01, 0.001], [0.05, 0.025], [0.01, 0.007]],
+    scalings = [[[0.01, 0.001], [0.01, 0.0075], [0.01, 0.007]],
                 [[0.007, 0.02]],
                 [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
                 [[0.02,  0.004], [0.03,  0.006], [0.02, 0.004]]]
@@ -215,10 +215,10 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
-                         [-0.35,   0.225],
-                         [-3*pi/5,  3*pi/5],
-                         [-3*pi/5,  3*pi/5],
-                         [-pi/2,  pi/2]]
+                         [-0.15,   0.15],
+                         [-2*pi/6,  2*pi/6],
+                         [-2*pi/6,  2*pi/6],
+                         [-2*pi/6,  2*pi/6]]
 
     apply_range_tgt = True
 
@@ -228,7 +228,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    distance_thres = 0.05 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
