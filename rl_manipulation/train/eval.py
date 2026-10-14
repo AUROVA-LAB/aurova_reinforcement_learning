@@ -53,7 +53,7 @@ def main():
     # --- Loop through the models ---
     for idx, model_name in enumerate(models):
         
-        model_name_ = "model_204800000_steps.zip"
+        model_name_ = "model.zip"
 
         # Loading model
         model = PPO.load(os.path.join(dir, model_name_))
