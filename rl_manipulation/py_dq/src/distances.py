@@ -55,8 +55,8 @@ def geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = N
 
     log_diff = log_fc(diff_fc(x1, x2))
 
-    log_diff[:, :3] /= 1.57
-    log_diff[:, :3] /= 0.74
+    log_diff[:, :3] /= 1.0
+    log_diff[:, 3:] /= 1.48
 
     return torch.norm(log_diff, dim = -1)
 
