@@ -1,4 +1,4 @@
-FROM ros:humble-ros-core-jammy
+FROM ros:humble
 
 # ============================================================
 # Base configuration
@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     python3-colcon-ros \
     python3-rosdep \
     python3-vcstool \
+    ros-humble-ur \
     ros-humble-ros-base \
     ros-humble-ament-cmake \
     ros-humble-ros2cli \
@@ -50,11 +51,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN apt-get update && apt-get install ros-humble-ur-msgs
 
 
-RUN sed -i '/find_package(PythonInterp 3.6 REQUIRED)/i \
-if(POLICY CMP0148)\n\
-  cmake_policy(SET CMP0148 OLD)\n\
-endif()\n' \
-    /opt/ros/humble/share/rosidl_generator_py/cmake/rosidl_generator_py_generate_interfaces.cmake
+# RUN sed -i '/find_package(PythonInterp 3.6 REQUIRED)/i \
+# if(POLICY CMP0148)\n\
+#   cmake_policy(SET CMP0148 OLD)\n\
+# endif()\n' \
+#     /opt/ros/humble/share/rosidl_generator_py/cmake/rosidl_generator_py_generate_interfaces.cmake
 
 
 # Install CMake 3.28.3
@@ -71,8 +72,8 @@ ENV PATH="/opt/cmake-3.28.3/bin:${PATH}"
 # Create non-root user
 # ============================================================
 
-ARG UID=1001
-ARG GID=1001
+ARG UID=1000
+ARG GID=1000
 
 RUN groupadd -o -g ${GID} daniel_docker 2>/dev/null || true && \
     useradd -o -m -u ${UID} -g ${GID} -s /bin/bash daniel_docker 2>/dev/null || true && \
@@ -106,7 +107,16 @@ RUN colcon mixin add default \
 
 WORKDIR /home/daniel_docker/ros2_ws
 
+# Instalar UR Gazebo
+RUN cd src/ && git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Gazebo_Simulation.git && \
+    rosdep update && rosdep install --ignore-src --from-paths . -y
+
+# Instalar UR Driver
+# RUN cd src && 
+
 RUN chown -R ${UID}:${GID} /home/daniel_docker/ros2_ws
+
+
 
 # ============================================================
 # Environment configuration
@@ -120,4 +130,5 @@ RUN echo "source /opt/ros/humble/setup.bash" >> /home/daniel_docker/.bashrc && \
 CMD ["/bin/bash"]
 
 # BUILD: sudo docker build     --no-cache     --build-arg UID="$(id -u)"     --build-arg GID="$(id -g)"     -t ros2-docker .
-# LAUNCH: sudo docker run --gpus all --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --rm -it --name docker_geograsp --net host --cpuset-cpus="0-11" -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /dev:/dev -v $(pwd)/Universal_Robots_ROS2_Driver:/home/docker/ros2_ws/src/Universal_Robots_ROS2_Driver -v $(pwd)/Universal_Robots_ROS2_GZ_Simulation:/home/docker/ros2_ws/src/Universal_Robots_ROS2_GZ_Simulation --user=$(id -u $USER):$(id -g $USER) --pid=host --privileged ros2-docker
+# LAUNCH: sudo docker run --gpus all     --shm-size=1g     --ulimit memlock=-1     --ulimit stack=67108864     --rm -it     --name ros2_docker     --net host     --cpuset-cpus="0-11"     -e DISPLAY="$DISPLAY"     -v /tmp/.X11-unix:/tmp/.X11-unix:rw     -v /dev:/dev        --user="$(id -u):$(id -g)"     --pid=host     --privileged     ros2-docker
+# ALLOW: sudo docker exec -u root ros2_docker     chown -R daniel_docker:daniel_docker /home/daniel_docker/.ros
