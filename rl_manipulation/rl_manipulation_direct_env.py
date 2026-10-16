@@ -396,8 +396,8 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
-        obs[:, :3] /= 1.25
-        obs[:, 3:] /= 0.74
+        obs[:, :3] /= 0.554 # DQ, MAT: 1.25
+        obs[:, 3:] /= 0.384 # DQ, MAT: 0.74
 
         # self.max_obs_rot = max(self.max_obs_rot, obs[:, :3].max().item())
         # self.max_obs_pos = max(self.max_obs_pos, obs[:, 3:].max().item())
