@@ -273,9 +273,13 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
+
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
         action_pose = self.normalize(action_pose)
+        
 
         # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab(action_pose)
