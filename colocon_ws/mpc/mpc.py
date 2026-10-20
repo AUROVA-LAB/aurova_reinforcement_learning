@@ -5,6 +5,9 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
+from .mpc_controller import *
+import time
+
 
 class MinimalPublisher(Node):
 
@@ -51,12 +54,55 @@ class MinimalPublisher(Node):
 
         self.point.positions = [0.0] * 6
         self.point.velocities = [0.0] * 6
+        self.point.velocities[0] = 0.1
 
         # Trajectory execution time: 0.1 seconds
         self.point.time_from_start = Duration(
             sec=0,
             nanosec=100_000_000
         )
+
+        self.controller = drop_NMPC_setup(
+            ini=[0.0] * 6,
+            ref=[0.4, 0.0, 0.3, 0.0, 0.0, 0.0],
+            dt=0.01,
+            horizon=15,
+        )
+
+
+        self.max_steps=1000
+        self.control_dt=0.01
+
+        self.opti = self.controller["opti"]
+        self.X = self.controller["X"]
+        self.U = self.controller["U"]
+    
+        self.q_parameter = self.controller["q_measured"]
+        self.u_previous_parameter = self.controller["u_previous"]
+    
+        self.T_ref = self.controller["T_ref"]
+    
+        self.dt = (
+            self.controller["dt"]
+            if self.control_dt is None
+            else self.control_dt
+        )
+    
+        if self.dt <= 0:
+            raise ValueError("control_dt must be positive.")
+    
+        self.horizon = self.controller["horizon"]
+    
+        # Previous applied velocity command.
+        self.u_previous = np.zeros(6)
+    
+        # Initial solver guesses.
+        self.X_guess = np.tile(
+            np.asarray([0,0,0,0,0,0], dtype=float).reshape(6, 1),
+            (1, self.horizon+1),
+        )
+    
+        self.U_guess = np.zeros((6, self.horizon))
 
         self.msg.points = [self.point]
 
@@ -79,6 +125,70 @@ class MinimalPublisher(Node):
             for name in self.joint_names
         ]
 
+
+    def mpc_step(self,):
+
+        loop_start = time.perf_counter()
+                
+        # ------------------------------------------
+        # 1. Read the latest robot state
+        # ------------------------------------------
+        q_measured = np.asarray(
+            self.current_positions,
+            dtype=float,
+        ).reshape(6)
+
+        if not np.all(np.isfinite(q_measured)):
+            raise ValueError(
+                "Received invalid joint positions."
+            )
+
+        # ------------------------------------------
+        # 2. Update NMPC parameters
+        # ------------------------------------------
+        self.opti.set_value(
+            self.q_parameter,
+            q_measured,
+        )
+
+        self.opti.set_value(
+            self.u_previous_parameter,
+            self.u_previous,
+        )
+
+        # ------------------------------------------
+        # 3. Warm-start the optimization
+        # ------------------------------------------
+        
+        self.opti.set_initial(self.X, self.X_guess)
+        self.opti.set_initial(self.U, self.U_guess)
+
+        # ------------------------------------------
+        # 4. Solve NMPC
+        # ------------------------------------------
+        solve_start = time.perf_counter()
+
+        solution = self.opti.solve()
+
+        solve_time = time.perf_counter() - solve_start
+
+        # ------------------------------------------
+        # 5. Extract the first optimal command
+        # ------------------------------------------
+        U_opt = solution.value(self.U)
+        X_opt = solution.value(self.X)
+
+        u_cmd = np.asarray(
+            U_opt[:, 0],
+            dtype=float,
+        ).reshape(6)
+
+        self.u_previous = u_cmd.copy()
+
+        return u_cmd
+
+
+
     def timer_callback(self):
         """Publish a trajectory using the latest measured joint positions."""
 
@@ -89,16 +199,20 @@ class MinimalPublisher(Node):
             )
             return
 
+        cmd = self.mpc_step()
+
         # Update the trajectory point with the current joint positions
-        self.msg.points[0].positions = self.current_positions.copy()
-        self.msg.points[0].velocities = [0.7, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.msg.points[0].positions = (self.current_positions.copy() + cmd*self.dt).tolist()
+        # self.msg.points[0].positions[0] = self.current_positions[0]+0.1
+        
+        self.msg.points[0].velocities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
         
         # Publish the trajectory
         self.publisher_.publish(self.msg)
 
-        self.get_logger().info(
-            f"Publishing joint positions: {self.msg.points[0].positions}"
-        )
+        # self.get_logger().info(
+        #     f"Publishing joint positions: {self.msg.points[0].positions}"
+        # )
 
 
 def main(args=None):
