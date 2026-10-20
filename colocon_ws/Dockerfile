@@ -13,7 +13,12 @@ ENV NVIDIA_DRIVER_CAPABILITIES=all
 # ============================================================
 # Install build tools, Python and ROS 2 dependencies
 # ============================================================
-
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    python3 \
+    python3-pip
+    
+RUN pip3 install hilo_mpc matplotlib torch
+    
 RUN apt-get update && apt-get install --no-install-recommends -y \
     apt-utils \
     build-essential \
@@ -25,9 +30,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     ca-certificates \
     bash-completion \
     sudo \
-    python3 \
     python3-dev \
-    python3-pip \
     python3-setuptools \
     python3-colcon-common-extensions \
     python3-colcon-mixin \
@@ -109,7 +112,7 @@ RUN colcon mixin add default \
 WORKDIR /home/daniel_docker/ros2_ws
 
 # Instalar UR Gazebo
-RUN cd src/ && git clone -b humble https://github.com/DanielFrauAlfaro/Universal_Robots_ROS2_GZ_Simulation && \
+RUN cd src/ && git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Gazebo_Simulation.git && \
     rosdep update && rosdep install --ignore-src --from-paths . -y
 
 # Instalar UR Driver
@@ -136,7 +139,7 @@ RUN . /opt/ros/humble/setup.sh && \
 
 COPY ./config/mpc/package.xml /home/daniel_docker/ros2_ws/src/mpc/ 
 COPY ./config/mpc/setup.py /home/daniel_docker/ros2_ws/src/mpc/ 
-COPY ./config/mpc/setup.py /home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_GZ_Simulation/ur_simulation_gz/config 
+COPY ./config/mpc/ur_controllers.yaml /home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_GZ_Simulation/ur_simulation_gz/config 
 
 
 
