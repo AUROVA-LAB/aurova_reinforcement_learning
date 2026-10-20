@@ -109,7 +109,7 @@ RUN colcon mixin add default \
 WORKDIR /home/daniel_docker/ros2_ws
 
 # Instalar UR Gazebo
-RUN cd src/ && git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Gazebo_Simulation.git && \
+RUN cd src/ && git clone -b humble https://github.com/DanielFrauAlfaro/Universal_Robots_ROS2_GZ_Simulation && \
     rosdep update && rosdep install --ignore-src --from-paths . -y
 
 # Instalar UR Driver
@@ -136,6 +136,7 @@ RUN . /opt/ros/humble/setup.sh && \
 
 COPY ./config/mpc/package.xml /home/daniel_docker/ros2_ws/src/mpc/ 
 COPY ./config/mpc/setup.py /home/daniel_docker/ros2_ws/src/mpc/ 
+COPY ./config/mpc/setup.py /home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_GZ_Simulation/ur_simulation_gz/config 
 
 
 
