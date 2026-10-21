@@ -105,6 +105,8 @@ RUN colcon mixin add default \
         https://raw.githubusercontent.com/colcon/colcon-metadata-repository/master/index.yaml && \
     colcon metadata update
 
+RUN python3 -m pip install --upgrade packaging
+
 # ============================================================
 # Workspace configuration
 # ============================================================
@@ -137,9 +139,9 @@ RUN . /opt/ros/humble/setup.sh && \
     ros2 pkg create --build-type ament_python \
         mpc
 
-COPY ./config/mpc/package.xml /home/daniel_docker/ros2_ws/src/mpc/ 
-COPY ./config/mpc/setup.py /home/daniel_docker/ros2_ws/src/mpc/ 
-COPY ./config/mpc/ur_controllers.yaml /home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_GZ_Simulation/ur_simulation_gz/config 
+COPY ./config/package.xml /home/daniel_docker/ros2_ws/src/mpc/ 
+COPY ./config/setup.py /home/daniel_docker/ros2_ws/src/mpc/ 
+COPY ./config/ur_controllers.yaml /home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_Gazebo_Simulation/ur_simulation_gazebo 
 
 
 
