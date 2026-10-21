@@ -399,25 +399,25 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        # obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
-        obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /=  1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ, MAT: 1.25
-        obs[:, 3:6] /=  1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ, MAT: 0.74
+        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
+        # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
+        obs[:, :3]  /= 0.77 # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ, MAT: 1.25  # DQ+: 0.77
+        obs[:, 3:] /= 0.26 # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ, MAT: 0.74 # DQ+: 0.26
 
-        obs[:, 6:9] /=  0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
-        obs[:, 9:]  /=  0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
+        # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
+        # obs[:, 9:]  /= # TQ norel 0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
 
-        # self.max_obs_rot = max(self.max_obs_rot, obs[:, 6:3+6].max().item())
-        # self.max_obs_pos = max(self.max_obs_pos, obs[:, 3+6:6+6].max().item())
+        self.max_obs_rot = max(self.max_obs_rot, obs[:, :3].max().item())
+        self.max_obs_pos = max(self.max_obs_pos, obs[:, 3:].max().item())
 
-        # self.min_obs_rot = min(self.min_obs_rot, obs[:, 6:3+6].min().item())
-        # self.min_obs_pos = min(self.min_obs_pos, obs[:, 3+6:6+6].min().item())
+        self.min_obs_rot = min(self.min_obs_rot, obs[:, :3].min().item())
+        self.min_obs_pos = min(self.min_obs_pos, obs[:, 3:].min().item())
 
-        # print("MAX ROT: ", self.max_obs_rot)
-        # print("MAX POS: ", self.max_obs_pos)
-        # print("MIN ROT: ", self.min_obs_rot)
-        # print("MIN POS: ", self.min_obs_pos)
-        # print("-----------")
+        print("MAX ROT: ", self.max_obs_rot)
+        print("MAX POS: ", self.max_obs_pos)
+        print("MIN ROT: ", self.min_obs_rot)
+        print("MIN POS: ", self.min_obs_pos)
+        print("-----------")
 
         # Builds the dictionary
         observations = {"policy": obs}
