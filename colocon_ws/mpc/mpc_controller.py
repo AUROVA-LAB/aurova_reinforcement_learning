@@ -254,7 +254,7 @@ def drop_NMPC_setup(
         ini = [0.0] * 6
 
     if ref is None:
-        ref = [0.4, 0.0, 0.3, 0.0, 0.0, 0.0]
+        ref = [0.4, 0.0, 0.3, 1.0, 0.0, 0.0, 0.0]
 
     if q_min is None:
         q_min = [-2 * np.pi] * 6
@@ -263,23 +263,23 @@ def drop_NMPC_setup(
         q_max = [2 * np.pi] * 6
 
     if dq_max is None:
-        dq_max = [1.0] * 6
+        dq_max = [2*1.0] * 6
 
     if ddq_max is None:
-        ddq_max = [2.0] * 6
+        ddq_max = [2*2.0] * 6
 
     if q_weights is None:
-        q_weights = [100.0, 100.0, 100.0,
-                     10.0, 10.0, 10.0]
+        q_weights = [1.0, 1.0, 1.0,
+                     1.0, 1.0, 1.0]
 
     if u_weights is None:
-        u_weights = [0.01] * 6
+        u_weights = [0.001] * 6
 
     if du_weights is None:
-        du_weights = [0.1] * 6
+        du_weights = [0.01] * 6
 
     ini = np.asarray(ini, dtype=float).reshape(6)
-    ref = np.asarray(ref, dtype=float).reshape(6)
+    ref = np.asarray(ref, dtype=float).reshape(7)
 
     q_min = np.asarray(q_min, dtype=float).reshape(6)
     q_max = np.asarray(q_max, dtype=float).reshape(6)
@@ -294,42 +294,41 @@ def drop_NMPC_setup(
     # 2. Target pose
     # --------------------------------------------------
 
-    # ref = [x, y, z, roll, pitch, yaw]
+    # ref = [x, y, z, qw, qx, qy, qz]
     #
     # Target orientation uses Rz(yaw)*Ry(pitch)*Rx(roll).
     # Angles are in radians.
 
-    px, py, pz, roll, pitch, yaw = ref
+    px, py, pz, qw, qx, qy, qz = ref
 
-    cr, sr = np.cos(roll), np.sin(roll)
-    cp, sp = np.cos(pitch), np.sin(pitch)
-    cy, sy = np.cos(yaw), np.sin(yaw)
+    # Normalize quaternion
+    q_norm = ca.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
+    qw, qx, qy, qz = qw/q_norm, qx/q_norm, qy/q_norm, qz/q_norm
 
-    Rx = np.array([
-        [1, 0, 0],
-        [0, cr, -sr],
-        [0, sr, cr],
-    ])
+    # Rotation matrix from quaternion [qw, qx, qy, qz]
+    R_ref = ca.vertcat(
+        ca.horzcat(
+            1 - 2*(qy**2 + qz**2),
+            2*(qx*qy - qw*qz),
+            2*(qx*qz + qw*qy)
+        ),
+        ca.horzcat(
+            2*(qx*qy + qw*qz),
+            1 - 2*(qx**2 + qz**2),
+            2*(qy*qz - qw*qx)
+        ),
+        ca.horzcat(
+            2*(qx*qz - qw*qy),
+            2*(qy*qz + qw*qx),
+            1 - 2*(qx**2 + qy**2)
+        )
+    )
 
-    Ry = np.array([
-        [cp, 0, sp],
-        [0, 1, 0],
-        [-sp, 0, cp],
-    ])
-
-    Rz = np.array([
-        [cy, -sy, 0],
-        [sy, cy, 0],
-        [0, 0, 1],
-    ])
-
-    R_ref = Rz @ Ry @ Rx
-
-    T_ref_np = np.eye(4)
-    T_ref_np[:3, :3] = R_ref
-    T_ref_np[:3, 3] = [px, py, pz]
-
-    T_ref = ca.DM(T_ref_np)
+    # Homogeneous transformation matrix
+    T_ref = ca.vertcat(
+        ca.horzcat(R_ref, ca.DM([px, py, pz]).reshape((3, 1))),
+        ca.DM([[0, 0, 0, 1]])
+    )
 
     # Symbolic joint configuration
     q_sym = ca.SX.sym("q_eval", 6)

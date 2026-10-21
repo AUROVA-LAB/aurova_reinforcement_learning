@@ -42,8 +42,10 @@ class MinimalPublisher(Node):
             10
         )
 
+        self.dt = 0.01
+
         # Timer
-        self.timer = self.create_timer(0.5, self.timer_callback)
+        self.timer = self.create_timer(self.dt, self.timer_callback)
 
         # Create the trajectory message
         self.msg = JointTrajectory()
@@ -54,24 +56,25 @@ class MinimalPublisher(Node):
 
         self.point.positions = [0.0] * 6
         self.point.velocities = [0.0] * 6
-        self.point.velocities[0] = 0.1
+        self.point.velocities[0] = 0.05
 
         # Trajectory execution time: 0.1 seconds
         self.point.time_from_start = Duration(
             sec=0,
-            nanosec=100_000_000
+            nanosec=10_000_000
         )
 
         self.controller = drop_NMPC_setup(
             ini=[0.0] * 6,
-            ref=[0.4, 0.0, 0.3, 0.0, 0.0, 0.0],
-            dt=0.01,
-            horizon=15,
+            ref=[-4.9190e-01,  1.3330e-01,  4.8790e-01,  
+                 -0.0190,      -0.3845,     -0.9191,      0.0843],
+            dt=self.dt,
+            horizon=30,
         )
 
 
         self.max_steps=1000
-        self.control_dt=0.01
+        self.control_dt=self.dt
 
         self.opti = self.controller["opti"]
         self.X = self.controller["X"]
@@ -128,8 +131,6 @@ class MinimalPublisher(Node):
 
     def mpc_step(self,):
 
-        loop_start = time.perf_counter()
-                
         # ------------------------------------------
         # 1. Read the latest robot state
         # ------------------------------------------
@@ -185,6 +186,25 @@ class MinimalPublisher(Node):
 
         self.u_previous = u_cmd.copy()
 
+        pose_error = np.asarray(
+            self.controller["pose_error"](q_measured).full()
+        ).reshape(6)
+
+        position_error = np.linalg.norm(
+            pose_error[:3]
+        )
+
+        orientation_error = np.linalg.norm(
+            pose_error[3:]
+        )
+
+        print(
+                f"position error={position_error:.4f} m | "
+                f"orientation error={orientation_error:.4f} rad | "
+                f"solve={solve_time * 1000:.1f} ms"
+            )
+        print("---------------")
+
         return u_cmd
 
 
@@ -203,9 +223,8 @@ class MinimalPublisher(Node):
 
         # Update the trajectory point with the current joint positions
         self.msg.points[0].positions = (self.current_positions.copy() + cmd*self.dt).tolist()
-        # self.msg.points[0].positions[0] = self.current_positions[0]+0.1
         
-        self.msg.points[0].velocities = [0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+        # self.msg.points[0].velocities = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
         
         # Publish the trajectory
         self.publisher_.publish(self.msg)
