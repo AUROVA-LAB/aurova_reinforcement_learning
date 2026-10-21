@@ -56,7 +56,6 @@ class MinimalPublisher(Node):
 
         self.point.positions = [0.0] * 6
         self.point.velocities = [0.0] * 6
-        self.point.velocities[0] = 0.05
 
         # Trajectory execution time: 0.1 seconds
         self.point.time_from_start = Duration(
@@ -66,7 +65,7 @@ class MinimalPublisher(Node):
 
         self.controller = drop_NMPC_setup(
             ini=[0.0] * 6,
-            ref=[-4.9190e-01,  1.3330e-01,  4.8790e-01,  
+            ref=[-0.49,  -0.13, 0.4088,  
                  -0.0190,      -0.3845,     -0.9191,      0.0843],
             dt=self.dt,
             horizon=30,
