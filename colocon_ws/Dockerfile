@@ -121,7 +121,7 @@ RUN python3 -m pip install --upgrade packaging
 WORKDIR /home/daniel_docker/ros2_ws
 
 # Instalar UR Gazebo
-RUN cd src/ && git clone -b humble https://github.com/DanielFrauAlfaro/Universal_Robots_ROS2_Gazebo_Simulation.git && cd src/ && rosdep update && rosdep install --ignore-src --from-paths . -y
+RUN cd src/ && git clone -b humble https://github.com/DanielFrauAlfaro/Universal_Robots_ROS2_Gazebo_Simulation.git && rosdep update && rosdep install --ignore-src --from-paths . -y
 
 # Instalar UR Driver
 # RUN cd src && 
