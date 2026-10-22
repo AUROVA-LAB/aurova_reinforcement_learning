@@ -51,6 +51,12 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     ros-humble-ros2-control \
     ros-humble-ros2-controllers \ 
     ros-humble-kinematics-interface-kdl \
+    ros-humble-ros-testing \
+    freeglut3-dev \ 
+    ros-humble-hardware-interface-testing \
+    ros-humble-cv-bridge \
+    ros-humble-moveit \ 
+    ros-humble-gazebo-ros-pkgs \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install ros-humble-ur-msgs
@@ -115,8 +121,8 @@ RUN python3 -m pip install --upgrade packaging
 WORKDIR /home/daniel_docker/ros2_ws
 
 # Instalar UR Gazebo
-# RUN cd src/ && git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Gazebo_Simulation.git && \
-#     rosdep update && rosdep install --ignore-src --from-paths . -y
+RUN cd src/ && git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Gazebo_Simulation.git && \
+    rosdep update && rosdep install --ignore-src --from-paths . -y
 
 # Instalar UR Driver
 # RUN cd src && 
@@ -148,5 +154,5 @@ COPY ./config/ur_controllers.yaml /home/daniel_docker/ros2_ws/src/Universal_Robo
 
 # Set workspace ownership after creating the package
 # BUILD: sudo docker build     --no-cache     --build-arg UID="$(id -u)"     --build-arg GID="$(id -g)"     -t ros2-docker .
-# LAUNCH: sudo docker run --gpus all     --shm-size=1g     --ulimit memlock=-1     --ulimit stack=67108864     --rm -it     --name ros2_docker     --net host     --cpuset-cpus="0-11"     -e DISPLAY="$DISPLAY"     -v /tmp/.X11-unix:/tmp/.X11-unix:rw     -v /dev:/dev   -v ./mpc:/home/daniel_docker/ros2_ws/src/mpc/mpc  -v   ./ros2_controllers:/home/daniel_docker/ros2_ws/src/ros2_controllers -v ./moveit2:/home/daniel_docker/ros2_ws/src/moveit2   -v ./Universal_Robots_ROS2_Description:/home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_Description -v ./Universal_Robots_ROS2_Gazebo_Simulation:/home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_Gazebo_Simulation   --user="$(id -u):$(id -g)"     --pid=host     --privileged     ros2-docker
+# LAUNCH: sudo docker run --gpus all     --shm-size=1g     --ulimit memlock=-1     --ulimit stack=67108864     --rm -it     --name ros2_docker     --net host     --cpuset-cpus="0-11"     -e DISPLAY="$DISPLAY"     -v /tmp/.X11-unix:/tmp/.X11-unix:rw     -v /dev:/dev    --user="$(id -u):$(id -g)"     --pid=host     --privileged     ros2-docker
 # FIX PERMISSIONS: sudo docker exec -u root ros2_docker     chown -R daniel_docker:daniel_docker /home/daniel_docker/.ros
