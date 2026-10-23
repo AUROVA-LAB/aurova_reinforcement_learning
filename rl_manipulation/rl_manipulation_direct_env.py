@@ -273,12 +273,12 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Perform increment in the algebra and exponential map -> (plus operator)
-        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        # action_pose = self.normalize(action_pose)
-
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
+
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
+        # action_pose = self.normalize(action_pose)
         
 
         # Convert to IsaacLab representation (translation, quaternion)
@@ -367,8 +367,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.debug_robot_ee_pose_w = torch.cat((robot_rot_ee_pos_w, robot_rot_ee_quat_w), dim = -1)
 
         # Fix double cover
-        neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
-        robot_rot_ee_quat_r[neg_idx] *= -1
+        # neg_idx = robot_rot_ee_quat_r[:, 0] < 0.0
+        # robot_rot_ee_quat_r[neg_idx] *= -1
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
@@ -401,8 +401,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.77  # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 1.00  # DQ+: 0.77
-        obs[:, 3:]  /= 0.26  # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 1.124 # DQ+: 0.26
+        obs[:, :3]  /= 2.8  # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 1.00  # DQ+: 0.77
+        obs[:, 3:]  /= 0.18  # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 1.124 # DQ+: 0.26
 
         # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
         # obs[:, 9:]  /= # TQ norel 0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
