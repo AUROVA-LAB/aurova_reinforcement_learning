@@ -42,11 +42,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     sizes = [[8, 6, 7, 16], [6]*4]
     
     representation = DQ
-    mapping = 2
+    mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
     distance = 1
-    se3_dist = True
+    se3_dist = False
 
     # Scalings for each action
     scalings = [[[0.01, 0.001], [0.01, 0.005], [0.01, 0.005]],
