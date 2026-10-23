@@ -154,5 +154,8 @@ COPY ./config/initial_positions.yaml /home/daniel_docker/ros2_ws/src/Universal_R
 
 # Set workspace ownership after creating the package
 # BUILD: sudo docker build     --no-cache     --build-arg UID="$(id -u)"     --build-arg GID="$(id -g)"     -t ros2-docker .
-# LAUNCH: sudo docker run --gpus all     --shm-size=1g     --ulimit memlock=-1     --ulimit stack=67108864     --rm -it     --name ros2_docker     --net host     --cpuset-cpus="0-11"     -e DISPLAY="$DISPLAY"     -v /tmp/.X11-unix:/tmp/.X11-unix:rw     -v /dev:/dev    --user="$(id -u):$(id -g)"     --pid=host     --privileged     ros2-docker
+# LAUNCH: sudo docker run --gpus all     --shm-size=1g     --ulimit memlock=-1     --ulimit stack=67108864     --rm -it     --name ros2_docker     --net host     --cpuset-cpus="0-11"     -e DISPLAY="$DISPLAY"     -v /tmp/.X11-unix:/tmp/.X11-unix:rw     -v /dev:/dev  -v ./mpc:/home/daniel_docker/ros2_ws/src/mpc/mpc   -v ./my_ur_description:/home/daniel_docker/ros2_ws/src/my_ur_description    --user="$(id -u):$(id -g)"     --pid=host     --privileged     ros2-docker
 # FIX PERMISSIONS: sudo docker exec -u root ros2_docker     chown -R daniel_docker:daniel_docker /home/daniel_docker/.ros
+# SIM: ros2 launch ur_simulation_gazebo ur_sim_control.launch.py description_package:=my_ur_description initial_positions_file:=/home/daniel_docker/ros2_ws/src/Universal_Robots_ROS2_Gazebo_Simulation/ur_simulation_gazebo/initial_positions.yaml
+
+
