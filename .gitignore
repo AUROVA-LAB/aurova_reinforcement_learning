@@ -1,6 +1,7 @@
 __pycache__/
 output/
 logs/
+ycb_aux/
 wandb/
 *.zip
 *.png
