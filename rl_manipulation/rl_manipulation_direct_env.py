@@ -401,8 +401,8 @@ class RLManipulationDirect(DirectRLEnv):
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.74  # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 1.00  # DQ+: 0.74
-        obs[:, 3:]  /= 0.24  # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 1.124 # DQ+: 0.24
+        obs[:, :3]  /= 0.856  # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856  # DQ+: 0.74
+        obs[:, 3:]  /= 0.354  # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 0.354 # DQ+: 0.24
 
         # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
         # obs[:, 9:]  /= # TQ norel 0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
