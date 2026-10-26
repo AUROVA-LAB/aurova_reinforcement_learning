@@ -3,6 +3,7 @@ output/
 logs/
 dataset*/
 rgb/
+ycb_aux/
 *.pth
 *.pt
 *.jpg
