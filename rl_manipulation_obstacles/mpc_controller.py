@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import torch
 import pickle
 
-from rl_manipulation_obstacles.mpc_utils import *
+from .mpc_utils import *
 
 
 
@@ -246,6 +246,10 @@ def drop_NMPC_setup(
         cartesian_pose_error(q, T_ref, T_tool=None)
     """
 
+    ref[0] *= -1
+    # ref[1] *= -1
+    ref[2] += 0.15
+
     # --------------------------------------------------
     # 1. Parameters
     # --------------------------------------------------
@@ -254,7 +258,7 @@ def drop_NMPC_setup(
         ini = [0.0] * 6
 
     if ref is None:
-        ref = [0.4, 0.0, 0.3, 0.0, 0.0, 0.0]
+        ref = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 
     if q_min is None:
         q_min = [-2 * np.pi] * 6
@@ -263,23 +267,23 @@ def drop_NMPC_setup(
         q_max = [2 * np.pi] * 6
 
     if dq_max is None:
-        dq_max = [1.0] * 6
+        dq_max = [2*1.0] * 6
 
     if ddq_max is None:
-        ddq_max = [2.0] * 6
+        ddq_max = [2*2.0] * 6
 
     if q_weights is None:
-        q_weights = [100.0, 100.0, 100.0,
-                     10.0, 10.0, 10.0]
+        q_weights = [1.0, 1.0, 1.0,
+                     1.0, 1.0, 1.0]
 
     if u_weights is None:
-        u_weights = [0.01] * 6
+        u_weights = [0.001] * 6
 
     if du_weights is None:
-        du_weights = [0.1] * 6
+        du_weights = [0.01] * 6
 
     ini = np.asarray(ini, dtype=float).reshape(6)
-    ref = np.asarray(ref, dtype=float).reshape(6)
+    ref = np.asarray(ref, dtype=float).reshape(7)
 
     q_min = np.asarray(q_min, dtype=float).reshape(6)
     q_max = np.asarray(q_max, dtype=float).reshape(6)
@@ -294,42 +298,41 @@ def drop_NMPC_setup(
     # 2. Target pose
     # --------------------------------------------------
 
-    # ref = [x, y, z, roll, pitch, yaw]
+    # ref = [x, y, z, qw, qx, qy, qz]
     #
     # Target orientation uses Rz(yaw)*Ry(pitch)*Rx(roll).
     # Angles are in radians.
 
-    px, py, pz, roll, pitch, yaw = ref
+    px, py, pz, qw, qx, qy, qz = ref
 
-    cr, sr = np.cos(roll), np.sin(roll)
-    cp, sp = np.cos(pitch), np.sin(pitch)
-    cy, sy = np.cos(yaw), np.sin(yaw)
+    # Normalize quaternion
+    q_norm = ca.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
+    qw, qx, qy, qz = qw/q_norm, qx/q_norm, qy/q_norm, qz/q_norm
 
-    Rx = np.array([
-        [1, 0, 0],
-        [0, cr, -sr],
-        [0, sr, cr],
-    ])
+    # Rotation matrix from quaternion [qw, qx, qy, qz]
+    R_ref = ca.vertcat(
+        ca.horzcat(
+            1 - 2*(qy**2 + qz**2),
+            2*(qx*qy - qw*qz),
+            2*(qx*qz + qw*qy)
+        ),
+        ca.horzcat(
+            2*(qx*qy + qw*qz),
+            1 - 2*(qx**2 + qz**2),
+            2*(qy*qz - qw*qx)
+        ),
+        ca.horzcat(
+            2*(qx*qz - qw*qy),
+            2*(qy*qz + qw*qx),
+            1 - 2*(qx**2 + qy**2)
+        )
+    )
 
-    Ry = np.array([
-        [cp, 0, sp],
-        [0, 1, 0],
-        [-sp, 0, cp],
-    ])
-
-    Rz = np.array([
-        [cy, -sy, 0],
-        [sy, cy, 0],
-        [0, 0, 1],
-    ])
-
-    R_ref = Rz @ Ry @ Rx
-
-    T_ref_np = np.eye(4)
-    T_ref_np[:3, :3] = R_ref
-    T_ref_np[:3, 3] = [px, py, pz]
-
-    T_ref = ca.DM(T_ref_np)
+    # Homogeneous transformation matrix
+    T_ref = ca.vertcat(
+        ca.horzcat(R_ref, ca.DM([px, py, pz]).reshape((3, 1))),
+        ca.DM([[0, 0, 0, 1]])
+    )
 
     # Symbolic joint configuration
     q_sym = ca.SX.sym("q_eval", 6)
@@ -377,18 +380,18 @@ def drop_NMPC_setup(
     # Joint position limits
     opti.subject_to(
         opti.bounded(
-            ca.repmat(ca.DM(q_min), 1, horizon),
+            ca.repmat(ca.DM(q_min), 1, horizon+1),
             X,
-            ca.repmat(ca.DM(q_max), 1, horizon),
+            ca.repmat(ca.DM(q_max), 1, horizon+1),
         )
     )
 
     # Joint velocity limits
     opti.subject_to(
         opti.bounded(
-            -ca.repmat(ca.DM(dq_max), 1, horizon - 1),
+            -ca.repmat(ca.DM(dq_max), 1, horizon),
             U,
-            ca.repmat(ca.DM(dq_max), 1, horizon - 1),
+            ca.repmat(ca.DM(dq_max), 1, horizon),
         )
     )
 
@@ -512,295 +515,3 @@ def save_traj(traj, lie, saving_dir):
         pickle.dump(dict_save, f)
 
 
-
-
-# ============================================================
-# UR5e DH parameters
-# ============================================================
-
-d1 = 0.1625
-a2 = -0.425
-a3 = -0.3922
-d4 = 0.1333
-d5 = 0.0997
-d6 = 0.0996
-
-
-# ============================================================
-# DH transform
-# ============================================================
-
-def dh(a, alpha, d, theta):
-
-    ct = ca.cos(theta)
-    st = ca.sin(theta)
-
-    ca_ = ca.cos(alpha)
-    sa_ = ca.sin(alpha)
-
-    T = ca.vertcat(
-        ca.horzcat(ct, -st*ca_,  st*sa_, a*ct),
-        ca.horzcat(st,  ct*ca_, -ct*sa_, a*st),
-        ca.horzcat(0,      sa_,      ca_,    d),
-        ca.horzcat(0,         0,         0,    1)
-    )
-
-    return T
-
-
-# ============================================================
-# Forward kinematics UR5e
-# ============================================================
-
-def ur5e_fk(q):
-
-    q1 = q[0]
-    q2 = q[1]
-    q3 = q[2]
-    q4 = q[3]
-    q5 = q[4]
-    q6 = q[5]
-
-    T1 = dh(0,      np.pi/2, d1, q1)
-    T2 = dh(a2,     0,       0,  q2)
-    T3 = dh(a3,     0,       0,  q3)
-    T4 = dh(0,      np.pi/2, d4, q4)
-    T5 = dh(0,     -np.pi/2, d5, q5)
-    T6 = dh(0,      0,       d6, q6)
-
-    T = T1 @ T2 @ T3 @ T4 @ T5 @ T6
-
-    p = T[0:3, 3]
-    R = T[0:3, 0:3]
-
-    return p, R
-
-
-# ============================================================
-# Orientation error
-# ============================================================
-
-def rotation_error(R, Rd):
-
-    Re = Rd.T @ R
-
-    e = 0.5 * ca.vertcat(
-        Re[2,1] - Re[1,2],
-        Re[0,2] - Re[2,0],
-        Re[1,0] - Re[0,1]
-    )
-
-    return e
-
-
-# ============================================================
-# NMPC setup
-# ============================================================
-
-def ur5e_NMPC_setup(
-    goal_position,
-    goal_rotation,
-    dt=0.05,
-    horizon=20,
-    q0=None
-):
-
-    # ========================================================
-    # Create model
-    # ========================================================
-
-    model = Model(plot_backend='bokeh')
-
-    # ========================================================
-    # States (joint angles)
-    # ========================================================
-
-    q = model.set_dynamical_states([
-        'q1', 'q2', 'q3',
-        'q4', 'q5', 'q6'
-    ])
-
-    # ========================================================
-    # Inputs (joint velocities)
-    # ========================================================
-
-    dq = model.set_inputs([
-        'dq1', 'dq2', 'dq3',
-        'dq4', 'dq5', 'dq6'
-    ])
-
-    # ========================================================
-    # Dynamics
-    # ========================================================
-
-    dx = ca.vertcat(
-        dq[0],
-        dq[1],
-        dq[2],
-        dq[3],
-        dq[4],
-        dq[5]
-    )
-
-    model.set_dynamical_equations(dx)
-
-    # ========================================================
-    # Measurements
-    # ========================================================
-
-    model.set_measurements([
-        'yq1', 'yq2', 'yq3',
-        'yq4', 'yq5', 'yq6'
-    ])
-
-    model.set_measurement_equations(q)
-
-    # ========================================================
-    # Setup model
-    # ========================================================
-
-    model.setup(dt=dt)
-
-    # ========================================================
-    # NMPC
-    # ========================================================
-
-    nmpc = NMPC(model)
-
-    # ========================================================
-    # Forward kinematics
-    # ========================================================
-
-    p_ee, R_ee = ur5e_fk(q)
-
-    px = p_ee[0]
-    py = p_ee[1]
-    pz = p_ee[2]
-
-    # ========================================================
-    # Goal
-    # ========================================================
-
-    p_ref = ca.DM(goal_position)
-
-    R_ref = ca.DM(goal_rotation)
-
-    # ========================================================
-    # Position error
-    # ========================================================
-
-    pos_error = ca.vertcat(
-        px - p_ref[0],
-        py - p_ref[1],
-        pz - p_ref[2]
-    )
-
-    # ========================================================
-    # Orientation error
-    # ========================================================
-
-    ori_error = rotation_error(R_ee, R_ref)
-
-    # ========================================================
-    # Cost function
-    # ========================================================
-
-    stage_cost = (
-        200 * ca.sumsqr(pos_error) +
-        50  * ca.sumsqr(ori_error) +
-        0.01 * ca.sumsqr(dq)
-    )
-
-    nmpc.set_stage_cost(stage_cost)
-
-    # ========================================================
-    # Horizon
-    # ========================================================
-
-    nmpc.horizon = horizon
-
-    # ========================================================
-    # Joint limits UR5e
-    # ========================================================
-
-    q_lb = [
-        -2*np.pi,
-        -2*np.pi,
-        -2*np.pi,
-        -2*np.pi,
-        -2*np.pi,
-        -2*np.pi
-    ]
-
-    q_ub = [
-        2*np.pi,
-        2*np.pi,
-        2*np.pi,
-        2*np.pi,
-        2*np.pi,
-        2*np.pi
-    ]
-
-    # ========================================================
-    # Joint velocity limits
-    # ========================================================
-
-    dq_lb = [
-        -1.5,
-        -1.5,
-        -1.5,
-        -1.5,
-        -1.5,
-        -1.5
-    ]
-
-    dq_ub = [
-        1.5,
-        1.5,
-        1.5,
-        1.5,
-        1.5,
-        1.5
-    ]
-
-    # ========================================================
-    # Constraints
-    # ========================================================
-
-    nmpc.set_box_constraints(
-        x_lb=q_lb,
-        x_ub=q_ub,
-        u_lb=dq_lb,
-        u_ub=dq_ub
-    )
-
-    # ========================================================
-    # Initial condition
-    # ========================================================
-
-    if q0 is None:
-        q0 = [0]*6
-
-    u0 = [0]*6
-
-    model.set_initial_conditions(
-        x0=q0,
-        z0=None
-    )
-
-    nmpc.set_initial_guess(
-        x_guess=q0,
-        u_guess=u0
-    )
-
-    # ========================================================
-    # Setup solver
-    # ========================================================
-
-    nmpc.setup(
-        options={
-            'print_level': 0
-        }
-    )
-
-    return model, nmpc

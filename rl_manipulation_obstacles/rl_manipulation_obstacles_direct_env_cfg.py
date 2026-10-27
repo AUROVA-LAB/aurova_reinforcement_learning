@@ -66,11 +66,11 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = DQ
+    representation = MAT
     mapping = 1
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
 
     # Scalings for each action
     scalings = [[[0.01, 0.001], [0.03,  0.006], [0.01, 0.007]],
@@ -91,8 +91,8 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     num_envs = 1                # Number of environments by default (overriden)
 
-    debug_markers = False       # Activate marker visualization
-    save_imgs = True           # Activate image saving from cameras
+    debug_markers = True        # Activate marker visualization
+    save_imgs = True            # Activate image saving from cameras
     render_steps = 6            # Render images every certain amount of steps
 
     velocity_limit = 10         # Velocity limit for robots' end effector
@@ -212,6 +212,12 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+
+            "robot": sim_utils.UsdFileCfg(
+                            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+                            scale=(0.1, 0.1, 0.1),
+                            visible = debug_markers
+                        ),
             
         }
     )

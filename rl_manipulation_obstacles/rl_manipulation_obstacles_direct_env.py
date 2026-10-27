@@ -39,7 +39,7 @@ import open3d as o3d
 from .train.sam2.Pointnet_Pointnet2_pytorch.models.pointnet2_sem_seg import *
 
 from .train.sam2.train_utils import farthest_point_sampling, farthest_point_sampling_BERT, preprocess_pcd_single_batch, preprocess_pcd_single, preprocess_single_pcd_raw
-from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
+# from .train.sam2.Point_BERT.models.Point_BERT import PointTransformer
 
 from easydict import EasyDict
 
@@ -51,7 +51,8 @@ from .train.sam2.sam2.build_sam import build_sam2
 import sys
 sys.path.append('../../../')
 
-from .mpc_controller import drop_MPC_setup, save_traj
+from .mpc_controller import drop_MPC_setup, drop_NMPC_setup, save_traj
+import time
 
 
 
@@ -274,7 +275,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         #    use_relative_mode: Whether to use relative mode for the controller. --> Use increments for the positions.
         #    ik_method: Method for computing inverse of Jacobian.
 
-        self.controller = DifferentialIKController(controller_cfg, num_envs = self.num_envs, device = self.device)
+        self.controller_ik = DifferentialIKController(controller_cfg, num_envs = self.num_envs, device = self.device)
         # DifferentialIKController: Differential inverse kinematics (IK) controller.
         #    num_envs: Number of environments handled by the controller.
         #    device: Device into which the controller is stored.
@@ -449,20 +450,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         #     new_quat = quat_from_euler_xyz(self.my_traj[:, 3], self.my_traj[:, 4], self.my_traj[:, 5])
         #     self.my_traj = torch.cat((self.my_traj[:, :3], new_quat), dim = -1).to(self.device)
 
-        self.pc_seq = TensorQueue(max_size=self.cfg.horizon, element_shape=self.cfg.pc_shape)
-        self.pose_seq = TensorQueue(max_size=self.cfg.horizon, element_shape=(self.cfg.size,))
-
-        num_classes = 13
-        self.pcd_model = get_model(num_classes=num_classes).cuda()
-
-        checkpoint = torch.load(
-            "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_sem.pth",
-            map_location="cuda:0",
-            weights_only=False
-        )
-
-        self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
-        self.pcd_model.eval()
 
 
         self.my_cmd = torch.zeros((1,6)).to(self.device)
@@ -635,177 +622,92 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         cmd = self.gripper_pose_r_lie.clone()
 
+        # ------------------------------------------
+        # 1. Read the latest robot state
+        # ------------------------------------------
+        q_measured = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[0, self._robot_joints_idx].cpu().numpy()
+
+        if not np.all(np.isfinite(q_measured)):
+            raise ValueError(
+                "Received invalid joint positions."
+            )
+
+        # ------------------------------------------
+        # 2. Update NMPC parameters
+        # ------------------------------------------
+        self.opti.set_value(
+            self.q_parameter,
+            q_measured,
+        )
+
+        self.opti.set_value(
+            self.u_previous_parameter,
+            self.u_previous,
+        )
+
+        # ------------------------------------------
+        # 3. Warm-start the optimization
+        # ------------------------------------------
         
-        if not self.cfg.test:
-            if self.count < self.subs_limit:
-                if self.gripper_pose_r_lie[0,0].item() < 0 and self.target_pose_r_lie[0,0].item() > 0:
-                    self.gripper_pose_r_lie[:, :3] *= -1
-                elif self.gripper_pose_r_lie[0,0].item() > 0 and self.target_pose_r_lie[0,0].item() < 0:
-                    self.target_pose_r_lie[:, :3] *= -1
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = my_inc #self.target_pose_r_lie[:, :3]
-            else:
-                my_inc = self.gripper_pose_r_lie[:,:3] + 0.05*(self.end_target_pose_r_lie[:, :3] - self.gripper_pose_r_lie[:,:3])
-                self.trajectory_save[self.count][:3] = self.end_target_pose_r_lie[:,:3]
-            cmd_lie = self.trajectory_save[self.count].repeat(self.num_envs, 1)
-            cmd = self.convert_to_Lab(self.exp(cmd_lie))
-            
-            cmd = combine_frame_transforms(t01= cmd[:, :3],  q01 = cmd[:, 3:],
-                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation) 
-                                           
+        self.opti.set_initial(self.X, self.X_guess)
+        self.opti.set_initial(self.U, self.U_guess)
 
+        # ------------------------------------------
+        # 4. Solve NMPC
+        # ------------------------------------------
+        solve_start = time.perf_counter()
 
-            self.gripper_action = self.count >= self.start_grip_idx and (not self.is_contact.item())
-            
-            self.increment_condition = (self.count < self.trajectory_save.shape[0] and not self.gripper_action) or self.increment_condition
+        solution = self.opti.solve()
 
-            if self.increment_condition:
-                self.count += 1
+        solve_time = time.perf_counter() - solve_start
 
-            grip_action += self.cfg.grip_scaling * int(self.gripper_action) 
+        # ------------------------------------------
+        # 5. Extract the first optimal command
+        # ------------------------------------------
+        U_opt = solution.value(self.U)
+        X_opt = solution.value(self.X)
+
+        u_cmd = np.asarray(
+            U_opt[:, 0],
+            dtype=float,
+        ).reshape(6)
+
+        self.u_previous = u_cmd.copy()
+
+        pose_error = np.asarray(
+            self.controller["pose_error"](q_measured).full()
+        ).reshape(6)
+
+        position_error = np.linalg.norm(
+            pose_error[:3]
+        )
+
+        orientation_error = np.linalg.norm(
+            pose_error[3:]
+        )
+
+        print(
+                f"position error={position_error:.4f} m | "
+                f"orientation error={orientation_error:.4f} rad | "
+                f"solve={solve_time * 1000:.1f} ms"
+            )
         
-        else:
-            if self.cfg.mode == "img":
+        print("---------------")
 
-                f1 = self.camera_w[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                f2 = self.camera_ext[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                f3 = self.camera_front[-1].unsqueeze(0).repeat(3,1,1).permute(1,2,0) 
-                
-
-                f1 = self.transform(f1.cpu().numpy()).to(self.device).unsqueeze(0)
-                f2 = self.transform(f2.cpu().numpy()).to(self.device).unsqueeze(0)
-                f3 = self.transform(f3.cpu().numpy()).to(self.device).unsqueeze(0)
-
-                f = torch.cat((f1, f2, f3), dim = 0)
-
-                f = self.backbone(f)['backbone_fpn'][-1].mean(dim = 1).view(f.shape[0], -1)
-
-                
-                cmd = self.test_model(f[0].unsqueeze(0),
-                                    f[1].unsqueeze(0),
-                                    f[2].unsqueeze(0),
-                                    self.gripper_pose_r_lie)
-
-            elif self.cfg.mode == "pcd":
-
-                pc_all = np.concatenate([self.pc_w.float().cpu().numpy(),
-                                         self.pc_ext.float().cpu().numpy(),
-                                         self.pc_front.float().cpu().numpy()], axis=0)
-
-                # ============================================================
-                # 2. VOXEL DOWNSAMPLE
-                # ============================================================
-
-                voxel_size = 0.025
-
-                pcd = o3d.geometry.PointCloud()
-                pcd.points = o3d.utility.Vector3dVector(pc_all[:, :3])
-
-                pcd = pcd.voxel_down_sample(voxel_size)
-
-                pc_all = np.asarray(pcd.points)
-
-                # ============================================================
-                # 3. FILTERING (your original logic cleaned)
-                # ============================================================
-
-                pc_all = pc_all[pc_all[:, 2] > 0.025]
-                pc_all = pc_all[pc_all[:, 0] > -0.8]
-                pc_all = pc_all[pc_all[:, 0] < 0.1]
-                pc_all = pc_all[pc_all[:, 1] > -0.5]
-
-                # pts = torch.from_numpy(pc_all).float()[None]  # (1, N, 3)
-
-                if pc_all.shape[0] != 0:
-
-                    sampled_pts, sampled_idx = farthest_point_sampling(
-                        pc_all,
-                        n_samples=512
-                    )
-
-
-                sampled_pts = torch.tensor(sampled_pts).float().unsqueeze(0).to(self.device)
-                cmd = self.test_model(sampled_pts, self.target_pose_r_lie - self.gripper_pose_r_lie)
-
-            elif "seq" in self.cfg.mode:
-                if self.count < self.cfg.save_interval * self.cfg.horizon:
-                    self.trajectory_save[self.count][:3] = self.target_pose_r_lie[:, :3]
-                    cmd = self.trajectory_save[self.count].unsqueeze(0)
-
-                else:
-                    if self.count % self.cfg.save_interval == 0:
-
-                        cmd, cmd_mag = self.test_model(self.pc_seq.queue.to(self.device).unsqueeze(0))
-
-                        # cmd = self.stats["actions_minmax"].inverse_transform(cmd.cpu().numpy())
-                        # cmd = self.stats["qt_pc"].transform(cmd)
-
-                        cmd = torch.tensor(cmd).to(self.device)
-                        cmd = torch.clip(cmd, min = 0, max = 1)
-
-                        new_cmd = []
-                        for i in range(6):
-                            inc = 0.0
-                            if cmd[0, i*3].item() > 0: inc = -cmd_mag[0, i]# * 0.173#0.01
-                            if cmd[0, i*3+2].item() > 0: inc = cmd_mag[0, i]# * 0.173#0.01
-                            new_cmd.append(inc)
-                        cmd = torch.tensor(new_cmd).unsqueeze(0).to(self.device)
-                        self.my_cmd = cmd.clone()
-
-                        cmd += self.gripper_pose_r_lie
-                    else:
-                        pass
-                        # cmd = self.my_cmd.clone()
-                        # cmd += self.gripper_pose_r_lie
-
-            else:
-                pc_rob = self.processed_pc_robot / self.stats["max_pc_rob"]
-                pc_obj = self.processed_pc_object / self.stats["max_pc_obj"]
-
-
-                self.test_model.max_diff_rot = self.stats["max_diff_rot"] 
-                self.test_model.max_diff_trans = self.stats["max_diff_trans"]   
-
-
-                target_pose = copy.deepcopy(self.target_pose_r_lie.float())
-                target_pose[:, :3] /= self.stats["max_obj_rot"]
-                target_pose[:, 3:] /= self.stats["max_obj_trans"]
-
-                gripper_pose = copy.deepcopy(self.gripper_pose_r_lie.float())
-                gripper_pose[:, :3] /= self.stats["max_gripper_rot"]
-                gripper_pose[:, 3:] /= self.stats["max_gripper_trans"]
-
-                cmd = self.test_model(pc_obj.unsqueeze(0), pc_rob.unsqueeze(0), gripper_pose, target_pose)
-
-                cmd[:, :3] *= self.stats["max_diff_rot"] 
-                cmd[:, 3:] *= self.stats["max_diff_trans"] 
-
-            # actions = self._preprocess_actions(cmd)
-            # cmd[:,:3] = self.target_pose_r_lie[:, :3]
-
-            grip_action = cmd[:, -1].clone()*0
-            cmd_lie = cmd.clone()
-
-            cmd = self.convert_to_Lab(self.exp(cmd_lie + self.gripper_pose_r_lie))
-            
-            cmd = combine_frame_transforms(t01= cmd[:, :3],                  q01 = cmd[:, 3:],
-                                        t12 = -self.cfg.ee_translation,   q12 = self.cfg.ee_rotation)
-            
-            self.count += 1
-            
-
-        self.controller.set_command(torch.cat(cmd, dim = -1))
+        # self.controller.set_command(torch.cat(cmd, dim = -1))
 
         # Set the command for the IKDifferentialController
         
         # Obtains the poses
-        ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
+        # ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()
 
+        u_cmd = torch.tensor(u_cmd).repeat(self.num_envs, 1).to(self.device)
+        u_cmd = u_cmd * self.dt + self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[:, self._robot_joints_idx]
         
         # Get the actions for the robot. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        self.actions[:, :6] = self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
+        self.actions[:, :6] = torch.tensor(u_cmd).repeat(self.num_envs, 1).to(self.device) # self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos)
 
 
         # --- Update gripper position ---
@@ -854,17 +756,20 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
-
+        robot_pose = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
+        
         # Updates poses in simulation
         self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
                                                                          self.target_pose_r2[:, :3],
                                                                          self.cfg.camera_ext_trans_front,
-                                                                         self.cfg.camera_ext_trans)), 
+                                                                         self.cfg.camera_ext_trans,
+                                                                         robot_pose[:, :3])), 
                                                                          
                                                 orientations = torch.cat((self.target_pose_r[:, 3:],
                                                                           self.target_pose_r2[:, 3:], 
                                                                           self.cfg.camera_ext_rot_front,
-                                                                          self.cfg.camera_ext_rot)), 
+                                                                          self.cfg.camera_ext_rot,
+                                                                          robot_pose[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -1158,8 +1063,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
                 # o3d.visualization.draw_geometries([cloud])
 
-        self.processed_pc_object, _, _ = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
-        self.processed_pc_robot, _, _ = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
+        # self.processed_pc_object, _, _ = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
+        # self.processed_pc_robot, _, _ = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
          
         
         if self.cfg.test:
@@ -1518,8 +1423,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        self._get_images()
-        self._get_PC()
+        # self._get_images()
+        # self._get_PC()
         
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
@@ -1602,7 +1507,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.home_reached)
+        terminated = torch.logical_or(time_out*0, self.home_reached)
 
         return truncated, terminated
     
@@ -1656,7 +1561,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.reset_robot_poses_group_r[env_ids] = self.convert_to_group(ee_init_pose[:, :3], ee_init_pose[:, 3:])
 
         # Sets the command to the DifferentialIKController
-        self.controller.set_command(ee_init_pose)
+        self.controller_ik.set_command(ee_init_pose)
 
         # Obtains current poses for the robot
         ee_pos_r, ee_quat_r, jacobian, joint_pos = self._get_ee_pose()  
@@ -1664,7 +1569,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtains the joint positions to reset. Concatenates:
         #   - the joint coordinates for the action computed by the IKDifferentialController and
         #   - the joint coordinates for the hand.
-        joint_pos = torch.cat((self.controller.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
+        joint_pos = torch.cat((self.controller_ik.compute(ee_pos_r, ee_quat_r, jacobian, joint_pos), 
                                self.default_joint_pos[:, (6):]), 
                                dim=-1)[env_ids] 
                 
@@ -1743,7 +1648,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.robot_rot_ee_pose_r_lie[env_ids] = self.log(self.pose_group_r)[env_ids]
 
         # --- Reset controller ---
-        self.controller.reset()
+        self.controller_ik.reset()
         
         # --- Reset target ---
         # Samples the new initial pose for the object
@@ -1809,127 +1714,52 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         if self.episode_id >= 850:
             raise
 
+        self.dt = 0.01
+
+        tgt = copy.deepcopy(self.target_pose_r2)
         
-        self.trajectory = []
-        self.trajectory_save = []
+        
+        self.controller = drop_NMPC_setup(
+            ini=self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[0, self._robot_joints_idx].cpu().numpy(),
+            ref=tgt.squeeze(0).cpu().numpy().tolist(),
+            dt=self.dt,
+            horizon=30,
+        )
 
-        references = [self.interm_pose_r_lie.clone(), self.target_pose_r_lie.clone()]#, self.end_target_pose_r_lie.clone()]
+        self.max_steps=1000
+        self.control_dt=self.dt
 
-        # NMPC model creation
-        self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
-        self.x0 = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
+        self.opti = self.controller["opti"]
+        self.X = self.controller["X"]
+        self.U = self.controller["U"]
+    
+        self.q_parameter = self.controller["q_measured"]
+        self.u_previous_parameter = self.controller["u_previous"]
+    
+        self.T_ref = self.controller["T_ref"]
+    
+        self.dt = (
+            self.controller["dt"]
+            if self.control_dt is None
+            else self.control_dt
+        )
+    
+        if self.dt <= 0:
+            raise ValueError("control_dt must be positive.")
+    
+        self.horizon = self.controller["horizon"]
+    
+        # Previous applied velocity command.
+        self.u_previous = np.zeros(6)
+    
+        # Initial solver guesses.
+        self.X_guess = np.tile(
+            np.asarray([0,0,0,0,0,0], dtype=float).reshape(6, 1),
+            (1, self.horizon+1),
+        )
+    
+        self.U_guess = np.zeros((6, self.horizon))
 
-        self.x0 = self.gripper_pose_r_lie.clone()
-        x0 = torch.cat((self.x0, self.u_opt), dim = -1)
-        x0 = x0[0].cpu().numpy().tolist()
-
-        save_idx = 0
-        self.start_grip_idx = 0
-
-        latch_end = 0
-
-        for idx, ref in enumerate(references):
-
-            
-            if idx == 0:
-                self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
-                                                        self.cfg.ellipsoid_r, 
-                                                        ini = x0, 
-                                                        ref = ref[0],
-                                                        dt = self.cfg.dt, 
-                                                        lie = self.cfg.lie_mpc,
-                                                        )
-            else:
-                self.model, self.nmpc, ellipsoid_r_torch = drop_MPC_setup(self.cfg.obst_list, 
-                                                        self.cfg.ellipsoid_r, 
-                                                        ini = x0, 
-                                                        ref = ref[0],
-                                                        dt = self.cfg.dt, 
-                                                        lie = self.cfg.lie_mpc,
-                                                        limits = [[-0.2, -0.2, -0.2, -0.005, -0.005, -0.005],
-                                                                  [0.2, 0.2, 0.2, 0.005, 0.005, 0.005]])
-
-            # ======================================================
-            # Simulation loop
-            # ======================================================
-            
-            sol = self.model.solution
-
-
-            # x0 = x0[0].cpu().numpy().tolist()
-
-            for k in range(self.cfg.n_steps_mpc):
-                u_opt = self.nmpc.optimize(x0)
-                self.model.simulate(u=u_opt, steps=1)
-                x0 = sol['x:f']
-
-                x0_tensor = torch.tensor([[float(x0[0]), float(x0[1]), float(x0[2]), 
-                                        float(x0[3]), float(x0[4]), float(x0[5])]])
-                
-                x0_group = self.exp(x0_tensor)
-                x0_lab   = self.convert_to_Lab(x0_group)
-
-                self.trajectory_save.append(x0_tensor[0].numpy().tolist())
-
-                if self.cfg.get_img_mpc:
-                    fig, ax = get_frame(
-                        x0_tensor[0],
-                        tgt=ref[0].cpu().numpy().tolist(),
-                        traj=self.trajectory_save,
-                        ax=None,
-                        obst_centers=self.cfg.obst_list,
-                        obst_radii=ellipsoid_r_torch*2,
-                        rot = self.cfg.get_rot,)
-            
-                    name = f"{save_idx:03d}.png"
-                    # fig.savefig(os.path.join(path, name))
-
-                    name = f"{save_idx:03d}.png"
-                    ax.view_init(elev=0, azim=0)
-                    fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
-
-
-                    f"side_{save_idx:03d}.png"
-                    # ax.view_init(elev=0, azim=45)
-                    # fig.savefig(os.path.join(path, name))
-
-
-                    name = f"other_{save_idx:03d}.png"
-                    ax.view_init(elev=90, azim=-0)
-                    fig.savefig(os.path.join(self.cfg.path_traj_mpc, name))
-                    
-                    plt.close(fig)
-
-
-                save_idx += 1
-                
-                if idx == 1:
-                    self.start_grip_idx = save_idx
-
-
-                if torch.norm(x0_tensor[:, 3:].to(self.device) - ref[:, 3:]).item() < self.cfg.plan_chg_thres - 2.0*self.cfg.plan_chg_thres/3.0*(idx == len(references) - 1):
-                    if idx < 1:
-                        break
-                    elif latch_end > 50:
-                        break 
-                    latch_end += 1
-
-            if idx == 1:
-                self.subs_limit = save_idx
-            
-
-
-        self.trajectory_save = torch.tensor(self.trajectory_save).to(self.device)
-        self.prev_pose = self.gripper_pose_r_lie.clone()
-
-        self.increment_condition = False
-        self.gripper_action = False
-
-
-        self.episode_id += 1
-
-        if self.episode_id > 600:
-            raise
 
         self.object_points = torch.zeros((1024, 3)).to(self.device)
         self.robot_points = torch.zeros((1024, 3)).to(self.device)
@@ -1937,183 +1767,3 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.object_bbox_min, self.object_bbox_max, self.robot_bbox_min, self.robot_bbox_max = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
         self.object_bbox_min_ext, self.object_bbox_max_ext, self.robot_bbox_min_ext, self.robot_bbox_max_ext = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
         self.object_bbox_min_front, self.object_bbox_max_front, self.robot_bbox_min_front, self.robot_bbox_max_front = torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device), torch.zeros((1, 3)).to(self.device)
-        
-
-        # saving_dir = os.path.join(self.cfg.path_traj_mpc, "traj.pkl")
-        # save_traj(self.trajectory_save, lie = True, saving_dir = saving_dir)
-        if not self.cfg.test:
-            if self.cfg.hdf5:
-                self.writer = HDF5EpisodeWriter(
-                                                output_dir=os.path.join(self.current_path, "dataset"),
-                                                episode_idx=self.episode_id,
-                                                max_steps=self.trajectory_save.shape[0]
-                                                )
-            else:
-                if self.episode_id > 1:
-                    print(len(self.s_diff))
-                    
-                    episode_dict = {
-                        "s_cam": self.s_cam,
-                        "s_cam_ext": self.s_cam_ext,
-                        "s_cam_front": self.s_cam_front,
-
-                        "s_target_pose": self.s_target_pose,
-                        "s_gripper_pose": self.s_gripper_pose,
-                        "s_action": self.s_action,
-
-                        "s_diff": self.s_diff,
-
-                        "s_pc_w": self.s_pc_w,
-                        "s_pc_ext": self.s_pc_ext,
-                        "s_pc_front": self.s_pc_front,
-
-                        "s_cam_p": self.s_cam_p,
-                        "s_pcd_p": self.s_pcd_p,
-                        "s_pcd_net": self.s_pcd_net,
-                        "s_pcd_net2": self.s_pcd_net2,
-                        "s_pcd_net3": self.s_pcd_net3,
-
-                        "s_pcd_net3_object": self.s_pcd_net3_object,
-                        "s_pcd_net3_robot": self.s_pcd_net3_robot,
-
-
-                        "s_object_points": self.s_object_points,
-                        "s_robot_points": self.s_robot_points,
-
-                    }
-
-                    # print(os.path.join(self.current_path, "dataset","ep_"+str(self.episode_id-1)+".pkl"))
-                    # raise
-
-                    # Save
-                    with open(os.path.join(self.current_path, "dataset", "ep_" + str(self.episode_id - 1) + ".pkl"), "wb") as f:
-                        pickle.dump(episode_dict, f)
-
-
-                self.s_cam = []
-                self.s_cam_ext = []
-                self.s_cam_front = []
-
-                self.s_target_pose = []
-                self.s_gripper_pose = []
-                self.s_action = []
-
-                self.s_diff = []
-
-                self.s_pc_w = []
-                self.s_pc_ext = []
-                self.s_pc_front = []
-
-                self.s_cam_p = []
-                self.s_pcd_p = []
-                self.s_pcd_net = []
-                self.s_pcd_net2 = []
-                self.s_pcd_net3 = []
-
-                self.s_pcd_net3_object = []
-                self.s_pcd_net3_robot = []
-
-
-                self.s_object_points = []
-                self.s_robot_points = []
-
-                self.s_bb_object = []
-                self.s_bb_robot = []
-            
-
-        else:
-
-            self.dct_reducer = FastDCTFeatureReducer(input_dim=4096, output_dim=512)
-
-
-            # Create model
-            self.test_model = CnnPolicy(6, 6*3, 
-                      in_channels = 3,
-                      pc=True,
-                      hidden_dim=64).to(self.device)
-
-            # Load checkpoint
-            checkpoint = torch.load(self.cfg.model_path, map_location=self.device)
-            
-            # If you saved only state_dict
-            self.test_model.load_state_dict(checkpoint, strict = False)
-
-            # OR if checkpoint is wrapped
-            # self.test_model.load_state_dict(checkpoint["self.model_state_dict"])
-
-            # Move to GPU if available
-            self.test_model.to(self.device)
-
-            # Inference mode
-            self.test_model.eval()
-
-            
-            # checkpoint = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/checkpoints/sam2.1_hiera_tiny.pt"
-            # model_cfg = "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/sam2/configs/sam2.1/sam2.1_hiera_t.yaml"
-            # sam2 = build_sam2(model_cfg, checkpoint)
-
-            
-            # self.backbone = sam2.image_encoder
-
-            # self.transform = T.Compose([
-            #         T.ToPILImage(),
-            #         T.Resize((1024, 1024)),   # depends on model config
-            #         T.ToTensor(),
-            #         T.Normalize(
-            #             mean=[0.485, 0.456, 0.406],
-            #             std=[0.229, 0.224, 0.225]
-            #         )
-            #     ])
-            
-            if self.cfg.pcd_model_type == "PointNet":
-                num_classes = 13
-                self.pcd_model = get_model(num_classes=num_classes).cuda()
-
-                checkpoint = torch.load(
-                    "/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/best_model_sem.pth",
-                    map_location="cuda:0",
-                    weights_only=False
-                )
-
-                self.pcd_model.load_state_dict(checkpoint["model_state_dict"])
-                self.pcd_model.eval()
-            
-            elif self.cfg.pcd_model_type == "BERT":
-                config = EasyDict({
-                    'trans_dim':384,
-                    'depth':12,
-                    'drop_path_rate':0.1,
-                    'cls_dim':40,
-                    'num_heads':6,
-                    'group_size':32,
-                    'num_group':128,
-                    'encoder_dims':256
-                })
-
-                self.pcd_model = PointTransformer(config)
-
-                # load pretrained checkpoint
-                # ckpt = torch.load(
-                #     "Point-BERT.pth",
-                #     map_location="cpu",
-                #     weights_only=False
-                # )
-
-                # # depending on checkpoint structure:
-                # model.load_state_dict(
-                #     ckpt['base_model'],
-                #     strict=False
-                # )
-
-                self.pcd_model.load_model_from_ckpt(
-                    bert_ckpt_path="/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/Point-BERT.pth",)
-
-                self.pcd_model.eval()
-                self.pcd_model.cuda()
-
-                with open("/" + os.getcwd() + "/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation_obstacles/train/sam2/action_preprocessing.pkl","rb") as f:
-                    self.stats = pickle.load(f)
-
-
-                self.test_model.max_dct_obj = self.stats["max_pc_obj"]
-                self.test_model.max_dct_rob = self.stats["max_pc_rob"]
