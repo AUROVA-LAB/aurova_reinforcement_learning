@@ -12,7 +12,7 @@ from isaaclab.utils.math import matrix_from_quat
 
 import cv2 as cv
 
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+# from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 
 
 
