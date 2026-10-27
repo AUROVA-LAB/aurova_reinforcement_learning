@@ -41,11 +41,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = MAT
-    mapping = 1
+    representation = DQ
+    mapping = 2
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 0
+    distance = 1
     se3_dist = False
 
     # Scalings for each action
