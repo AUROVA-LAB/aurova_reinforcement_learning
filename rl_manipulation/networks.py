@@ -14,18 +14,37 @@ class CustomFeatureExtractor(BaseFeaturesExtractor):
 
         input_dim = observation_space.shape[0]
 
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, 32),
+        self.network_rot = nn.Sequential(
+            nn.Linear(input_dim / 2 , 16),
+            nn.LayerNorm(16),
+            nn.Tanh(),
+
+            nn.Linear(16, 32),
             nn.LayerNorm(32),
             nn.Tanh(),
 
-            nn.Linear(32, 64),
-            nn.LayerNorm(64),
+            nn.Linear(32, features_dim),
+            nn.Tanh(),
+        )
+
+        self.network_pos = nn.Sequential(
+            nn.Linear(input_dim / 2 , 16),
+            nn.LayerNorm(16),
             nn.Tanh(),
 
-            nn.Linear(64, features_dim),
+            nn.Linear(16, 32),
+            nn.LayerNorm(32),
+            nn.Tanh(),
+
+            nn.Linear(32, features_dim),
             nn.Tanh(),
         )
 
     def forward(self, observations):
-        return self.network(observations)
+        rot = observations[:, :3]
+        pos = observations[:, 3:]
+
+        rot = self.network_rot(rot)
+        pos = self.network_rot(pos)
+        
+        return th.cat((rot, pos), dim=-1)
