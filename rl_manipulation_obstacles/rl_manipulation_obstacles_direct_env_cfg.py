@@ -22,6 +22,32 @@ from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg
 
 
 
+# Function to change a Euler angles to a quaternion as a tensor
+def rot2tensor(rot: Rotation) -> torch.tensor:
+    '''
+    In:
+        - rot - scipy.Rotation(3): rotation expressed in Euler angles.
+
+    Out:
+        - rot_tensor_quat - torch.tensor - (4): rotation expressed a quaternion in a tensor.
+    '''
+
+    # Transform rotation to tensor
+    rot_tensor = torch.tensor(rot.as_quat())
+    rot_tensor_quat = torch.zeros((4))
+
+    # Scipy uses the notation (x,y,z,w) whilst IsaacLab uses (w,x,y,z), so that is changed
+    rot_tensor_quat[0], rot_tensor_quat[1:] = rot_tensor[-1].clone(), rot_tensor[:3].clone()
+    
+    return rot_tensor_quat
+
+
+
+rot_180_z_pos = Rotation.from_rotvec(pi/2 * np.array([0, 1, 0]))        # Positive 180 degrees rotation in Z axis 
+rot_180_z_pos_fr = Rotation.from_rotvec(pi * np.array([0, 0, 1]))        # Positive 180 degrees rotation in Z axis 
+rot_45_z_pos = Rotation.from_rotvec((pi/4) * np.array([0.05, 0.05, 1.05]))     # Positive 45 degrees rotation in Z axis 
+
+
 # Configuration class for the environment
 @configclass
 class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
@@ -427,16 +453,30 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     # ---- Target poses ----
     target_pose = [-0.4919, 0.1333, 0.4879, pi, 2*pi, 2.3562]
+    target_pose_2 = [-0.4308,  0.1459,  0.4802-0.25,  0, 3, 0]  
+
     target_poses_incs = [[-0.2,  0.2],
                          [-0.2,   0.2],
                          [-0.35,   0.225],
                          [-3*pi/5,  3*pi/5],
                          [-3*pi/5,  3*pi/5],
                          [-pi/2,  pi/2]]
+    target_poses_incs2 = [[-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
+                          [-0.1*0,  0.1*0],
+                          [-1*pi/5*0,  1*pi/5*0],
+                          [-1*pi/5*0,  1*pi/5*0],
+                          [-1*pi/5*0,  1*pi/5*0]]
 
     apply_range_tgt = True
 
-    box_range_x = [0,0]
+
+    rot_45_z_pos_quat = rot2tensor(rot_45_z_pos).numpy().tolist()
+    rot_180_z_pos_quat = rot2tensor(rot_180_z_pos).numpy().tolist()
+    rot_180_z_pos_fr_quat = rot2tensor(rot_180_z_pos_fr).numpy().tolist()
+
+
+    box_range_x = [1,1]
     box_range_y = [1,1]
     object_base_pose = [-0.6800, -0.3700,  0.1400,  1.0000,  0.0000,  0.0000,  0.0000]
     object_increments = [0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0]
@@ -519,6 +559,7 @@ def update_cfg(cfg, num_envs, device):
     '''
 
     cfg.target_pose = torch.tensor(cfg.target_pose).repeat(num_envs, 1).to(device)
+    cfg.target_pose_2 = torch.tensor(cfg.target_pose_2).repeat(num_envs, 1).to(device)
     cfg.object_base_pose = torch.tensor(cfg.object_base_pose).repeat(num_envs, 1).to(device)
     cfg.object_increments = torch.tensor(cfg.object_increments).repeat(num_envs, 1).to(device)
     cfg.moving_joints_gripper = torch.tensor(cfg.moving_joints_gripper).repeat(num_envs, 1).to(device)
@@ -535,6 +576,11 @@ def update_cfg(cfg, num_envs, device):
     cfg.contact_matrix = cfg.contact_matrix.repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy = torch.tensor(cfg.rot_neg90_xy).repeat(num_envs, 1).to(device)
     cfg.rot_neg90_xy_2 = torch.tensor(cfg.rot_neg90_xy_2).repeat(num_envs, 1).to(device)
+
+    cfg.rot_45_z_pos_quat = torch.tensor(cfg.rot_45_z_pos_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_quat = torch.tensor(cfg.rot_180_z_pos_quat).repeat(num_envs, 1).to(device)
+    cfg.rot_180_z_pos_fr_quat = torch.tensor(cfg.rot_180_z_pos_fr_quat).repeat(num_envs, 1).to(device)
+
 
     cfg.obst_list = torch.tensor(cfg.obst_list).repeat(num_envs, 1).to(device)
 
