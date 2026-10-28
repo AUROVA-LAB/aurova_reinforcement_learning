@@ -632,6 +632,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 "Received invalid joint positions."
             )
 
+        T_ref_new = self.controller["pose_to_transform"](self.target_pose_r2.squeeze(0).cpu().numpy())
+
         # ------------------------------------------
         # 2. Update NMPC parameters
         # ------------------------------------------
@@ -644,6 +646,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             self.u_previous_parameter,
             self.u_previous,
         )
+
+
+        # Update the target parameter
+        self.opti.set_value(
+            self.T_ref,
+            T_ref_new,
+        )
+
 
         # ------------------------------------------
         # 3. Warm-start the optimization
@@ -674,25 +684,25 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.u_previous = u_cmd.copy()
 
-        pose_error = np.asarray(
-            self.controller["pose_error"](q_measured).full()
-        ).reshape(6)
+        # pose_error = np.asarray(
+        #     self.controller["pose_error"](q_measured).full()
+        # ).reshape(6)
 
-        position_error = np.linalg.norm(
-            pose_error[:3]
-        )
+        # position_error = np.linalg.norm(
+        #     pose_error[:3]
+        # )
 
-        orientation_error = np.linalg.norm(
-            pose_error[3:]
-        )
+        # orientation_error = np.linalg.norm(
+        #     pose_error[3:]
+        # )
 
-        print(
-                f"position error={position_error:.4f} m | "
-                f"orientation error={orientation_error:.4f} rad | "
-                f"solve={solve_time * 1000:.1f} ms"
-            )
+        # print(
+        #         f"position error={position_error:.4f} m | "
+        #         f"orientation error={orientation_error:.4f} rad | "
+        #         f"solve={solve_time * 1000:.1f} ms"
+        #     )
         
-        print("---------------")
+        # print("---------------")
 
         # self.controller.set_command(torch.cat(cmd, dim = -1))
 
@@ -1735,6 +1745,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
     
         self.q_parameter = self.controller["q_measured"]
         self.u_previous_parameter = self.controller["u_previous"]
+        self.T_ref = self.controller["T_ref"]
     
         self.T_ref = self.controller["T_ref"]
     

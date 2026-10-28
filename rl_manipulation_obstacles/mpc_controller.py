@@ -224,34 +224,82 @@ def drop_NMPC_setup(
     q_weights=None,
     u_weights=None,
     du_weights=None,
+    T_tool=None,
 ):
     """
     Cartesian pose-tracking NMPC for a UR5e.
 
     States:
-        q: Joint positions [rad].
+        X[:, k]: joint positions [rad].
 
     Inputs:
-        u: Joint velocity commands [rad/s].
+        U[:, k]: joint velocity commands [rad/s].
 
     Dynamics:
-        q[k+1] = q[k] + dt*u[k]
+        q[k+1] = q[k] + dt * u[k]
 
-    Returns:
-        controller: dictionary containing the optimizer and
-                    the functions required to run the MPC.
+    Reference pose:
+        ref = [x, y, z, qw, qx, qy, qz]
 
-    Requires the previously defined:
+    The Cartesian reference is an Opti parameter, so it can
+    be updated during execution without rebuilding the solver.
+
+    Requires:
         ur5e_fk(q, T_tool=None)
         cartesian_pose_error(q, T_ref, T_tool=None)
+
+    Parameters
+    ----------
+    ini : array-like, shape (6,)
+        Initial joint positions.
+
+    ref : array-like, shape (7,)
+        Initial target Cartesian pose.
+
+    dt : float
+        Control interval in seconds.
+
+    horizon : int
+        Number of control intervals.
+
+    q_min, q_max : array-like, shape (6,)
+        Joint position limits.
+
+    dq_max : array-like, shape (6,)
+        Absolute joint velocity limits.
+
+    ddq_max : array-like, shape (6,)
+        Absolute joint acceleration limits.
+
+    q_weights : array-like, shape (6,)
+        Weights for the Cartesian position and orientation errors.
+
+    u_weights : array-like, shape (6,)
+        Weights for joint velocity commands.
+
+    du_weights : array-like, shape (6,)
+        Weights for changes in joint velocity commands.
+
+    T_tool : array-like, shape (4, 4), optional
+        Fixed transformation from the robot flange to the TCP.
+        If omitted, uses a 0.25 m translation along local Z,
+        matching the example in the original function.
+        Replace this example with the actual TCP transform.
+
+    Returns
+    -------
+    controller : dict
+        Contains the optimizer, decision variables, parameters,
+        and compiled functions required to run the NMPC.
     """
 
-    ref[0] *= -1
+    # ref[0] *= -1
     # ref[1] *= -1
-    ref[2] += 0.15
+    # ref[2] += 0.15
+    
 
     # --------------------------------------------------
-    # 1. Parameters
+    # 1. Parameters and defaults
     # --------------------------------------------------
 
     if ini is None:
@@ -260,6 +308,18 @@ def drop_NMPC_setup(
     if ref is None:
         ref = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 
+    # Copy the reference to avoid modifying the caller's array.
+    ref = np.asarray(ref, dtype=float).reshape(7).copy()
+
+    # Apply coordinate conversion only if your frames require it.
+    # ref[0] *= -1
+
+    if dt <= 0:
+        raise ValueError("dt must be positive.")
+
+    if horizon < 1:
+        raise ValueError("horizon must be at least 1.")
+
     if q_min is None:
         q_min = [-2 * np.pi] * 6
 
@@ -267,14 +327,13 @@ def drop_NMPC_setup(
         q_max = [2 * np.pi] * 6
 
     if dq_max is None:
-        dq_max = [2*1.0] * 6
+        dq_max = [2.0] * 6
 
     if ddq_max is None:
-        ddq_max = [2*2.0] * 6
+        ddq_max = [4.0] * 6
 
     if q_weights is None:
-        q_weights = [1.0, 1.0, 1.0,
-                     1.0, 1.0, 1.0]
+        q_weights = [1.0] * 6
 
     if u_weights is None:
         u_weights = [0.001] * 6
@@ -283,90 +342,68 @@ def drop_NMPC_setup(
         du_weights = [0.01] * 6
 
     ini = np.asarray(ini, dtype=float).reshape(6)
-    ref = np.asarray(ref, dtype=float).reshape(7)
-
     q_min = np.asarray(q_min, dtype=float).reshape(6)
     q_max = np.asarray(q_max, dtype=float).reshape(6)
     dq_max = np.asarray(dq_max, dtype=float).reshape(6)
     ddq_max = np.asarray(ddq_max, dtype=float).reshape(6)
+
+    q_weights = np.asarray(q_weights, dtype=float).reshape(6)
+    u_weights = np.asarray(u_weights, dtype=float).reshape(6)
+    du_weights = np.asarray(du_weights, dtype=float).reshape(6)
+
+    if np.any(q_min > q_max):
+        raise ValueError("Every q_min element must be <= q_max.")
+
+    if np.any(dq_max <= 0):
+        raise ValueError("All dq_max values must be positive.")
+
+    if np.any(ddq_max <= 0):
+        raise ValueError("All ddq_max values must be positive.")
+
+    if np.any(q_weights < 0) or np.any(u_weights < 0) or np.any(du_weights < 0):
+        raise ValueError("Cost weights must be nonnegative.")
 
     Q = ca.diag(ca.DM(q_weights))
     R = ca.diag(ca.DM(u_weights))
     S = ca.diag(ca.DM(du_weights))
 
     # --------------------------------------------------
-    # 2. Target pose
+    # 2. Tool transformation
     # --------------------------------------------------
 
-    # ref = [x, y, z, qw, qx, qy, qz]
-    #
-    # Target orientation uses Rz(yaw)*Ry(pitch)*Rx(roll).
-    # Angles are in radians.
+    if T_tool is None:
+        # Example only: 25 cm along the flange's local Z axis.
+        # Replace this with your actual flange-to-TCP transform.
+        T_tool_np = np.eye(4)
+        T_tool_np[2, 3] = 0.25
+    else:
+        T_tool_np = np.asarray(T_tool, dtype=float).reshape(4, 4)
 
-    px, py, pz, qw, qx, qy, qz = ref
-
-    # Normalize quaternion
-    q_norm = ca.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
-    qw, qx, qy, qz = qw/q_norm, qx/q_norm, qy/q_norm, qz/q_norm
-
-    # Rotation matrix from quaternion [qw, qx, qy, qz]
-    R_ref = ca.vertcat(
-        ca.horzcat(
-            1 - 2*(qy**2 + qz**2),
-            2*(qx*qy - qw*qz),
-            2*(qx*qz + qw*qy)
-        ),
-        ca.horzcat(
-            2*(qx*qy + qw*qz),
-            1 - 2*(qx**2 + qz**2),
-            2*(qy*qz - qw*qx)
-        ),
-        ca.horzcat(
-            2*(qx*qz - qw*qy),
-            2*(qy*qz + qw*qx),
-            1 - 2*(qx**2 + qy**2)
-        )
-    )
-
-    # Homogeneous transformation matrix
-    T_ref = ca.vertcat(
-        ca.horzcat(R_ref, ca.DM([px, py, pz]).reshape((3, 1))),
-        ca.DM([[0, 0, 0, 1]])
-    )
-
-    # Symbolic joint configuration
-    q_sym = ca.SX.sym("q_eval", 6)
-
-    # Symbolic Cartesian error
-    e_sym, T_sym = cartesian_pose_error(q_sym, T_ref)
-
-    # Compiled CasADi functions for numerical evaluation
-    # TODO: estas funciones llaman a cartesian_pose_error pero no incluyen T_tool
-    pose_error_fn = ca.Function(
-        "pose_error_fn",
-        [q_sym],
-        [e_sym],
-    )
-
-    fk_fn = ca.Function(
-        "fk_fn",
-        [q_sym],
-        [T_sym],
-    )
+    T_tool = ca.DM(T_tool_np)
 
     # --------------------------------------------------
-    # 3. Optimization problem
+    # 3. Create the optimizer and reference parameter
     # --------------------------------------------------
 
     opti = ca.Opti()
 
+    # Runtime-updatable target transformation.
+    T_ref = opti.parameter(4, 4)
+
+    T_ref_initial = pose_to_transform(ref)
+    opti.set_value(T_ref, T_ref_initial)
+
+    # --------------------------------------------------
+    # 4. Decision variables
+    # --------------------------------------------------
+
     # Predicted joint positions: 6 x (N+1)
-    X = opti.variable(6, horizon+1)
+    X = opti.variable(6, horizon + 1)
 
     # Joint velocity commands: 6 x N
     U = opti.variable(6, horizon)
 
-    # Parameters updated at every control iteration
+    # Parameters updated during every control iteration.
     q_measured = opti.parameter(6)
     u_previous = opti.parameter(6)
 
@@ -374,15 +411,15 @@ def drop_NMPC_setup(
     opti.set_value(u_previous, np.zeros(6))
 
     # --------------------------------------------------
-    # 4. State and input constraints
+    # 5. State and input constraints
     # --------------------------------------------------
 
     # Joint position limits
     opti.subject_to(
         opti.bounded(
-            ca.repmat(ca.DM(q_min), 1, horizon+1),
+            ca.repmat(ca.DM(q_min), 1, horizon + 1),
             X,
-            ca.repmat(ca.DM(q_max), 1, horizon+1),
+            ca.repmat(ca.DM(q_max), 1, horizon + 1),
         )
     )
 
@@ -395,68 +432,69 @@ def drop_NMPC_setup(
         )
     )
 
-    # Initial measured joint positions
+    # Initial state is the measured joint configuration.
     opti.subject_to(X[:, 0] == q_measured)
 
     # --------------------------------------------------
-    # 5. Symbolic Cartesian cost
+    # 6. Cartesian tracking cost and dynamics
     # --------------------------------------------------
 
     J = 0
 
-    for k in range(horizon - 1):
+    for k in range(horizon):
 
         # Predicted joint configuration
         q_k = X[:, k]
 
-        # Forward kinematics and Cartesian pose error
-        e_k, T_k = cartesian_pose_error(q_k, T_ref)
+        # TCP pose error, evaluated against the parameter T_ref.
+        e_k, T_k = cartesian_pose_error(
+            q_k,
+            T_ref,
+            T_tool=T_tool,
+        )
 
-        # This is the symbolic Cartesian cost.
+        # Cartesian position and orientation tracking cost
         J_pose = ca.mtimes([e_k.T, Q, e_k])
 
         # Joint velocity regularization
         u_k = U[:, k]
         J_velocity = ca.mtimes([u_k.T, R, u_k])
 
-        # Velocity change regularization
+        # Change in commanded joint velocity
         if k == 0:
             du_k = u_k - u_previous
         else:
             du_k = u_k - U[:, k - 1]
 
+        # Smoothness cost
         J_smooth = ca.mtimes([du_k.T, S, du_k])
 
-        # Total stage cost
+        # Accumulate stage cost
         J += J_pose + J_velocity + J_smooth
 
-        # --------------------------------------------------
-        # 6. Joint-space dynamics
-        # --------------------------------------------------
-
+        # Joint-space discrete dynamics
         opti.subject_to(
             X[:, k + 1] == X[:, k] + dt * U[:, k]
         )
 
-        # --------------------------------------------------
-        # 7. Joint acceleration constraints
-        # --------------------------------------------------
-
+        # Acceleration limits:
+        # |u[k] - u[k-1]| <= ddq_max * dt
         opti.subject_to(
             opti.bounded(
-                -ddq_max * dt,
+                -ca.DM(ddq_max) * dt,
                 du_k,
-                ddq_max * dt,
+                ca.DM(ddq_max) * dt,
             )
         )
 
     # --------------------------------------------------
-    # 8. Terminal pose cost
+    # 7. Terminal Cartesian tracking cost
     # --------------------------------------------------
 
     e_terminal, T_terminal = cartesian_pose_error(
-        X[:, horizon - 1],
+        X[:, horizon],
         T_ref,
+        T_tool=T_tool,
     )
 
     J_terminal = ca.mtimes([
@@ -468,7 +506,7 @@ def drop_NMPC_setup(
     J += J_terminal
 
     # --------------------------------------------------
-    # 9. Set objective and solver
+    # 8. Objective and solver
     # --------------------------------------------------
 
     opti.minimize(J)
@@ -487,6 +525,31 @@ def drop_NMPC_setup(
     )
 
     # --------------------------------------------------
+    # 9. Compiled functions for numerical evaluation
+    # --------------------------------------------------
+
+    q_sym = ca.SX.sym("q_eval", 6)
+    T_ref_sym = ca.SX.sym("T_ref_eval", 4, 4)
+
+    e_sym, T_sym = cartesian_pose_error(
+        q_sym,
+        T_ref_sym,
+        T_tool=T_tool,
+    )
+
+    pose_error_fn = ca.Function(
+        "pose_error_fn",
+        [q_sym, T_ref_sym],
+        [e_sym],
+    )
+
+    fk_fn = ca.Function(
+        "fk_fn",
+        [q_sym],
+        [ur5e_fk(q_sym, T_tool=T_tool)],
+    )
+
+    # --------------------------------------------------
     # 10. Return controller
     # --------------------------------------------------
 
@@ -497,9 +560,11 @@ def drop_NMPC_setup(
         "q_measured": q_measured,
         "u_previous": u_previous,
         "T_ref": T_ref,
+        "T_tool": T_tool,
         "cost": J,
         "fk": fk_fn,
         "pose_error": pose_error_fn,
+        "pose_to_transform": pose_to_transform,
         "dt": dt,
         "horizon": horizon,
     }

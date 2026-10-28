@@ -2,6 +2,37 @@ import casadi as ca
 import numpy as np
 
 
+
+def pose_to_transform(ref):
+    """
+    Convert [x, y, z, qw, qx, qy, qz] into a 4x4
+    homogeneous transformation matrix.
+    """
+    ref = np.asarray(ref, dtype=float).reshape(7)
+
+    px, py, pz, qw, qx, qy, qz = ref
+    px *= -1
+
+    # Normalize quaternion
+    q_norm = np.linalg.norm([qw, qx, qy, qz])
+    if q_norm < 1e-12:
+        raise ValueError("Reference quaternion must not be zero.")
+
+    qw, qx, qy, qz = qw/q_norm, qx/q_norm, qy/q_norm, qz/q_norm
+
+    R = np.array([
+        [1 - 2*(qy**2 + qz**2), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
+        [2*(qx*qy + qw*qz),     1 - 2*(qx**2 + qz**2), 2*(qy*qz - qw*qx)],
+        [2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx**2 + qy**2)],
+    ])
+
+    T = np.eye(4)
+    T[:3, :3] = R
+    T[:3, 3] = [px, py, pz]
+
+    return T
+
+
 def ur5e_fk(q, T_tool=None):
     """
     UR5e forward kinematics using standard DH parameters.
