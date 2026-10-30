@@ -43,7 +43,7 @@ import pickle
 from math import atan, pi
 from scipy.spatial.transform import Rotation
 
-
+from .mpc_utils import *
 
 
 
@@ -558,6 +558,19 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             )
 
         T_ref_new = self.controller["pose_to_transform"](self.target_pose_r.squeeze(0).cpu().numpy())
+        T_ref_new2 = self.controller["pose_to_transform"](self.gripper_pose_r.squeeze(0).cpu().numpy())
+
+        diff = self.diff_operator(self.gripper_group_r, self.target_pose_r_group)
+        print(self.gripper_group_r.view(1, 4, 4)[0].cpu().numpy())
+        print(T_ref_new2)
+        print(self.target_pose_r_group.view(1, 4, 4)[0].cpu().numpy())
+        print(T_ref_new)
+        print(self.log(diff))
+
+        print("------")
+        print(rotation_log(diff.view(1,4,4)[0, :3, :3].cpu().numpy()))
+        print(rotation_log(T_ref_new2[:3, :3]))
+        print(rotation_log(T_ref_new[:3, :3]))
 
         # ------------------------------------------
         # 2. Update NMPC parameters
@@ -609,26 +622,30 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.u_previous = u_cmd.copy()
 
-        # pose_error = np.asarray(
-        #     self.controller["pose_error"](q_measured).full()
-        # ).reshape(6)
+        pose_error = np.asarray(
+            self.controller["pose_error"](
+                q_measured,
+                T_ref_new,
+            ).full()
+        ).reshape(6)
 
-        # position_error = np.linalg.norm(
-        #     pose_error[:3]
-        # )
+        position_error = np.linalg.norm(
+            pose_error[:3]
+        )
 
-        # orientation_error = np.linalg.norm(
-        #     pose_error[3:]
-        # )
+        orientation_error = np.linalg.norm(
+            pose_error[3:]
+        )
 
-        # print(
-        #         f"position error={position_error:.4f} m | "
-        #         f"orientation error={orientation_error:.4f} rad | "
-        #         f"solve={solve_time * 1000:.1f} ms"
-        #     )
+        print(
+                f"position error={position_error:.4f} m | "
+                f"orientation error={orientation_error:.4f} rad | "
+                f"solve={solve_time * 1000:.1f} ms"
+            )
         
-        # print("---------------")
+        print("---------------")
 
+        raise
         # self.controller.set_command(torch.cat(cmd, dim = -1))
 
         # Set the command for the IKDifferentialController
@@ -752,8 +769,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Obtain the pose of the UR5e end effector in world frame
         self.debug_robot_ee_pose_w = self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.body_state_w[:, self.ee_jacobi_idx+1, 0:7]
 
-        print("ROBOT: ", self.debug_robot_ee_pose_w)
-
         # Obtain the pose of the end effector in UR5e root frame
         robot_rot_ee_pos_r, robot_rot_ee_quat_r = subtract_frame_transforms(t01 = self.root_robot_pose[:, :3], q01 = self.root_robot_pose[:, 3:],
                                                                               t02 = self.debug_robot_ee_pose_w[:, :3], q02 = self.debug_robot_ee_pose_w[:, 3:])
@@ -809,8 +824,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
         self.target_pose_r_group = self.convert_to_group(target_pos_r, target_quat_r)
-
-        # print(self.log(self.target_pose_r_group))
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
@@ -973,10 +986,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
         self.robot_points = farthest_point_sampling_BERT(robot_points.unsqueeze(0), 1024).squeeze(0)
-
-                # print("Robot points shape: ", robot_points.shape)
-                # print("Object points shape: ", object_points.shape)
-                                
                 
         
                 # cloud = o3d.geometry.PointCloud()

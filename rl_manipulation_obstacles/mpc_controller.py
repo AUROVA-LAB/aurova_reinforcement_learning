@@ -537,8 +537,8 @@ def drop_NMPC_setup(
         T_tool=T_tool,
     )
 
-    pose_error_fn = ca.Function(
-        "pose_error_fn",
+    pose_error = ca.Function(
+        "pose_error",
         [q_sym, T_ref_sym],
         [e_sym],
     )
@@ -563,7 +563,7 @@ def drop_NMPC_setup(
         "T_tool": T_tool,
         "cost": J,
         "fk": fk_fn,
-        "pose_error": pose_error_fn,
+        "pose_error": pose_error,
         "pose_to_transform": pose_to_transform,
         "dt": dt,
         "horizon": horizon,
