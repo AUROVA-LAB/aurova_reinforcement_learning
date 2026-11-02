@@ -100,7 +100,7 @@ from isaaclab_rl.sb3 import Sb3VecEnvWrapper, process_sb3_cfg
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation.train.networks import CustomActorCriticPolicy
+from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_learning.rl_manipulation.train.networks import *
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 
