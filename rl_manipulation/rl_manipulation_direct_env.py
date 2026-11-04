@@ -154,6 +154,12 @@ class RLManipulationDirect(DirectRLEnv):
         self.min_obs_rot =  100000
         self.min_obs_pos =  100000
 
+        self.max_obs_rot2 = -100000
+        self.max_obs_pos2 = -100000
+
+        self.min_obs_rot2 =  100000
+        self.min_obs_pos2 =  100000
+
         self.actions_ee = torch.zeros(6).to(self.device).repeat(self.num_envs, 1).float()
     
 
@@ -400,9 +406,11 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
+        self.my_obs = torch.cat((self.my_obs, obs), dim=0)
+        
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.74  # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856  # DQ+: 0.74
-        obs[:, 3:]  /= 0.24  # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 0.354 # DQ+: 0.24
+        obs[:, :3]  /= 0.91   # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856 MATNEW: 0.91 # DQ+: 0.74
+        obs[:, 3:]  /= 0.43   # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 0.354 MATNEW: 0.43 # DQ+: 0.24
 
         # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
         # obs[:, 9:]  /= # TQ norel 0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
@@ -448,6 +456,20 @@ class RLManipulationDirect(DirectRLEnv):
             pose_se3 = self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:])
             tgt_se3  = self.to_group_dist(t = self.target_pose_r[:, :3], r = self.target_pose_r[:, 3:])
 
+            # a = self.log_dist(self.diff_operator_dist(pose_se3, tgt_se3))
+
+            # self.max_obs_rot2 = max(self.max_obs_rot2, a[:, :3].max().item())
+            # self.max_obs_pos2 = max(self.max_obs_pos2, a[:, 3:].max().item())
+    
+            # self.min_obs_rot2 = min(self.min_obs_rot2, a[:, :3].min().item())
+            # self.min_obs_pos2 = min(self.min_obs_pos2, a[:, 3:].min().item())
+    
+            # print("MAX ROT: ", self.max_obs_rot2)
+            # print("MAX POS: ", self.max_obs_pos2)
+            # print("MIN ROT: ", self.min_obs_rot2)
+            # print("MIN POS: ", self.min_obs_pos2)
+            # print("-----------")
+
             dist = self.dist_function(pose_se3, tgt_se3, self.log_dist, self.diff_operator_dist)                                                                   
 
         # Obtains wether the agent is approaching or not
@@ -462,7 +484,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached #  - torch.norm(self.actions_ee, dim = -1) / 5
+        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached  - torch.norm(self.actions_ee, dim = -1) * 10
 
         # Update previous distances
         self.prev_dist = dist
@@ -490,6 +512,21 @@ class RLManipulationDirect(DirectRLEnv):
         # Truncated and terminated variables
         truncated = out_of_bounds
         terminated = torch.logical_or(time_out, self.target_reached)
+
+        # if terminated.item() or truncated.item():
+
+        #     pose_lab = self.convert_to_Lab(self.pose_group_r)
+            
+        #     pose_se3 = self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:])
+        #     tgt_se3  = self.to_group_dist(t = self.target_pose_r[:, :3], r = self.target_pose_r[:, 3:])
+
+        #     dist = self.dist_function(pose_se3, tgt_se3, self.log_dist, self.diff_operator_dist) 
+        #     print(dist)
+        #     print(self.my_obs)
+        #     torch.save(self.my_obs, "evol_TQ2.pth")
+        #     raise
+
+
 
         return truncated, terminated
     
@@ -619,6 +656,8 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Updates the poses 
         self.update_new_poses()  
+
+        self.my_obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
 
 
         
