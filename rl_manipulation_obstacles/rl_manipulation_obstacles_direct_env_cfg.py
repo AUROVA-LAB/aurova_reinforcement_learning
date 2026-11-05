@@ -185,112 +185,117 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
-            "target_point": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
+            # "target_point": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),
+            # "shelf_pose": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),
 
-            "shelf_pose1": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose2": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose3": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose5": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose6": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose7": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"limit_": sim_utils.SphereCfg(
-                radius = 0.0275,
-                visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
-                visible = debug_markers
-            ),"shelf_pose9": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose10": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose11": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose12": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose13": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose14": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose15": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose16": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose17": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose18": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose19": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose20": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose21": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose22": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose23": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),"shelf_pose24": sim_utils.UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
-                scale=(0.1, 0.1, 0.1),
-                visible = debug_markers
-            ),
-            "shelf_pose25": sim_utils.UsdFileCfg(
+            # "shelf_pose1": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),
+            # "shelf_pose2": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose3": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose5": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose6": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose7": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"limit_": sim_utils.SphereCfg(
+            #     radius = 0.0275,
+            #     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=0.2),
+            #     visible = debug_markers
+            # ),"shelf_pose9": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose10": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose11": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose12": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose13": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose14": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose15": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose16": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose17": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose18": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose19": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose20": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose21": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose22": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose23": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),"shelf_pose24": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),
+            # "shelf_pose25": sim_utils.UsdFileCfg(
+            #     usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
+            #     scale=(0.1, 0.1, 0.1),
+            #     visible = debug_markers
+            # ),
+            "nmpc_tgt_pose": sim_utils.UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/frame_prim.usd",
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
@@ -311,44 +316,71 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
 
     tiled_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 1.5),
+        ),
+
         width=img_width,
         height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True,
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
     tiled_camera_ext: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 1.5),
+        ),
+
         width=img_width,
         height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
     tiled_camera_ext_2: TiledCameraCfg = TiledCameraCfg(
         prim_path="/World/envs/env_.*/camera_ext_2",
-        offset=TiledCameraCfg.OffsetCfg(pos=(-0.0, 0.0, 5.0), rot=(1.0, 0.0, 0.0, 0.0),),
-        data_types=["rgb", "depth", "instance_id_segmentation_fast", ],
-        depth_clipping_behavior = "max",
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 20.0)
+
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 5.0),
+            rot=(1.0, 0.0, 0.0, 0.0),
         ),
+
+        data_types=["rgb", "depth", "instance_id_segmentation_fast", "distance_to_image_plane"],
+
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=20.1,              # ← computed
+            horizontal_aperture=20.955,     # ← assumed
+            clipping_range=(0.1, 1.5),
+        ),
+
         width=img_width,
         height=img_height,
-        # update_latest_camera_pose = True
-        colorize_instance_id_segmentation = True
+
+        depth_clipping_behavior="max",
+        colorize_instance_id_segmentation=True,
     )
 
 
