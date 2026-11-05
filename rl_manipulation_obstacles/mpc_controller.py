@@ -293,10 +293,6 @@ def drop_NMPC_setup(
         and compiled functions required to run the NMPC.
     """
 
-    # ref[0] *= -1
-    # ref[1] *= -1
-    # ref[2] += 0.15
-    
 
     # --------------------------------------------------
     # 1. Parameters and defaults
@@ -310,9 +306,6 @@ def drop_NMPC_setup(
 
     # Copy the reference to avoid modifying the caller's array.
     ref = np.asarray(ref, dtype=float).reshape(7).copy()
-
-    # Apply coordinate conversion only if your frames require it.
-    # ref[0] *= -1
 
     if dt <= 0:
         raise ValueError("dt must be positive.")

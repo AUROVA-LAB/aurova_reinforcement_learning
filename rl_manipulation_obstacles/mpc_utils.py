@@ -1,29 +1,42 @@
 import casadi as ca
 import numpy as np
 
-
-
 def pose_to_transform(ref):
     """
-    Convert [x, y, z, qw, qx, qy, qz] into a 4x4
-    homogeneous transformation matrix.
+    Convert [x, y, z, qw, qx, qy, qz] into a homogeneous transform.
+
+    No change of reference frame is performed.
     """
     ref = np.asarray(ref, dtype=float).reshape(7)
 
-    px, py, pz, qw, qx, qy, qz = ref
-    px *= -1
+    if not np.all(np.isfinite(ref)):
+        raise ValueError("Reference pose must contain finite values.")
 
-    # Normalize quaternion
-    # q_norm = np.linalg.norm([qw, qx, qy, qz])
-    # if q_norm < 1e-12:
-    #     raise ValueError("Reference quaternion must not be zero.")
+    px, py, pz = ref[:3]
+    quat = ref[3:]
 
-    # qw, qx, qy, qz = qw/q_norm, qx/q_norm, qy/q_norm, qz/q_norm
+    q_norm = np.linalg.norm(quat)
+    if q_norm < 1e-12:
+        raise ValueError("Reference quaternion must not be zero.")
+
+    qw, qx, qy, qz = quat / q_norm
 
     R = np.array([
-        [1 - 2*(qy**2 + qz**2), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
-        [2*(qx*qy + qw*qz),     1 - 2*(qx**2 + qz**2), 2*(qy*qz - qw*qx)],
-        [2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx**2 + qy**2)],
+        [
+            1 - 2 * (qy**2 + qz**2),
+            2 * (qx*qy - qw*qz),
+            2 * (qx*qz + qw*qy),
+        ],
+        [
+            2 * (qx*qy + qw*qz),
+            1 - 2 * (qx**2 + qz**2),
+            2 * (qy*qz - qw*qx),
+        ],
+        [
+            2 * (qx*qz - qw*qy),
+            2 * (qy*qz + qw*qx),
+            1 - 2 * (qx**2 + qy**2),
+        ],
     ])
 
     T = np.eye(4)
@@ -49,6 +62,8 @@ def ur5e_fk(q, T_tool=None):
     T : casadi 4x4 matrix
         Transformation from the base frame to the TCP.
     """
+
+    q = ca.vertcat(q[0] + np.pi, q[1:])
 
     # Standard DH parameters for UR5e (meters, radians).
     a = [0.0, -0.425, -0.3922, 0.0, 0.0, 0.0]
