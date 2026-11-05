@@ -36,9 +36,9 @@ from pynput import keyboard
 import sys
 sys.path.append('../../../')
 
-from hilo_mpc import NMPC, Model
 import casadi as ca
 from .mpc_controller import drop_NMPC_setup
+from .sim_utils import * 
 import pickle
 from math import atan, pi
 from scipy.spatial.transform import Rotation
@@ -358,6 +358,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.new_camera_trans = torch.zeros((self.num_envs, 3)).to(self.device)
         self.new_camera_rot = torch.tensor([[1.0, 0.0, 0.0, 0.0]]).to(self.device)
 
+
+        self.camera_ext = None
+        self.camera_w = None
+        self.camera_front = None
+
+        self.pc_w = None
+        self.pc_ext = None
+        self.pc_front = None
+
+
+
         self.contact_thres = self.cfg.contact_matrix[0, :-1].mean().item()*2
 
         self.u_opt = torch.tensor([[0, 0, 0, 0, 0, 0]]).to(self.device)
@@ -558,19 +569,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             )
 
         T_ref_new = self.controller["pose_to_transform"](self.target_pose_r.squeeze(0).cpu().numpy())
-        T_ref_new2 = self.controller["pose_to_transform"](self.gripper_pose_r.squeeze(0).cpu().numpy())
-
-        diff = self.diff_operator(self.gripper_group_r, self.target_pose_r_group)
-        print(self.gripper_group_r.view(1, 4, 4)[0].cpu().numpy())
-        print(T_ref_new2)
-        print(self.target_pose_r_group.view(1, 4, 4)[0].cpu().numpy())
-        print(T_ref_new)
-        print(self.log(diff))
-
-        print("------")
-        print(rotation_log(diff.view(1,4,4)[0, :3, :3].cpu().numpy()))
-        print(rotation_log(T_ref_new2[:3, :3]))
-        print(rotation_log(T_ref_new[:3, :3]))
 
         # ------------------------------------------
         # 2. Update NMPC parameters
@@ -645,7 +643,6 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         
         print("---------------")
 
-        raise
         # self.controller.set_command(torch.cat(cmd, dim = -1))
 
         # Set the command for the IKDifferentialController
@@ -703,7 +700,10 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         '''
         
         shelf_pose = self.scene.rigid_objects["shelf"].data.body_state_w[:, 0, :7]
-
+        T_ref_new = self.controller["pose_to_transform"](self.target_pose_r.squeeze(0).cpu().numpy())
+        # T_ref_new[0, 3] *= -1
+        T_ref_new = torch.tensor(T_ref_new).to(self.device)
+        T_ref_new = self.convert_to_Lab(T_ref_new.view(-1, 16))
 
         '''
         Pose de la estanteria:
@@ -721,17 +721,21 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
 
         # Updates poses in simulation
-        self.scene.extras["markers"].visualize(translations = torch.cat((self.target_pose_r[:, :3], 
-                                                                         self.gripper_pose_r[:, :3],
-                                                                         shelf_pose[:, :3],
-                                                                         self.cfg.obst_list[:, :3],
-                                                                         self.gripper_pose_r[:, :3])), 
+        self.scene.extras["markers"].visualize(translations = torch.cat((
+                                                                         self.target_pose_r[:, :3], 
+                                                                        #  self.gripper_pose_r[:, :3],
+                                                                        #  shelf_pose[:, :3],
+                                                                        #  self.cfg.obst_list[:, :3],
+                                                                        #  self.gripper_pose_r[:, :3],
+                                                                         T_ref_new[:, :3])), 
                                                                          
-                                                orientations = torch.cat((self.target_pose_r[:, 3:], 
-                                                                          self.gripper_pose_r[:,3:],
-                                                                          shelf_pose[:, 3:],
-                                                                          self.cfg.obst_list[:, 3:],
-                                                                          self.gripper_pose_r[:, 3:])), 
+                                                orientations = torch.cat((
+                                                                          self.target_pose_r[:, 3:], 
+                                                                        #   self.gripper_pose_r[:,3:],
+                                                                        #   shelf_pose[:, 3:],
+                                                                        #   self.cfg.obst_list[:, 3:],
+                                                                        #   self.gripper_pose_r[:, 3:],
+                                                                          T_ref_new[:, 3:])), 
 
                                                 marker_indices=marker_indices)
 
@@ -871,11 +875,11 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # ---- Get data ----
         cam = self.scene.sensors["camera"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
         cam_ext = self.scene.sensors["camera_ext"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
-        cam_front = self.scene.sensors["camera_front"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
+        cam_front = self.scene.sensors["camera_ext_2"].data.output["rgb"][0, ..., :3].permute(2, 0, 1)
 
         cam_D = self.scene.sensors["camera"].data.output["depth"][0, ..., 0].unsqueeze(0)
         cam_ext_D = self.scene.sensors["camera_ext"].data.output["depth"][0, ..., 0].unsqueeze(0)
-        cam_front_D = self.scene.sensors["camera_front"].data.output["depth"][0, ..., 0].unsqueeze(0)
+        cam_front_D = self.scene.sensors["camera_ext_2"].data.output["depth"][0, ..., 0].unsqueeze(0)
 
         # cam_ext_D = torch.clip(cam_ext_D, 0.8, 1.0)
         # cam_ext_D = (cam_ext_D - 0.0) / 1.0
@@ -911,7 +915,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
     def _get_PC(self):
         intrinsics = self.scene.sensors["camera"].data.intrinsic_matrices[0]
         intrinsics_ext = self.scene.sensors["camera_ext"].data.intrinsic_matrices[0]
-        intrinsics_front = self.scene.sensors["camera_front"].data.intrinsic_matrices[0]
+        intrinsics_front = self.scene.sensors["camera_ext_2"].data.intrinsic_matrices[0]
 
 
         pc_w = depth_to_pointcloud(self.camera_w, intrinsics[0, 0], intrinsics[1, 1], intrinsics[0, 2], intrinsics[1, 2])
@@ -986,47 +990,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
         self.robot_points = farthest_point_sampling_BERT(robot_points.unsqueeze(0), 1024).squeeze(0)
-                
         
-                # cloud = o3d.geometry.PointCloud()
-                # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
-                # o3d.visualization.draw_geometries([cloud])
-    
-                # cloud = o3d.geometry.PointCloud()
-                # cloud.points = o3d.utility.Vector3dVector(robot_points.cpu().numpy())
-                # o3d.visualization.draw_geometries([cloud])
-
-        # self.processed_pc_object, _, _ = preprocess_pcd_single(object_points.cpu().numpy(), model = self.pcd_model)
-        # self.processed_pc_robot, _, _ = preprocess_pcd_single(robot_points.cpu().numpy(), model = self.pcd_model)
-         
-        
-        if self.cfg.test:
-            if self.cfg.mode == "seq":
-                pc_all_color /= 1.0
-                pc_all_color = pc_all_color
-
-                self.processed_pc, _, _ = preprocess_pcd_single(pc_all_color, self.pcd_model)
-                
-                # self.processed_pc = self.processed_pc[0].cpu().numpy()
-            elif self.cfg.mode == "seq_raw":
-                self.processed_pc = preprocess_single_pcd_raw(pc_all, self.gripper_pose_r_lie[0].cpu().numpy())
-
-            # self.processed_pc = torch.tensor(self.processed_pc).float().to(self.device)
-
-
-
-
-            if False:
-                for _ in range(self.cfg.horizon):
-                    self.pose_seq.enqueue(self.gripper_pose_r_lie)
-                    self.pc_seq.enqueue(self.processed_pc)
-
-            # else:
-            #     if self.count % self.cfg.save_interval == 0:
-            #         self.pose_seq.enqueue(self.gripper_pose_r_lie)
-            #         self.pc_seq.enqueue(self.processed_pc)        
-
-
 
     def get_3d_bboxes_from_instances(
         self,
@@ -1284,8 +1248,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses()
         self.filter_collisions()
         
-        # self._get_images()
-        # self._get_PC()
+        self._get_images()
+        self._get_PC()
         
 
         # Builds the tensor with all the observations in a single row tensor (N, 6+1+3+80*80)
