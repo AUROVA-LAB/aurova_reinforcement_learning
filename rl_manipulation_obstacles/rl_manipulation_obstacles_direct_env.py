@@ -30,6 +30,8 @@ from isaaclab.sensors import TiledCamera, ContactSensor
 
 import numpy as np
 import matplotlib.pyplot as plt
+import open3d as o3d
+
 
 from pynput import keyboard
 
@@ -343,16 +345,16 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                                       t12  =self.cfg.camera_ext_trans_2,   q12 = self.cfg.camera_ext_rot_2)
         
 
-        new_ext_pos, new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
+        self.new_ext_pos, self.new_ext_rot = combine_frame_transforms(t01 =self.cfg.camera_ext_trans,   q01 = self.cfg.camera_ext_rot,
                                                             t12 = torch.zeros_like(self.cfg.camera_ext_trans).to(self.device),   q12 = self.cfg.rot_neg90_xy)
-        self.scene.sensors["camera_ext"].set_world_poses(positions = new_ext_pos, orientations = new_ext_rot)
+        self.scene.sensors["camera_ext"].set_world_poses(positions = self.new_ext_pos, orientations = self.new_ext_rot)
    
         
 
         
-        new_ext_pos_2, new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
+        self.new_ext_pos_2, self.new_ext_rot_2 = combine_frame_transforms(t01 =self.cfg.camera_ext_trans_2,   q01 = self.cfg.camera_ext_rot_2,
                                                             t12 = torch.zeros_like(self.cfg.camera_ext_trans_2).to(self.device),   q12 = self.cfg.rot_neg90_xy_2)
-        self.scene.sensors["camera_ext_2"].set_world_poses(positions = new_ext_pos_2, orientations = new_ext_rot_2)
+        self.scene.sensors["camera_ext_2"].set_world_poses(positions = self.new_ext_pos_2, orientations = self.new_ext_rot_2)
 
 
         self.new_camera_trans = torch.zeros((self.num_envs, 3)).to(self.device)
@@ -934,21 +936,34 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # camera_ext_pos = self.scene.sensors["camera_ext"].data.pos_w
         # camera_ext_quat = self.scene.sensors["camera_ext"].data.quat_w_world
 
-        self.pc_ext = transform_points(pc_ext, self.cfg.camera_ext_trans.squeeze(0), self.cfg.camera_ext_rot.squeeze(0))
+        self.pc_ext = transform_points(pc_ext, self.new_ext_pos.squeeze(0), self.new_ext_rot.squeeze(0))
 
 
         # camera_front_pos = self.scene.sensors["camera_front"].data.pos_w
         # camera_front_quat = self.scene.sensors["camera_front"].data.quat_w_world
 
-        self.pc_front = transform_points(pc_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+        self.pc_front = transform_points(pc_front, self.new_ext_pos_2.squeeze(0), self.new_ext_rot_2.squeeze(0))
 
-        pc_all = np.concatenate([self.pc_w[:, :3].cpu().numpy(), self.pc_ext[:, :3].cpu().numpy(), self.pc_front[:, :3].cpu().numpy()], axis=0)
-        pc_all_color = np.concatenate([self.pc_w.cpu().numpy(), self.pc_ext.cpu().numpy(), self.pc_front.cpu().numpy()], axis=0)
+        
+        # XYZ coordinates: (N, 3)
+        pc_all = np.concatenate([
+            self.pc_w[:, :3].detach().cpu().numpy(),
+            self.pc_ext[:, :3].detach().cpu().numpy(),
+            self.pc_front[:, :3].detach().cpu().numpy(),
+        ], axis=0)
+
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pc_all)
+
+
+        o3d.visualization.draw_geometries([pcd])
+
 
 
         object_bbox_min, object_bbox_max, robot_bbox_min, robot_bbox_max, object_points, robot_points = self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0)
         object_bbox_min_ext, object_bbox_max_ext, robot_bbox_min_ext, robot_bbox_max_ext, object_points_ext, robot_points_ext = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext"], 0)
-        object_bbox_min_front, object_bbox_max_front, robot_bbox_min_front, robot_bbox_max_front, object_points_front, robot_points_front = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_front"], 0)
+        object_bbox_min_front, object_bbox_max_front, robot_bbox_min_front, robot_bbox_max_front, object_points_front, robot_points_front = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext_2"], 0)
 
         if robot_points is not None:
             robot_points = transform_points(robot_points, self.new_camera_trans.squeeze(0), self.new_camera_rot.squeeze(0))
@@ -963,7 +978,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             robot_bbox_min_ext, robot_bbox_max_ext = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if robot_points_front is not None:
-            robot_points_front = transform_points(robot_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+            robot_points_front = transform_points(robot_points_front, self.cfg.camera_ext_trans_2.squeeze(0), self.cfg.camera_ext_rot_2.squeeze(0))
             robot_points = torch.cat((robot_points, robot_points_front), dim = 0)
         else:
             robot_bbox_min_front, robot_bbox_max_front = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
@@ -982,7 +997,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             object_bbox_min_ext, object_bbox_max_ext = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
         if object_points_front is not None:
-            object_points_front = transform_points(object_points_front, self.cfg.camera_ext_trans_front.squeeze(0), self.cfg.camera_ext_rot_front.squeeze(0))
+            object_points_front = transform_points(object_points_front, self.cfg.camera_ext_trans_2.squeeze(0), self.cfg.camera_ext_rot_2.squeeze(0))
             object_points = torch.cat((object_points, object_points_front), dim = 0)
         else:
             object_bbox_min_front, object_bbox_max_front = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
