@@ -3,3 +3,5 @@ output/
 logs/
 ycb_aux/
 wandb/
+*.png
+*.pth
