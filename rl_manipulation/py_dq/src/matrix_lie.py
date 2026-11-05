@@ -1,196 +1,300 @@
 import torch
 from .matrix import *
 import torch.nn.functional as F
+import math
+
 
 
 def hat(vec):
-    """
-    Converts a vector [*, 3] to its skew-symmetric matric [*,3,3].
+    """[..., 3] -> [..., 3, 3]."""
+    x, y, z = vec.unbind(-1)
+    o = torch.zeros_like(x)
 
-    In:
-        - vec: [B, 3]: tensor with a set of skew angles (x,y,z)
-
-    Out:
-        - res: [B, 3, 3]: tensor with the corresponding skew-symmetric matrices
-    """
-    
-    B = vec.shape[0]
-    x, y, z = vec[:,0], vec[:,1], vec[:,2]
-    O = torch.zeros(B, device=vec.device, dtype=vec.dtype)
-    K = torch.stack([
-        torch.stack([ O, -z,  y], dim=-1),
-        torch.stack([ z,  O, -x], dim=-1),
-        torch.stack([-y,  x,  O], dim=-1),
-    ], dim=1)
-
-    return K
+    return torch.stack(
+        (o, -z, y, z, o, -x, -y, x, o),
+        dim=-1,
+    ).reshape(vec.shape[:-1] + (3, 3))
 
 
 def vee(mat):
-    """
-    Converts a  skew-symmetric matric mat of the shape [*,3,3] to a vector [*, 3]. 
-
-    In:
-        - mat: [B, 3, 3]: tensor with a set of skew-symmetric matrices
-
-    Out:
-        - res: [B, 3]: tensor with the corresponding skew angles (x,y,z)
-    """
-
-    return torch.stack([mat[:,2,1], mat[:,0,2], mat[:,1,0]], dim=-1)
+    """[..., 3, 3] -> [..., 3], para matrices antisimétricas."""
+    return torch.stack(
+        (
+            mat[..., 2, 1],
+            mat[..., 0, 2],
+            mat[..., 1, 0],
+        ),
+        dim=-1,
+    )
 
 
 def homo_from_rt(R, t):
     """
-    Builds a Homogeneous Transformation Matrix from a rotation matrix R of the shape [*,3,3] 
-        and a translation vector t of the shape [*, 3]
-    
-    In: 
-        - R: [B, 3, 3]: tensor with a set of rotation matrices
-        - t: [B, 3]: tensor with a set of translation vectors
-
-    Out:
-        - res: [B, 4, 4]: tensor with the corresponding homogenous transformation matrices
+    R: [..., 3, 3]
+    t: [..., 3]
+    Salida: [..., 4, 4]
     """
+    upper = torch.cat((R, t.unsqueeze(-1)), dim=-1)
 
-    B = R.shape[0]
-    H = torch.eye(4, device=R.device, dtype=R.dtype).unsqueeze(0).repeat(B,1,1)
-    H[:,:3,:3] = R
-    H[:,:3, 3] = t
+    bottom = R.new_tensor(
+        [0.0, 0.0, 0.0, 1.0]
+    ).expand(R.shape[:-2] + (1, 4))
 
-    return H
+    return torch.cat((upper, bottom), dim=-2)
 
 
-def log_se3(T: torch.Tensor, so3 = False):
+def _q_to_rotvec(q):
     """
-    Logarithm of a Homogeneous Transformation Matrix.
+    Cuaternión -> vector de rotación principal phi.
 
-    In:
-        - T: [B, 16]: tensor with a set of homogenous transformation matrices
-        - so3: [bool]: wether use the SO(3) or the SE(3) mapping functions
-
-    Out:
-        - res: [B, 6]: tensor with the corresponding twist coordinates
+    Selecciona qw >= 0, por lo que ||phi|| <= pi.
+    En pi existe la ambigüedad inevitable del eje.
     """
+    q = q / torch.linalg.vector_norm(
+        q, dim=-1, keepdim=True
+    )
 
-    B = T.shape[0]
+    q = torch.where(q[..., :1] < 0, -q, q)
 
-    T = T.view(-1, 4, 4)
+    w = q[..., 0]
+    v = q[..., 1:]
+    s = torch.linalg.vector_norm(v, dim=-1)
 
-    # Separate rotation and translation
-    R = T[:,:3,:3]
-    t = T[:,:3, 3]
+    small = s < 1e-3
+    scale = torch.empty_like(s)
 
-    # trace and angle
-    tr = R.diagonal(dim1=-2, dim2=-1).sum(-1)
-    cos_theta = torch.clamp((tr - 1)/2, -1, 1)
-    theta = torch.acos(cos_theta)
+    # 2*asin(s)/s alrededor de s = 0.
+    s2 = s[small] ** 2
+    scale[small] = 2 + s2 / 3 + 3 * s2**2 / 20
 
-    sin_theta = torch.sqrt(torch.clamp(1 - cos_theta**2, 0))
-    theta = torch.atan2(sin_theta, cos_theta)
+    scale[~small] = (
+        2 * torch.atan2(s[~small], w[~small])
+        / s[~small]
+    )
 
-
-    # Near zero cases
-    is_small = theta < 1e-6
-
-    # --- Map Rotation ---
-    K = 0.5 * (R - R.transpose(-1,-2))
-    phi = vee(K)  # = (sinθ/θ)*ω
-    scale = torch.ones_like(theta)
-    # scale[~is_small] = theta[~is_small] / torch.sin(theta[~is_small])
-    phi = phi * scale.unsqueeze(-1)
-
-    # "so3=True" -> only map rotation
-    if so3:
-        xi = torch.cat([phi, t], dim=-1)
-    
-    # "so3=False" -> map rotation and translatoin
-    else:
-        # --- Map Translation ---
-        # Build skew
-        A = hat(phi)
-        A2 = A @ A
-        I = torch.eye(3, device=R.device, dtype=R.dtype).unsqueeze(0).repeat(B,1,1)
-
-        # Inverse Jacobian J^{-1}
-        J_inv = I - 0.5*A
-        alpha = torch.zeros_like(theta)
-        mask = ~is_small
-        alpha[mask] = 1/theta[mask]**2 - (1+torch.cos(theta[mask]))/(2*theta[mask]*torch.sin(theta[mask]))
-        J_inv = J_inv + alpha.view(-1,1,1)*A2
-        
-        # Near zero case
-        J_inv[is_small] = (I - 0.5*A + (1/12.0)*A2)[is_small]
-
-        # Map translation
-        rho = torch.bmm(J_inv, t.unsqueeze(-1)).squeeze(-1)
-        xi = torch.cat([phi, rho], dim=-1)
-
-    # Round the result
-    return torch.round(xi, decimals =3)
+    return v * scale.unsqueeze(-1)
 
 
-def exp_se3(xi: torch.Tensor, so3 = False):
+def _so3_log(R):
     """
-    Exponential map of a Homogeneous Transformation Matrix.
+    Logaritmo de SO(3).
 
-    In:
-        - xi: [B, 6]: tensor with a set of twist elements from SE(3) or SO(3)
-        - so3: [bool]: wether use the SO(3) or the SE(3) mapping functions
-
-    Out:
-        - res: [B, 4, 4]: tensor with the corresponding homogeneous transformation matrices
+    Recupera primero el cuaternión mediante su componente
+    mejor condicionada, evitando dividir por sin(theta)
+    cerca de theta = pi.
     """
+    r00 = R[..., 0, 0]
+    r01 = R[..., 0, 1]
+    r02 = R[..., 0, 2]
 
-    B = xi.shape[0]
-    
-    # Separate rotation and translation
-    phi = xi[:,:3]
-    rho = xi[:,3:]
+    r10 = R[..., 1, 0]
+    r11 = R[..., 1, 1]
+    r12 = R[..., 1, 2]
 
-    # Obtain rotation angle
-    theta = torch.linalg.norm(phi, dim=-1)
-    
-    # Near zero flag
-    is_small = theta < 1e-6
+    r20 = R[..., 2, 0]
+    r21 = R[..., 2, 1]
+    r22 = R[..., 2, 2]
+
+    # [4*qw², 4*qx², 4*qy², 4*qz²].
+    four_sq = torch.stack(
+        (
+            1 + r00 + r11 + r22,
+            1 + r00 - r11 - r22,
+            1 - r00 + r11 - r22,
+            1 - r00 - r11 + r22,
+        ),
+        dim=-1,
+    )
+
+    candidates = torch.stack(
+        (
+            torch.stack(
+                (
+                    four_sq[..., 0],
+                    r21 - r12,
+                    r02 - r20,
+                    r10 - r01,
+                ),
+                dim=-1,
+            ),
+            torch.stack(
+                (
+                    r21 - r12,
+                    four_sq[..., 1],
+                    r10 + r01,
+                    r02 + r20,
+                ),
+                dim=-1,
+            ),
+            torch.stack(
+                (
+                    r02 - r20,
+                    r10 + r01,
+                    four_sq[..., 2],
+                    r12 + r21,
+                ),
+                dim=-1,
+            ),
+            torch.stack(
+                (
+                    r10 - r01,
+                    r02 + r20,
+                    r12 + r21,
+                    four_sq[..., 3],
+                ),
+                dim=-1,
+            ),
+        ),
+        dim=-2,
+    )
+
+    idx = four_sq.argmax(dim=-1)
+
+    row = torch.gather(
+        candidates,
+        dim=-2,
+        index=idx[..., None, None].expand(
+            idx.shape + (1, 4)
+        ),
+    ).squeeze(-2)
+
+    best = four_sq.gather(
+        dim=-1,
+        index=idx.unsqueeze(-1),
+    )
+
+    q = row / (2 * torch.sqrt(best))
+
+    return _q_to_rotvec(q)
+
+
+def _so3_exp_and_jacobian(phi):
+    """
+    Devuelve:
+        R = Exp_SO3(phi)
+        J = Jacobiano izquierdo J_l(phi)
+    """
+    theta = torch.linalg.vector_norm(phi, dim=-1)
 
     A = hat(phi)
     A2 = A @ A
-    I = torch.eye(3, device=xi.device, dtype=xi.dtype).unsqueeze(0).repeat(B,1,1)
 
-    # --- Map Rotation ---
-    R = I + A + 0.5*A2
-    
-    # "so3=True" -> only map rotation
+    I = torch.eye(
+        3,
+        device=phi.device,
+        dtype=phi.dtype,
+    ).expand(A.shape)
+
+    # torch.sinc(x) = sin(pi*x)/(pi*x).
+    a = torch.sinc(theta / math.pi)
+
+    b = (
+        0.5
+        * torch.sinc(theta / (2 * math.pi)) ** 2
+    )
+
+    # c = (theta - sin(theta))/theta³.
+    # Serie para evitar cancelación numérica cerca de cero.
+    small = theta < 0.05
+    c = torch.empty_like(theta)
+
+    th2 = theta[small] ** 2
+
+    c[small] = (
+        1 / 6
+        - th2 / 120
+        + th2**2 / 5040
+        - th2**3 / 362880
+    )
+
+    th = theta[~small]
+    c[~small] = (th - torch.sin(th)) / th**3
+
+    R = (
+        I
+        + a[..., None, None] * A
+        + b[..., None, None] * A2
+    )
+
+    J = (
+        I
+        + b[..., None, None] * A
+        + c[..., None, None] * A2
+    )
+
+    return R, J
+
+
+def log_se3(T: torch.Tensor, so3=False):
+    """
+    Entrada:
+        T: [..., 16] o [..., 4, 4].
+
+    Salida:
+        so3=False: [phi, rho], rho = J_l(phi)^(-1) @ t.
+        so3=True:  [phi, t].
+
+    so3=True es una parametrización separada de la pose,
+    no el logaritmo completo de SE(3).
+    """
+    if T.shape[-1] == 16:
+        T = T.reshape(T.shape[:-1] + (4, 4))
+
+    elif T.shape[-2:] != (4, 4):
+        raise ValueError(
+            "T debe tener forma [...,16] o [...,4,4]"
+        )
+
+    R = T[..., :3, :3]
+    t = T[..., :3, 3]
+
+    phi = _so3_log(R)
+
     if so3:
-        # Rounds the result
-        return torch.round(homo_from_rt(R, rho).view(B, -1), decimals =3)
-    
-    # "so3=False" -> map rotation and translation
+        return torch.cat((phi, t), dim=-1)
+
+    _, J = _so3_exp_and_jacobian(phi)
+
+    # Resuelve J @ rho = t sin invertir J explícitamente.
+    rho = torch.linalg.solve(
+        J,
+        t.unsqueeze(-1),
+    ).squeeze(-1)
+
+    return torch.cat((phi, rho), dim=-1)
+
+
+def exp_se3(xi: torch.Tensor, so3=False):
+    """
+    Entrada:
+        xi: [..., 6].
+
+        so3=False: xi = [phi, rho].
+        so3=True:  xi = [phi, t].
+
+    Salida:
+        Transformación aplanada [..., 16].
+    """
+    if xi.shape[-1] != 6:
+        raise ValueError(
+            "xi debe tener forma [...,6]"
+        )
+
+    phi = xi[..., :3]
+    rho = xi[..., 3:]
+
+    R, J = _so3_exp_and_jacobian(phi)
+
+    if so3:
+        t = rho
     else:
-        # --- Map Translation ---
-        # Distinguish if there is near zero cases
-        mask = ~is_small
-        if mask.any():
-            th = theta[mask]
-            R[mask] = I[mask] \
-                    + (torch.sin(th)/th).view(-1,1,1)*A[mask] \
-                    + ((1-torch.cos(th))/th**2).view(-1,1,1)*A2[mask]
+        t = (J @ rho.unsqueeze(-1)).squeeze(-1)
 
-        # Jacobian
-        J = I + 0.5*A + (1/6.0)*A2
-        if mask.any():
-            th = theta[mask]
-            J[mask] = I[mask] \
-                    + ((1-torch.cos(th))/th**2).view(-1,1,1)*A[mask] \
-                    + ((th-torch.sin(th))/th**3).view(-1,1,1)*A2[mask]
+    T = homo_from_rt(R, t)
 
-        # Maps the translation
-        t = torch.bmm(J, rho.unsqueeze(-1)).squeeze(-1)
+    return T.reshape(xi.shape[:-1] + (16,))
 
-        # Rounds the result
-        return torch.round(homo_from_rt(R, t).view(B, -1), decimals =3)
-    
+
 
 def log_gram(R: torch.Tensor):
     """
