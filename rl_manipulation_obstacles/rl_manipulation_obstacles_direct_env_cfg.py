@@ -350,7 +350,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
             horizontal_aperture=20.955,     # ← assumed
-            clipping_range=(0.1, 1.5),
+            clipping_range=(0.1, 4),
         ),
 
         width=img_width,
@@ -373,7 +373,7 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=20.1,              # ← computed
             horizontal_aperture=20.955,     # ← assumed
-            clipping_range=(0.1, 1.5),
+            clipping_range=(0.1, 4),
         ),
 
         width=img_width,
