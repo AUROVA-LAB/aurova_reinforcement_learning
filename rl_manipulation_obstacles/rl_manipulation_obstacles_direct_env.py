@@ -946,11 +946,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         
         # XYZ coordinates: (N, 3)
-        pc_all = np.concatenate([
-            self.pc_w[:, :3].detach().cpu().numpy(),
-            self.pc_ext[:, :3].detach().cpu().numpy(),
-            self.pc_front[:, :3].detach().cpu().numpy(),
-        ], axis=0)
+        pc_all = torch.cat(
+            (self.pc_w[:, :3],
+            self.pc_ext[:, :3],
+            self.pc_front[:, :3]), dim=0)
+
+        pc_all = preprocess_pointcloud(pc_all)
+
+        pc_all = pc_all.detach().cpu().numpy()
 
 
         pcd = o3d.geometry.PointCloud()
@@ -1003,8 +1006,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             object_bbox_min_front, object_bbox_max_front = torch.zeros((1,3)).to(self.device), torch.zeros((1,3)).to(self.device)
 
 
-        self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
-        self.robot_points = farthest_point_sampling_BERT(robot_points.unsqueeze(0), 1024).squeeze(0)
+        # self.object_points = farthest_point_sampling_BERT(object_points.unsqueeze(0), 1024).squeeze(0)
+        # self.robot_points = farthest_point_sampling_BERT(robot_points.unsqueeze(0), 1024).squeeze(0)
         
 
     def get_3d_bboxes_from_instances(
