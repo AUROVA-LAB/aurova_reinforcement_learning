@@ -144,8 +144,10 @@ class RLManipulationDirect(DirectRLEnv):
         self.dist_function = distances[cfg.representation][cfg.distance]        # Distance function
         self.diff_operator = diff_operators[cfg.representation]                 # Difference operator
         self.mul_operator = mul_operators[cfg.representation]                   # Multiply operator
-        self.normalize = normalizes[cfg.representation]                         # Normalization function
+        self.normalize = normalizes[cfg.representation] 
+        self.identity = torch.tensor(identities[cfg.representation]).repeat(self.num_envs, 1).to(self.device).float()   
 
+        
         # Initial pose in the group
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
         
@@ -762,14 +764,23 @@ class RLManipulationDirect(DirectRLEnv):
             - None
         '''
 
+        # COMENTADO 1
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
 
+        # COMENTADO 2
         # action_pose = self.exp(actions)
         # action_pose = self.mul_operator(self.pose_group_r, action_pose)
         # action_pose = self.normalize(action_pose)
+
+        # COMENTADO 3
+        actions += self.identity
+        action_pose = self.exp(actions)
+        action_pose = self.normalize(action_pose)
+        action_pose = self.mul_operator(self.pose_group_r, action_pose)
+        action_pose = self.normalize(action_pose)
 
         # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
         # action_pose = self.normalize(action_pose)
@@ -901,7 +912,7 @@ class RLManipulationDirect(DirectRLEnv):
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
         obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel.round(decimals = 3))
-        self.my_obs = torch.cat((self.my_obs, obs), dim=0)
+        # self.my_obs = torch.cat((self.my_obs, obs), dim=0)
         
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
         obs[:, :3]  /= 1.64   # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856 MATNEW: 1.64 # DQ+: 0.74
