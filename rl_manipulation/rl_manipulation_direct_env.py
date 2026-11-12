@@ -52,6 +52,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.target_pose_r_lie = torch.zeros((self.num_envs, cfg.size)).to(self.device).float()
         
         self.robot_rot_ee_pose_r_lie_rel = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
+        self.robot_rot_ee_pose_r_lie_rel2 = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
         self.robot_rot_ee_pose_r_lie = torch.zeros((self.num_envs, self.cfg.size)).to(self.device).float()
 
         # Pose of the base of the robot in the world frame
@@ -762,7 +763,7 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
         action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
         action_pose = self.normalize(action_pose)
 
@@ -872,6 +873,11 @@ class RLManipulationDirect(DirectRLEnv):
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator_dist(target_group_se3, pose_group_se3)
         self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff)
+
+
+        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
+        self.robot_rot_ee_pose_r_lie_rel2 = self.log(diff)
+        
 
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
