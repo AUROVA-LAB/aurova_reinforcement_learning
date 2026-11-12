@@ -990,7 +990,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # ---- Reward composition ----
         # Phase reward plus bonuses
-        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached  - torch.norm(self.actions_ee, dim = -1) * 10
+        reward = reward + self.target_reached * self.cfg.bonus_tgt_reached #  - torch.norm(self.actions_ee, dim = -1) * 10
 
         # Update previous distances
         self.prev_dist = dist
