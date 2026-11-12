@@ -6,3 +6,4 @@ wandb/
 *.zip
 *.png
 *.pth
+*.txt
