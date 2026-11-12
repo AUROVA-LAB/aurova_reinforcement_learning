@@ -26,6 +26,10 @@ from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transfo
 from isaaclab.utils.math import quat_from_euler_xyz
 from isaaclab.markers import VisualizationMarkers
 
+from pathlib import Path
+from contextlib import redirect_stdout
+from pathlib import Path
+
 
 
 # Class for the Bimanual Direct Environment
@@ -145,8 +149,16 @@ class RLManipulationDirect(DirectRLEnv):
         self.pose_group_r = torch.tensor(identities[cfg.representation]).to(self.device).repeat(self.num_envs, 1).float()
         
         self.log_dist = log_se3
+        self.exp_dist = exp_se3
         self.to_group_dist = homo_from_mat_trans_LAB
+        self.convert_to_Lab_dq = convert_homo_to_Lab
         self.diff_operator_dist = mat_diff
+
+        self.log_dq = log_bruno
+        self.exp_dq = exp_bruno
+        
+        self.convert_to_group_dq = dq_from_tr
+        self.convert_to_Lab_dq = convert_dq_to_Lab
 
         self.max_obs_rot = -100000
         self.max_obs_pos = -100000
@@ -161,7 +173,478 @@ class RLManipulationDirect(DirectRLEnv):
         self.min_obs_pos2 =  100000
 
         self.actions_ee = torch.zeros(6).to(self.device).repeat(self.num_envs, 1).float()
+
+
+        # # Para T+Q que recibe [traslación, cuaternión wxyz]:
+        # action_adapter = self.adapter_dq_log8
+        # experiment_name = "T+Qp"
+
+        # # Si T+Q suma internamente el cuaternión identidad, usa en su lugar:
+        # # action_adapter = adapter_t_quaternion_delta
+        # # experiment_name = "T+Q_delta"
+
+        # report_path = Path(
+        #     "/workspace/isaaclab/source/isaaclab_tasks/"
+        #     "isaaclab_tasks/manager_based/"
+        #     "aurova_reinforcement_learning/rl_manipulation"
+        # ) / f"experimento_3_{experiment_name}_seed14.txt"
+
+        # report_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # with report_path.open("w", encoding="utf-8") as report_file:
+        #     with redirect_stdout(report_file):
+        #         results = self.test_translation_rotation_coupling(
+        #             action_adapter=self.adapter_t_quaternion_delta,
+        #         )
+
+        # print(f"Informe guardado en {report_path.resolve()}")
+
+        # raise
+
+
+
+
+    @torch.no_grad()
+    def test_translation_rotation_coupling(
+        self,
+        distance=0.01,
+        theta_deg=(0, 1, 5, 15, 30, 60, 90),
+        alpha_deg=(0, 30, 60, 90),
+        action_adapter=None,
+        quaternion_order="wxyz",
+        dtype=torch.float32,
+        map_fn = None,
+    ):
+        """
+        Comprueba geométricamente el mapeo seleccionado en self.exp.
+
+        No modifica el estado del robot.
+
+        Convenciones físicas:
+            xi = [rho_x, rho_y, rho_z, phi_x, phi_y, phi_z]
+            rho: metros.
+            phi: vector de rotación en radianes de ángulo completo.
+
+        Se evalúan incrementos desde identidad:
+            phi = theta * [0, 0, 1]
+            rho = distance * [sin(alpha), 0, cos(alpha)]
+
+        action_adapter:
+            Función opcional xi [N,6] -> entrada esperada por self.exp.
+            Debe conservar el significado físico de rho y phi.
+
+        self.convert_to_Lab:
+            Debe devolver [N,7]: posición y cuaternión.
+
+        Returns:
+            Diccionario de tensores, uno por combinación theta-alpha.
+            Distancias en metros; ángulos indicados explícitamente.
+        """
+        if distance <= 0:
+            raise ValueError("distance debe ser positivo.")
+        if quaternion_order not in ("wxyz", "xyzw"):
+            raise ValueError("quaternion_order debe ser 'wxyz' o 'xyzw'.")
+
+        device = self.device
+
+        # ------------------------------------------------------------
+        # 1. Acciones físicas controladas.
+        # ------------------------------------------------------------
+        theta_grid, alpha_grid = torch.meshgrid(
+            torch.as_tensor(theta_deg, device=device, dtype=dtype),
+            torch.as_tensor(alpha_deg, device=device, dtype=dtype),
+            indexing="ij",
+        )
+
+        theta_values = theta_grid.reshape(-1)
+        alpha_values = alpha_grid.reshape(-1)
+
+        theta = torch.deg2rad(theta_values)
+        alpha = torch.deg2rad(alpha_values)
+
+        rho = distance * torch.stack(
+            (
+                torch.sin(alpha),
+                torch.zeros_like(alpha),
+                torch.cos(alpha),
+            ),
+            dim=-1,
+        )
+
+        phi = torch.stack(
+            (
+                torch.zeros_like(theta),
+                torch.zeros_like(theta),
+                theta,
+            ),
+            dim=-1,
+        )
+
+        xi = torch.cat((rho, phi), dim=-1)
+
+        # ------------------------------------------------------------
+        # 2. Evaluar TU implementación.
+        # No se aplican escalados adicionales ni normalización de xi.
+        # ------------------------------------------------------------
+        mapping_input = (
+            xi.clone()
+            if action_adapter is None
+            else action_adapter(xi.clone())
+        )
+
+        mapping_function = self.exp if map_fn is None else map_fn
+
+        print("Mapeo evaluado:", mapping_function)
+        print("Forma de entrada:", mapping_input.shape)
+
+        group_increment = mapping_function(mapping_input)
+
+        pose_lab = self.convert_to_Lab(group_increment)
+
+        if not isinstance(pose_lab, torch.Tensor):
+            raise TypeError(
+                "Adapta la salida de convert_to_Lab: se espera un tensor [N,7]."
+            )
+
+        if pose_lab.shape != (xi.shape[0], 7):
+            raise ValueError(
+                f"convert_to_Lab devuelve {tuple(pose_lab.shape)}; "
+                f"se esperaba {(xi.shape[0], 7)}."
+            )
+
+        if not torch.isfinite(pose_lab).all().item():
+            raise ValueError(
+                "El mapeo produce NaN/Inf, posiblemente en theta=0."
+            )
+
+        # Referencias y métricas en float64.
+        p_actual = pose_lab[:, :3].to(dtype=torch.float64)
+        q_actual = pose_lab[:, 3:].to(dtype=torch.float64)
+
+        if quaternion_order == "xyzw":
+            q_actual = q_actual[:, [3, 0, 1, 2]]
+
+        q_norm = torch.linalg.vector_norm(q_actual, dim=-1)
+
+        if (q_norm < 1e-12).any().item():
+            raise ValueError("El mapeo devuelve un cuaternión nulo.")
+
+        # Se registra el error de norma antes de normalizar para medir ángulos.
+        q_norm_error = (q_norm - 1.0).abs()
+        q_unit = q_actual / q_norm[:, None]
+
+        # ------------------------------------------------------------
+        # 3. Referencia SE(3) independiente mediante exponencial matricial.
+        # Evita reutilizar tu implementación de V(phi).
+        # ------------------------------------------------------------
+        rho_ref = rho.to(dtype=torch.float64)
+        phi_ref = phi.to(dtype=torch.float64)
+
+        batch_size = xi.shape[0]
+        xi_hat = torch.zeros(
+            (batch_size, 4, 4),
+            device=device,
+            dtype=torch.float64,
+        )
+
+        x, y, z = phi_ref.unbind(dim=-1)
+
+        xi_hat[:, 0, 1] = -z
+        xi_hat[:, 0, 2] = y
+        xi_hat[:, 1, 0] = z
+        xi_hat[:, 1, 2] = -x
+        xi_hat[:, 2, 0] = -y
+        xi_hat[:, 2, 1] = x
+        xi_hat[:, :3, 3] = rho_ref
+
+        T_reference = torch.matrix_exp(xi_hat)
+
+        p_lie = T_reference[:, :3, 3]
+        p_separated = rho_ref
+
+        # ------------------------------------------------------------
+        # 4. Error angular respecto a la rotación esperada alrededor de z.
+        # q_ref^{-1} * q_actual, con cuaterniones wxyz.
+        # ------------------------------------------------------------
+        half_theta = 0.5 * phi_ref[:, 2]
+
+        q_reference = torch.stack(
+            (
+                torch.cos(half_theta),
+                torch.zeros_like(half_theta),
+                torch.zeros_like(half_theta),
+                torch.sin(half_theta),
+            ),
+            dim=-1,
+        )
+
+        w_ref = q_reference[:, :1]
+        v_ref = q_reference[:, 1:]
+        w_actual = q_unit[:, :1]
+        v_actual = q_unit[:, 1:]
+
+        w_error = (
+            w_ref * w_actual
+            + (v_ref * v_actual).sum(dim=-1, keepdim=True)
+        )
+
+        v_error = (
+            w_ref * v_actual
+            - w_actual * v_ref
+            - torch.cross(v_ref, v_actual, dim=-1)
+        )
+
+        rotation_error = 2.0 * torch.atan2(
+            torch.linalg.vector_norm(v_error, dim=-1),
+            w_error[:, 0].abs(),
+        )
+
+        # ------------------------------------------------------------
+        # 5. Métricas de traslación.
+        # ------------------------------------------------------------
+        rho_norm = torch.linalg.vector_norm(rho_ref, dim=-1)
+        actual_norm = torch.linalg.vector_norm(p_actual, dim=-1)
+
+        error_to_lie = torch.linalg.vector_norm(
+            p_actual - p_lie, dim=-1
+        )
+        error_to_separated = torch.linalg.vector_norm(
+            p_actual - p_separated, dim=-1
+        )
+
+        theoretical_coupling = torch.linalg.vector_norm(
+            p_lie - p_separated, dim=-1
+        )
+
+        # Ángulo entre la traslación de entrada y la producida.
+        cross_norm = torch.linalg.vector_norm(
+            torch.cross(rho_ref, p_actual, dim=-1), dim=-1
+        )
+        dot = (rho_ref * p_actual).sum(dim=-1)
+
+        direction_change = torch.rad2deg(torch.atan2(cross_norm, dot))
+        direction_change = torch.where(
+            actual_norm > 1e-12,
+            direction_change,
+            torch.full_like(direction_change, float("nan")),
+        )
+
+        results = {
+            "theta_deg": theta_values,
+            "alpha_deg": alpha_values,
+            "xi_physical": xi,
+            "mapping_input": mapping_input,
+            "translation_actual_m": p_actual,
+            "translation_lie_m": p_lie,
+            "translation_separated_m": p_separated,
+            "error_to_lie_m": error_to_lie,
+            "error_to_separated_m": error_to_separated,
+            "theoretical_coupling_m": theoretical_coupling,
+            "theoretical_coupling_relative": theoretical_coupling / rho_norm,
+            "actual_change_relative": error_to_separated / rho_norm,
+            "translation_norm_ratio": actual_norm / rho_norm,
+            "direction_change_deg": direction_change,
+            "rotation_error_deg": torch.rad2deg(rotation_error),
+            "quaternion_norm_error": q_norm_error,
+        }
+
+        # Transferencia conjunta a CPU para imprimir.
+        columns = torch.stack(
+            (
+                theta_values.to(torch.float64),
+                alpha_values.to(torch.float64),
+                error_to_lie * 1000,
+                error_to_separated * 1000,
+                theoretical_coupling * 1000,
+                actual_norm / rho_norm,
+                direction_change,
+                torch.rad2deg(rotation_error),
+            ),
+            dim=-1,
+        ).cpu().tolist()
+
+        print(
+            "\n theta  alpha | err Lie  err Sep  acopl.ref |"
+            " |p|/|rho|  desvio   err R"
+        )
+        print(
+            "   deg    deg |      mm       mm         mm |"
+            "               deg     deg"
+        )
+
+        for th, al, e_lie, e_sep, coupling, ratio, deviation, e_rot in columns:
+            print(
+                f"{th:6.1f} {al:6.1f} | "
+                f"{e_lie:8.5f} {e_sep:8.5f} {coupling:10.5f} | "
+                f"{ratio:9.5f} {deviation:7.3f} {e_rot:7.4f}"
+            )
+
+        print(
+            "\nMáximo error de norma del cuaternión:",
+            f"{q_norm_error.max().item():.3e}",
+        )
+
+        return results
+
+    def adapter_se3(self, xi):
+        """
+        Entrada del ensayo: [rho, phi].
+        Salida para tu SE(3): [phi, rho].
+        """
+        return torch.cat((xi[:, 3:6], xi[:, :3]), dim=-1)
+
+    def adapter_dq_log8(self, xi):
+        """
+        Entrada del ensayo: [rho, phi].
+
+        Salida: logaritmo dual de 8 componentes:
+            [0, phi_x/2, phi_y/2, phi_z/2,
+            0, rho_x/2, rho_y/2, rho_z/2]
+
+        Requiere una exponencial DQ que acepte esta convención:
+        dos cuaterniones puros, parte real primero, orden wxyz.
+        """
+        rho = xi[:, :3]
+        phi = xi[:, 3:6]
+        zero = torch.zeros_like(xi[:, :1])
+
+        return torch.cat(
+            (
+                zero,
+                0.5 * phi,
+                zero,
+                0.5 * rho,
+            ),
+            dim=-1,
+        )
+
+    def adapter_dq6(self, xi):
+        """
+        Entrada del ensayo:
+            [rho, phi]
+
+        Entrada de tu función exp:
+            [phi/2, rho/2]
+        """
+        rho = xi[:, :3]
+        phi = xi[:, 3:6]
+
+        return torch.cat(
+            (0.5 * phi, 0.5 * rho),
+            dim=-1,
+        )
+
+    def adapter_t_quaternion(self, xi):
+        """
+        Entrada del ensayo: [rho, phi].
+
+        Salida para T+Q:
+            [rho_x, rho_y, rho_z, qw, qx, qy, qz]
+
+        El cuaternión representa la rotación phi.
+        """
+        rho = xi[:, :3]
+        phi = xi[:, 3:6]
+
+        angle = torch.linalg.vector_norm(
+            phi, dim=-1, keepdim=True
+        )
+
+        # sin(angle/2)/angle, con límite 1/2 cuando angle=0.
+        factor = 0.5 * torch.sinc(angle / (2.0 * torch.pi))
+
+        quaternion = torch.cat(
+            (
+                torch.cos(0.5 * angle),
+                factor * phi,
+            ),
+            dim=-1,
+        )
+
+        return torch.cat((rho, quaternion), dim=-1)
+
+    def adapter_t_quaternion_delta(self, xi):
+        """
+        Solo para un mapeo que suma internamente identidad
+        a la parte de cuaternión antes de normalizarla.
+        """
+        result = self.adapter_t_quaternion(xi)
+        result[:, 3] -= 1.0
+        return result
+
+    @torch.no_grad()
+    def project_unit_dq(self, dq):
+        """
+        Entrada y salida: [N,8], orden [qr, qd], ambos wxyz.
+
+        Impone:
+            ||qr|| = 1
+            qr · qd = 0
+        """
+        if dq.shape[-1] != 8:
+            raise ValueError("Se esperaba un tensor DQ de 8 componentes.")
+
+        qr = dq[..., :4]
+        qd = dq[..., 4:]
+
+        norm = torch.linalg.vector_norm(qr, dim=-1, keepdim=True)
+
+        if (norm < 1e-12).any().item():
+            raise ValueError("La parte real del DQ es nula.")
+
+        qr_unit = qr / norm
+        qd_scaled = qd / norm
+
+        dot = (qr_unit * qd_scaled).sum(dim=-1, keepdim=True)
+        qd_unit = qd_scaled - dot * qr_unit
+
+        return torch.cat((qr_unit, qd_unit), dim=-1)
+
+
+    @torch.no_grad()
+    def adapter_dq_direct(self, xi):
+        """
+        Entrada del ensayo: [N,6], orden [rho, phi].
+
+        Construye:
+            qr = cuaternión de la rotación phi
+            qd_raw = [0, rho/2]
+
+        Mantiene qd_raw independiente de phi y proyecta el resultado
+        a un cuaternión dual unitario.
+        """
+        rho = xi[:, :3]
+        phi = xi[:, 3:6]
+
+        angle = torch.linalg.vector_norm(
+            phi, dim=-1, keepdim=True
+        )
+
+        # sin(angle/2)/angle, estable en angle=0.
+        factor = 0.5 * torch.sinc(angle / (2.0 * torch.pi))
+
+        qr = torch.cat(
+            (
+                torch.cos(0.5 * angle),
+                factor * phi,
+            ),
+            dim=-1,
+        )
+
+        qd_raw = torch.cat(
+            (
+                torch.zeros_like(rho[:, :1]),
+                0.5 * rho,
+            ),
+            dim=-1,
+        )
+
+        dq_raw = torch.cat((qr, qd_raw), dim=-1)
+
+        return self.project_unit_dq(dq_raw)
     
+
+
 
     # Method to add all the prims to the scene --> Overrides method of DirectRLEnv
     def _setup_scene(self, ):
@@ -279,8 +762,12 @@ class RLManipulationDirect(DirectRLEnv):
         '''
 
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
+
+        action_pose = self.exp(actions)
+        action_pose = self.mul_operator(self.pose_group_r, action_pose)
         action_pose = self.normalize(action_pose)
 
         # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
@@ -378,11 +865,13 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Build the group object
         self.pose_group_r = self.convert_to_group(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+        pose_group_se3 = self.to_group_dist(robot_rot_ee_pos_r, robot_rot_ee_quat_r)
+        target_group_se3 = self.to_group_dist(self.target_pose_r[:, :3], self.target_pose_r[:, 3:])
 
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
-        diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
-        self.robot_rot_ee_pose_r_lie_rel = self.log(diff)
+        diff = self.diff_operator_dist(target_group_se3, pose_group_se3)
+        self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff)
 
         # --- Target pose ---
         # Obtain the pose for the target in the world frame
@@ -405,11 +894,11 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
+        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel.round(decimals = 3))
         self.my_obs = torch.cat((self.my_obs, obs), dim=0)
         
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.91   # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856 MATNEW: 0.91 # DQ+: 0.74
+        obs[:, :3]  /= 1.64   # TQ norel 1.0 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ 2.8 , MAT: 0.856 MATNEW: 1.64 # DQ+: 0.74
         obs[:, 3:]  /= 0.43   # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47 # T+Q: 0.384 # DQ: 0.18, MAT: 0.354 MATNEW: 0.43 # DQ+: 0.24
 
         # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25

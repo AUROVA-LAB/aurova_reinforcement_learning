@@ -49,10 +49,17 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     se3_dist = True
 
     # Scalings for each action
-    scalings = [[[0.01, 0.001], [0.01, 0.005], [0.01, 0.005]],
-                [[0.007, 0.02]],
-                [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
-                [[0.02,  0.004], [0.01,  0.005], [0.02, 0.004]]]
+    # scalings = [[[0.01, 0.001], [0.01, 0.005], [0.01, 0.005]],
+    #             [[0.007, 0.02]],
+    #             [[0.006, 0.025], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
+    #             [[0.01,  0.005], [0.01,  0.005], [0.01, 0.005]]]
+
+    scalings = [[[0.008, 0.0015], [0.01, 0.005], [0.00738, 0.00833]],
+                [[0.00626, 0.01095]],
+                [[0.0065, 0.006], [0.006, 0.03], [0.007, 0.015], [0.007, 0.015]],
+                [[	0.01555, 0.00605], [0.01573, 0.00658], [0.01379, 0.00679]]]
+                                        # SE3 = T+SO3
+
 
     # scalings = [[[0.01, 0.001], [0.03,  0.003], [0.01, 0.007]],
     #                 [[0.007, 0.02]],
@@ -63,8 +70,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = gym.spaces.Box(-1.0, 1.0, (6,), dtype=np.float32)             # Number of actions per environment (overridden)
-    observation_space = 6       # Number of observations per environment (overridden)
+    action_space = gym.spaces.Box(-1.0, 1.0, (size,), dtype=np.float32)             # Number of actions per environment (overridden)
+    observation_space = size       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)

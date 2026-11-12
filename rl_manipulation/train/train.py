@@ -107,6 +107,9 @@ from source.isaaclab_tasks.isaaclab_tasks.manager_based.aurova_reinforcement_lea
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
+from contextlib import redirect_stdout
+from pathlib import Path
+
 
 
 # directory for logging into
@@ -119,6 +122,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     """Train with stable-baselines agent."""
     # randomly sample a seed if seed = -1
     if args_cli.seed == -1:
+        raise
         args_cli.seed = random.randint(0, 10000)
 
     # override configurations with non-hydra CLI arguments
@@ -241,7 +245,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         obs = env.reset()
                              
         action = torch.zeros((env_cfg.scene.num_envs, env_cfg.size))
-        action = torch.tensor([[0,0,0,0,0,0]]).repeat(env_cfg.scene.num_envs, 1)
+        action = torch.tensor([[0,0,0,0,0,1]]).repeat(env_cfg.scene.num_envs, 1)
 
         # Simulate physics
         while True:
@@ -249,10 +253,205 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
                 # Step the environment
                 ret = env.step(action)
-                
 
+        n_samples = 256
+        samples = []
+        isaac_env = env.unwrapped
+
+        T_tcp_initial = np.array([-0.4919,  0.1333,  0.4879, 3.2050e-06, -3.8268e-01, -9.2388e-01,  2.0429e-06])
+        
+        T_initial_torch = torch.tensor(T_tcp_initial).view(-1).unsqueeze(0)
+        T_initial_group = isaac_env.convert_to_group(T_initial_torch[:, :3], T_initial_torch[:, 3:])
+        T_initial_se3 = isaac_env.to_group_dist(t = T_initial_torch[:, :3], r = T_initial_torch[:, 3:])
+        T_initial_se3 = T_initial_se3.view(-1, 4, 4).squeeze(0).cpu().numpy()
+        T_initial_inv = np.linalg.inv(T_initial_se3)
+
+        T_initial_lie = isaac_env.log(T_initial_group.float()).cpu().numpy()
+        T_initial_lie = np.repeat(T_initial_lie, env.num_envs, axis=0)
+
+        policy = agent.policy
+        policy.set_training_mode(False)
+        obs_tensor, _ = policy.obs_to_tensor(obs)
+
+
+        raw_samples, sent_samples, delta_samples = [], [], []
+
+
+        with torch.no_grad():
+            for _ in range(256):
+                policy.reset_noise(env.num_envs)
+                action_tensor, _, _ = policy(obs_tensor, deterministic=False)
+
+                raw_action = action_tensor.cpu().numpy()
+
+                sent_action = action_tensor.cpu().clone().numpy()
+
+
+                sent_action[:, :3] *= isaac_env.cfg.action_scaling[0]
+                sent_action[:, 3:] *= isaac_env.cfg.action_scaling[1]
+
+                raw_action[:, :3] *= isaac_env.cfg.action_scaling[0]
+                raw_action[:, 3:] *= isaac_env.cfg.action_scaling[1]
+
+                # Sustituye esta llamada por tu decodificador MAT o DQ.
+                sent_action = np.clip(
+                    raw_action, agent.action_space.low, agent.action_space.high
+                )
+
+                if isaac_env.cfg.mapping == 0:
+                    if isaac_env.cfg.representation == isaac_env.cfg.DQ:
+                        sent_action = torch.tensor(sent_action)
+                        iden = torch.zeros_like(sent_action)
+                        iden[:, 0] = 1.0
+                        sent_action += iden
+
+                        T_target_group = isaac_env.mul_operator(T_initial_group.repeat(env.num_envs, 1).float(), sent_action.float())
+
+                        sent_action = sent_action.cpu().numpy()
+
+                    elif isaac_env.cfg.representation == isaac_env.cfg.QUAT:
+                        sent_action = torch.tensor(sent_action)
+                        iden = torch.zeros_like(sent_action[:, 3:])
+                        iden[:, 0] = 1.0
+                        sent_action[:, 3:] += iden
+
+                        T_target_group = isaac_env.mul_operator(T_initial_group.repeat(env.num_envs, 1).float(), sent_action.float())
+
+                        sent_action = sent_action.cpu().numpy()
+
+                    elif isaac_env.cfg.representation == isaac_env.cfg.EULER:
+                        sent_action = torch.tensor(sent_action)
+                        
+                        T_target_group = isaac_env.mul_operator(T_initial_group.repeat(env.num_envs, 1).float(), sent_action.float())
+
+                        sent_action = sent_action.cpu().numpy()
+                    
+                    
+                else:
+                    T_target_lie = T_initial_lie + sent_action
+
+                    T_target_lie_torch = torch.tensor(T_target_lie)
+                    T_target_group = isaac_env.exp(T_target_lie_torch)
+
+                T_target_lab = isaac_env.convert_to_Lab(T_target_group)
+                T_target = isaac_env.to_group_dist(t = T_target_lab[:, :3], r = T_target_lab[:, 3:])
+                T_target = T_target.view(-1, 4, 4).squeeze(0).cpu().numpy()
+
+
+                raw_samples.append(raw_action.copy())
+                sent_samples.append(sent_action.copy())
+                delta_samples.append(T_initial_inv @ T_target)
+    
+    report_path = Path("/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation") / Path("experimento_1_DQ_seed" + str(agent_cfg["seed"]) + ".txt")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with report_path.open("w", encoding="utf-8") as report_file:
+        with redirect_stdout(report_file):
+            print_experiment_1(
+                "DQ | escala original | seed " + str(agent_cfg["seed"]),
+                np.stack(delta_samples),
+                np.stack(raw_samples),
+                np.stack(sent_samples),
+            )
+
+    print(f"Informe guardado en {report_path.resolve()}")
+    
     # close the simulator
     env.close()
+
+
+from scipy.spatial.transform import Rotation
+
+
+def print_experiment_1(
+    name,
+    delta_T,
+    raw_actions,
+    sent_actions,
+    *,
+    near_zero_mm=0.1,
+    near_zero_deg=0.1,
+    clip_atol=1e-7,
+):
+    """Resume incrementos del TCP y clipping para acciones Box sin squash.
+
+    delta_T:       (n_samples, n_envs, 4, 4), T_tcp_initial^-1 @ T_tcp_target
+    raw_actions:   (n_samples, n_envs, action_dim), antes del clip de SB3
+    sent_actions:  (n_samples, n_envs, action_dim), después del clip de SB3
+    """
+    delta_T = np.asarray(delta_T, dtype=np.float64)
+    raw_actions = np.asarray(raw_actions)
+    sent_actions = np.asarray(sent_actions)
+
+    if delta_T.ndim != 4 or delta_T.shape[-2:] != (4, 4):
+        raise ValueError("delta_T debe tener forma (n_samples, n_envs, 4, 4)")
+    if (
+        raw_actions.ndim != 3
+        or raw_actions.shape != sent_actions.shape
+        or raw_actions.shape[:2] != delta_T.shape[:2]
+    ):
+        raise ValueError("Las acciones y delta_T deben compartir muestras y entornos")
+
+    n_samples, n_envs = delta_T.shape[:2]
+    delta_T = delta_T.reshape(-1, 4, 4)
+    dp_mm = delta_T[:, :3, 3] * 1_000.0
+    rotvec_deg = Rotation.from_matrix(delta_T[:, :3, :3]).as_rotvec(degrees=True)
+
+    distance_mm = np.linalg.norm(dp_mm, axis=1)
+    angle_deg = np.linalg.norm(rotvec_deg, axis=1)
+
+    clip_error = np.abs(raw_actions - sent_actions)
+    clipped = clip_error > clip_atol
+    almost_static = (distance_mm <= near_zero_mm) & (angle_deg <= near_zero_deg)
+
+    def pearson(x, y):
+        if np.std(x) <= 1e-12 or np.std(y) <= 1e-12:
+            return np.nan
+        return np.corrcoef(x, y)[0, 1]
+
+    print(f"\n=== Experimento 1 | {name} ===")
+    print(f"{n_samples} muestras × {n_envs} entornos = {len(distance_mm)} acciones")
+    print(f"{'Magnitud':<22} {'Media':>8} {'DE':>8} {'P05':>8} "
+          f"{'P50':>8} {'P95':>8} {'P99':>8} {'Máx.':>8}")
+
+    for label, values in (
+        ("Traslación [mm]", distance_mm),
+        ("Giro [deg]", angle_deg),
+    ):
+        percentiles = np.percentile(values, [5, 50, 95, 99])
+        stats = [values.mean(), values.std(), *percentiles, values.max()]
+        print(f"{label:<22}" + "".join(f" {value:8.3f}" for value in stats))
+
+    fmt = {"precision": 3, "suppress_small": True}
+    print("\nPor eje, en el marco inicial del TCP [x, y, z]")
+    print("Traslación media [mm] :", np.array2string(dp_mm.mean(axis=0), **fmt))
+    print("Traslación DE [mm]    :", np.array2string(dp_mm.std(axis=0), **fmt))
+    print("Rotvec medio [deg]   :", np.array2string(rotvec_deg.mean(axis=0), **fmt))
+    print("Rotvec DE [deg]      :", np.array2string(rotvec_deg.std(axis=0), **fmt))
+
+    corr = pearson(distance_mm, angle_deg)
+    corr_label = f"{corr:.3f}" if np.isfinite(corr) else "indefinida (varianza nula)"
+    print(f"\nPearson entre magnitudes de traslación y giro = {corr_label}")
+
+    cross_corr = np.array([
+        [pearson(dp_mm[:, i], rotvec_deg[:, j]) for j in range(3)]
+        for i in range(3)
+    ])
+    print("Pearson por eje (filas dx, dy, dz | columnas rx, ry, rz)")
+    print(np.array2string(cross_corr, **fmt))
+
+    print(f"\nAcciones con algún canal recortado = {100 * clipped.any(axis=-1).mean():.2f}%")
+    print("Clipping por canal [%] =", np.array2string(
+        100 * clipped.mean(axis=(0, 1)), **fmt
+    ))
+    if clipped.any():
+        print(f"Recorte medio en canales afectados = {clip_error[clipped].mean():.4f}")
+    print(f"Incrementos casi nulos (≤ {near_zero_mm:g} mm y ≤ {near_zero_deg:g} deg)"
+          f" = {100 * almost_static.mean():.2f}%")
+
+import math
+import torch
+
 
 
 if __name__ == "__main__":
