@@ -28,242 +28,71 @@ def dq_adjoint(v: torch.Tensor, dq: torch.Tensor):
 
 
 
+def exp_bruno(dq_: torch.Tensor, kwargs = None):
+    """"
+    Exponential map for a twist dq_ of shape [*, 6].
 
-def hat(vec):
-    """[..., 3] -> [..., 3, 3]."""
-    x, y, z = vec.unbind(-1)
-    o = torch.zeros_like(x)
+    In: 
+        - dq_: [B, 6]: tensor with a set of twists from the dual quaternion group
 
-    return torch.stack(
-        (o, -z, y, z, o, -x, -y, x, o),
-        dim=-1,
-    ).reshape(vec.shape[:-1] + (3, 3))
-
-
-def vee(mat):
-    """[..., 3, 3] -> [..., 3], para matrices antisimétricas."""
-    return torch.stack(
-        (
-            mat[..., 2, 1],
-            mat[..., 0, 2],
-            mat[..., 1, 0],
-        ),
-        dim=-1,
-    )
-
-
-def _q_mul(a, b):
-    """Producto Hamilton. Cuaterniones en orden [w, x, y, z]."""
-    aw, av = a[..., :1], a[..., 1:]
-    bw, bv = b[..., :1], b[..., 1:]
-
-    scalar = aw * bw - (av * bv).sum(dim=-1, keepdim=True)
-
-    vector = (
-        aw * bv
-        + bw * av
-        + torch.linalg.cross(av, bv, dim=-1)
-    )
-
-    return torch.cat((scalar, vector), dim=-1)
-
-
-def _q_conj(q):
-    return torch.cat((q[..., :1], -q[..., 1:]), dim=-1)
-
-
-
-def _q_to_rotvec(q):
+    Out: 
+        - res: [B, 8]: tensor with the corresponding dual quaternions (w,x,y,z,  w_,x_,y_,z_)
     """
-    Cuaternión -> vector de rotación principal phi.
 
-    Selecciona qw >= 0, por lo que ||phi|| <= pi.
-    En pi existe la ambigüedad inevitable del eje.
-    """
-    q = q / torch.linalg.vector_norm(
-        q, dim=-1, keepdim=True
-    )
+    assert dq_.shape[-1] == 6
 
-    q = torch.where(q[..., :1] < 0, -q, q)
+    device = dq_.device
+    
+    # Add real part to the primary and dual part (converts it to a pure dual quaternion)
+    dq_ = torch.cat((torch.zeros((dq_.shape[0], 1), device = device), dq_[:, :3], 
+                     torch.zeros((dq_.shape[0], 1), device = device), dq_[:, 3:]), dim = -1)
 
-    w = q[..., 0]
-    v = q[..., 1:]
-    s = torch.linalg.vector_norm(v, dim=-1)
+    # Norm of the primary part
+    phi = torch.norm(dq_[:, :4], dim = -1)
+    phi_idx = phi != 0
 
-    small = s < 1e-3
-    scale = torch.empty_like(s)
+    # Identity quaternion
+    prim = torch.cat((torch.ones(dq_.shape[0], 1), torch.zeros(dq_.shape[0], 3)), dim = -1).to(device)
+    
+    # Assign the identity or apply the exponential mapping wether ...
+    # ... the primary part is null or not
+    prim[phi_idx] = (torch.sin(phi[phi_idx]) / phi[phi_idx]).unsqueeze(-1) * dq_[phi_idx, :4]
+    prim[phi_idx, 0] += torch.cos(phi[phi_idx])
 
-    # 2*asin(s)/s alrededor de s = 0.
-    s2 = s[small] ** 2
-    scale[small] = 2 + s2 / 3 + 3 * s2**2 / 20
+    # Concatenates the primary with the dual part
+    res = torch.cat((prim, q_mul(dq_[:, 4:], prim)), dim = -1)
 
-    scale[~small] = (
-        2 * torch.atan2(s[~small], w[~small])
-        / s[~small]
-    )
+    # Fix dual cover
+    neg_idx = res[:, 0] < 0.0
+    res[neg_idx] *= -1
+    
+    return res
 
-    return v * scale.unsqueeze(-1)
-
-
-def _so3_exp_and_jacobian(phi):
-    """
-    Devuelve:
-        R = Exp_SO3(phi)
-        J = Jacobiano izquierdo J_l(phi)
-    """
-    theta = torch.linalg.vector_norm(phi, dim=-1)
-
-    A = hat(phi)
-    A2 = A @ A
-
-    I = torch.eye(
-        3,
-        device=phi.device,
-        dtype=phi.dtype,
-    ).expand(A.shape)
-
-    # torch.sinc(x) = sin(pi*x)/(pi*x).
-    a = torch.sinc(theta / math.pi)
-
-    b = (
-        0.5
-        * torch.sinc(theta / (2 * math.pi)) ** 2
-    )
-
-    # c = (theta - sin(theta))/theta³.
-    # Serie para evitar cancelación numérica cerca de cero.
-    small = theta < 0.05
-    c = torch.empty_like(theta)
-
-    th2 = theta[small] ** 2
-
-    c[small] = (
-        1 / 6
-        - th2 / 120
-        + th2**2 / 5040
-        - th2**3 / 362880
-    )
-
-    th = theta[~small]
-    c[~small] = (th - torch.sin(th)) / th**3
-
-    R = (
-        I
-        + a[..., None, None] * A
-        + b[..., None, None] * A2
-    )
-
-    J = (
-        I
-        + b[..., None, None] * A
-        + c[..., None, None] * A2
-    )
-
-    return R, J
-
-
-
-def exp_bruno(dq_: torch.Tensor, kwargs=None):
-    """
-    Exponencial del álgebra de cuaterniones duales.
-
-    Entrada:
-        dq_: [..., 6] = [a, b].
-
-        phi = 2*a
-        rho = 2*b
-
-    Salida:
-        Q: [..., 8] = [qr, qd].
-        qd = 0.5 * (0, t) ⊗ qr.
-        t = J_l(phi) @ rho.
-
-    kwargs se conserva por compatibilidad y no se utiliza.
-    """
-    if dq_.shape[-1] != 6:
-        raise ValueError(
-            "dq_ debe tener forma [...,6]"
-        )
-
-    a = dq_[..., :3]
-    b = dq_[..., 3:]
-
-    phi = 2 * a
-    rho = 2 * b
-
-    half_theta = torch.linalg.vector_norm(
-        a, dim=-1, keepdim=True
-    )
-
-    qr = torch.cat(
-        (
-            torch.cos(half_theta),
-            torch.sinc(half_theta / math.pi) * a,
-        ),
-        dim=-1,
-    )
-
-    _, J = _so3_exp_and_jacobian(phi)
-
-    t = (J @ rho.unsqueeze(-1)).squeeze(-1)
-
-    pure_t = torch.cat(
-        (
-            torch.zeros_like(t[..., :1]),
-            t,
-        ),
-        dim=-1,
-    )
-
-    qd = 0.5 * _q_mul(pure_t, qr)
-
-    return torch.cat((qr, qd), dim=-1)
 
 
 def log_bruno(dq: torch.Tensor):
+    """"
+    Logarithmic map for a twist dq_ of shape [*, 6].
+
+    In:
+        - dq: [B, 8]: tensor with a set of dual quaternions (w,x,y,z,  w_,x_,y_,z_)
+
+    Out:
+        - res: [B, 6]: tensor with the corresponding twsits
     """
-    Logaritmo principal de un cuaternión dual.
 
-    Entrada:
-        dq: [..., 8] = [qr, qd].
+    assert dq.shape[-1] == 8
 
-    Salida:
-        [..., 6] = [phi/2, rho/2].
+    # Fix dual cover
+    neg_idx = dq[:, 0] < 0.0
+    dq[neg_idx] *= -1
 
-    Asume un cuaternión dual unitario válido,
-    admitiendo un factor común de escala no nulo.
-    """
-    if dq.shape[-1] != 8:
-        raise ValueError(
-            "dq debe tener forma [...,8]"
-        )
+    # Converts the parts
+    primary = (q_angle(q = dq[:, :4]).unsqueeze(-1)*0.5)*q_axis(q = dq[:, :4])
+    dual = dq_translation(dq = dq)*0.5
 
-    norm = torch.linalg.vector_norm(
-        dq[..., :4], dim=-1, keepdim=True
-    )
-
-    if torch.any(norm == 0):
-        raise ValueError(
-            "El cuaternión real no puede ser nulo"
-        )
-
-    # Normalizar ambas partes con el mismo factor.
-    qr = dq[..., :4] / norm
-    qd = dq[..., 4:] / norm
-
-    phi = _q_to_rotvec(qr)
-
-    # t = 2 * vector(qd ⊗ conjugado(qr)).
-    t = 2 * _q_mul(qd, _q_conj(qr))[..., 1:]
-
-    _, J = _so3_exp_and_jacobian(phi)
-
-    rho = torch.linalg.solve(
-        J,
-        t.unsqueeze(-1),
-    ).squeeze(-1)
-
-    return torch.cat((phi, rho), dim=-1)
+    # Returns the concatenation of both parts
+    return torch.cat((primary, dual), dim = -1)
 
 
 def exp_stereo_q(q_: torch.Tensor):
