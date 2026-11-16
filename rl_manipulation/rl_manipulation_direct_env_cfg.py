@@ -70,7 +70,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
 
     # --- Action / observation space ---
-    action_space = gym.spaces.Box(-1.0, 1.0, (8,), dtype=np.float32)             # Number of actions per environment (overridden)
+    action_space = gym.spaces.Box(-1.0, 1.0, (6,), dtype=np.float32)             # Number of actions per environment (overridden)
     observation_space = 6       # Number of observations per environment (overridden)
     state_space = observation_space
 
