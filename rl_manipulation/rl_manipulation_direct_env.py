@@ -156,6 +156,8 @@ class RLManipulationDirect(DirectRLEnv):
         self.to_group_dist = homo_from_mat_trans_LAB
         self.convert_to_Lab_dq = convert_homo_to_Lab
         self.diff_operator_dist = mat_diff
+        self.mul_operator_dist = mat_mul
+        self.normalize_dist = norm_mat
 
         self.log_dq = log_bruno
         self.exp_dq = exp_bruno
@@ -766,9 +768,9 @@ class RLManipulationDirect(DirectRLEnv):
 
         # COMENTADO 1
         # Perform increment in the algebra and exponential map -> (plus operator)
-        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
-        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        action_pose = self.normalize(action_pose)
+        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
+        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        # action_pose = self.normalize(action_pose)
 
         # COMENTADO 2
         # action_pose = self.exp(actions)
@@ -784,6 +786,12 @@ class RLManipulationDirect(DirectRLEnv):
 
         # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
         # action_pose = self.normalize(action_pose)
+
+        # COMENTADO 4
+        action_pose = self.exp_dist(actions)
+        pose_lab = self.convert_to_Lab(self.pose_group_r)
+        action_pose = self.mul_operator_dist(self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:]), action_pose)
+        action_pose = self.normalize_dist(action_pose)
         
 
         # Convert to IsaacLab representation (translation, quaternion)
@@ -911,7 +919,7 @@ class RLManipulationDirect(DirectRLEnv):
         self.update_new_poses()
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel.round(decimals = 3))
+        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel2.round(decimals = 3))
         # self.my_obs = torch.cat((self.my_obs, obs), dim=0)
         
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
