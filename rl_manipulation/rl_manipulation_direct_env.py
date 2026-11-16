@@ -766,14 +766,14 @@ class RLManipulationDirect(DirectRLEnv):
 
         # COMENTADO 1
         # Perform increment in the algebra and exponential map -> (plus operator)
-        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
-        # action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
-        # action_pose = self.normalize(action_pose)
+        action_pose = self.exp(self.robot_rot_ee_pose_r_lie_rel2 + actions)
+        action_pose = self.mul_operator(self.target_pose_r_group, action_pose)
+        action_pose = self.normalize(action_pose)
 
         # COMENTADO 2
-        action_pose = self.exp(actions)
-        action_pose = self.mul_operator(self.pose_group_r, action_pose)
-        action_pose = self.normalize(action_pose)
+        # action_pose = self.exp(actions)
+        # action_pose = self.mul_operator(self.pose_group_r, action_pose)
+        # action_pose = self.normalize(action_pose)
 
         # COMENTADO 3
         # actions += self.identity
