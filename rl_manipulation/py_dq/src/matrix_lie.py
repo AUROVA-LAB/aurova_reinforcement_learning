@@ -225,7 +225,7 @@ def _so3_exp_and_jacobian(phi):
     return R, J
 
 
-def log_se3(T: torch.Tensor, so3=True):
+def log_se3(T: torch.Tensor, so3=False):
     """
     Entrada:
         T: [..., 16] o [..., 4, 4].
@@ -264,7 +264,7 @@ def log_se3(T: torch.Tensor, so3=True):
     return torch.cat((phi, rho), dim=-1)
 
 
-def exp_se3(xi: torch.Tensor, so3=True):
+def exp_se3(xi: torch.Tensor, so3=False):
     """
     Entrada:
         xi: [..., 6].
