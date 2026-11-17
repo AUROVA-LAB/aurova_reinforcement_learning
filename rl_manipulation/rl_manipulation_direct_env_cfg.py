@@ -235,7 +235,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    distance_thres = 0.01 # 0.03 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.03 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100
