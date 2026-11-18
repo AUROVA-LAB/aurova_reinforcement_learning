@@ -29,8 +29,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 3.0      # Length of the episode in seconds
-    max_steps = 130             # Maximum steps in an episode
+    episode_length_s = 3.0*3      # Length of the episode in seconds
+    max_steps = 130*3             # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
@@ -41,11 +41,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = QUAT
+    representation = DQ
     mapping = 0
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 0
+    distance = 1
     se3_dist = True
 
     # Scalings for each action
@@ -235,7 +235,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     rew_scale_dist: float= 1.0
 
     # Position threshold for ending the episode
-    distance_thres = 0.01 # 0.03 # 0.08 # 0.03
+    distance_thres = 0.03 # 0.03 # 0.08 # 0.03
 
     # Bonus for reaching the target
     bonus_tgt_reached = 100

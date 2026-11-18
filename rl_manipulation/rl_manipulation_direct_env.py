@@ -922,7 +922,7 @@ class RLManipulationDirect(DirectRLEnv):
         # self.my_obs = torch.cat((self.my_obs, obs), dim=0)
         
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.31   # TQ norel 0.31 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
+        obs[:, :3]  /= 1.0    # TQ norel 0.31 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.554 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
         obs[:, 3:]  /= 1.0    # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47  # T+Q: 0.384  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
 
         # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
