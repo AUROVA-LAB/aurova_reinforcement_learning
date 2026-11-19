@@ -45,27 +45,23 @@ def pose_to_transform(ref):
 
     return T
 
-
-def ur5e_fk(q, T_tool=None):
+def ur5e_fk_frames(q, T_tool=None):
     """
-    UR5e forward kinematics using standard DH parameters.
+    Return base-to-DH-frame transformations.
 
-    Parameters
-    ----------
-    q : casadi.SX, MX, or DM
-        Six joint positions in radians.
-    T_tool : optional
-        4x4 transform from the flange to the TCP/tool frame.
+    frames[0]: identity, robot base
+    frames[1]: after joint 1
+    ...
+    frames[6]: after joint 6
 
-    Returns
-    -------
-    T : casadi 4x4 matrix
-        Transformation from the base frame to the TCP.
+    T_tcp: final transform including T_tool, if provided.
+
+    IMPORTANT:
+        These are DH frames. Their origins/orientations may differ
+        from the named link frames in Isaac Lab / the URDF.
     """
-
     q = ca.vertcat(q[0] + np.pi, q[1:])
 
-    # Standard DH parameters for UR5e (meters, radians).
     a = [0.0, -0.425, -0.3922, 0.0, 0.0, 0.0]
     d = [0.1625, 0.0, 0.0, 0.1333, 0.0997, 0.0996]
     alpha = [
@@ -77,13 +73,13 @@ def ur5e_fk(q, T_tool=None):
         0.0,
     ]
 
-    T = ca.SX.eye(4) if isinstance(q, ca.SX) else ca.MX.eye(4)
+    # Start with a numeric identity; CasADi promotes it as needed.
+    T = ca.DM.eye(4)
+    frames = [T]
 
     for i in range(6):
-        theta = q[i]
-
-        ct = ca.cos(theta)
-        st = ca.sin(theta)
+        ct = ca.cos(q[i])
+        st = ca.sin(q[i])
         ca_i = np.cos(alpha[i])
         sa_i = np.sin(alpha[i])
 
@@ -103,13 +99,72 @@ def ur5e_fk(q, T_tool=None):
         )
 
         T = T @ A_i
+        frames.append(T)
 
+    T_tcp = T
     if T_tool is not None:
-        T = T @ T_tool
+        T_tcp = T_tcp @ ca.DM(T_tool)
 
-    return T
+    return frames, T_tcp
 
+def ur5e_fk(q, T_tool=None):
+    """Existing interface, retained for your pose-tracking code."""
+    _, T_tcp = ur5e_fk_frames(q, T_tool=T_tool)
+    return T_tcp
 
+def ur5e_collision_spheres(q, sphere_specs, T_tool=None):
+    """
+    Compute collision-sphere centers in the robot base frame.
+
+    sphere_specs:
+        Sequence of dictionaries with:
+            frame: integer 0..6, or "tcp"
+            center: local [x, y, z] in metres
+            radius: positive radius in metres
+
+    Returns
+    -------
+    centers : CasADi matrix, shape (3, number_of_spheres)
+    radii   : CasADi DM, shape (number_of_spheres, 1)
+    """
+    if len(sphere_specs) == 0:
+        raise ValueError("Provide at least one collision sphere.")
+
+    frames, T_tcp = ur5e_fk_frames(q, T_tool=T_tool)
+
+    centers = []
+    radii = []
+
+    for spec in sphere_specs:
+        frame = spec["frame"]
+
+        if frame == "tcp":
+            T = T_tcp
+        elif isinstance(frame, (int, np.integer)) and 0 <= frame <= 6:
+            T = frames[int(frame)]
+        else:
+            raise ValueError("Sphere frame must be 0..6 or 'tcp'.")
+
+        center_local = np.asarray(
+            spec["center"], dtype=float
+        ).reshape(3)
+
+        radius = float(spec["radius"])
+
+        if not np.all(np.isfinite(center_local)):
+            raise ValueError("Sphere center must be finite.")
+        if not np.isfinite(radius) or radius <= 0:
+            raise ValueError("Sphere radius must be finite and positive.")
+
+        center_base = (
+            T[:3, :3] @ ca.DM(center_local)
+            + T[:3, 3]
+        )
+
+        centers.append(center_base)
+        radii.append(radius)
+
+    return ca.horzcat(*centers), ca.DM(radii)
 
 def hat(v):
     """
@@ -121,7 +176,6 @@ def hat(v):
         ca.horzcat(-v[1], v[0], 0),
     )
 
-
 def vee(A):
     """
     Extract a 3D vector from a skew-symmetric matrix.
@@ -131,7 +185,6 @@ def vee(A):
         A[0, 2],
         A[1, 0],
     )
-
 
 def rotation_log(R):
     """

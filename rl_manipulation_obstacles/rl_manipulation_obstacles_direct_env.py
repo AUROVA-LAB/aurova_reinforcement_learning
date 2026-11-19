@@ -24,7 +24,7 @@ from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
 from isaaclab.utils.math import sample_uniform
 from isaaclab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from isaaclab.utils.math import subtract_frame_transforms, combine_frame_transforms
-from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat
+from isaaclab.utils.math import quat_from_euler_xyz, euler_xyz_from_quat, quat_apply
 from isaaclab.markers import VisualizationMarkers
 from isaaclab.sensors import TiledCamera, ContactSensor
 
@@ -717,7 +717,89 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             · Z: +0.25       -> alto             -> semi-eje = 0.25
             · Rango de seguridad -> 0.1 + diámetro de la esfera alrededor de la pinza
         '''
-        
+
+        # --------------------------------------------------
+        # Visualize the robot collision spheres
+        # --------------------------------------------------
+
+        sphere_fn = self.controller.get("sphere_centers")
+        sphere_radii = self.controller.get("sphere_radii")
+
+        if sphere_fn is None or sphere_radii is None:
+            raise ValueError(
+                "Initialize the NMPC with sphere_specs and return "
+                "'sphere_centers' and 'sphere_radii'."
+            )
+
+        robot = self.scene.articulations[
+            self.cfg.keys[self.cfg.robot]
+        ]
+
+        joint_pos = robot.data.joint_pos[:, self._robot_joints_idx]
+        device = joint_pos.device
+        dtype = joint_pos.dtype
+
+        radii = torch.as_tensor(
+            np.asarray(sphere_radii.full()).reshape(-1),
+            dtype=dtype,
+            device=device,
+        )
+
+        num_spheres = radii.numel()
+        num_envs = joint_pos.shape[0]
+
+        # Evaluate sphere centers in the NMPC base frame.
+        # CasADi returns (3, num_spheres) for each configuration.
+        q_numpy = joint_pos.detach().cpu().numpy()
+
+        centers_base = torch.as_tensor(
+            np.stack(
+                [
+                    np.asarray(sphere_fn(q).full()).T
+                    for q in q_numpy
+                ],
+                axis=0,
+            ),
+            dtype=dtype,
+            device=device,
+        )  # (num_envs, num_spheres, 3)
+
+        # Transform from the robot base frame into world coordinates:
+        # c_world = p_world_base + R_world_base @ c_base
+        base_pos_w = robot.data.root_pos_w
+        base_quat_w = robot.data.root_quat_w
+
+        sphere_base_quats = (
+            base_quat_w[:, None, :]
+            .expand(-1, num_spheres, -1)
+            .reshape(-1, 4)
+            .contiguous()
+        )
+
+        centers_world = quat_apply(
+            sphere_base_quats,
+            centers_base.reshape(-1, 3),
+        ).reshape(num_envs, num_spheres, 3)
+
+        centers_world = centers_world + base_pos_w[:, None, :]
+
+        # A sphere has no meaningful orientation.
+        orientations = torch.zeros(
+            (num_envs * num_spheres, 4),
+            dtype=dtype,
+            device=device,
+        )
+        orientations[:, 0] = 1.0  # Quaternion: [w, x, y, z]
+
+        # The prototype has radius 1 m, so its scale equals
+        # the desired radius, not the diameter.
+        scales = (
+            radii[None, :, None]
+            .expand(num_envs, num_spheres, 3)
+            .reshape(-1, 3)
+            .contiguous()
+        )
+
 
         # Obtains a tensor of indices (a tensor containing tensors from 0 to the number of markers)
         marker_indices = torch.arange(self.scene.extras["markers"].num_prototypes).repeat(self.num_envs)
@@ -729,7 +811,9 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                         #  shelf_pose[:, :3],
                                                                         #  self.cfg.obst_list[:, :3],
                                                                         #  self.gripper_pose_r[:, :3],
-                                                                         T_ref_new[:, :3])), 
+                                                                         T_ref_new[:, :3],
+                                                                         centers_world.squeeze(0)
+                                                                         ),), 
                                                                          
                                                 orientations = torch.cat((
                                                                           self.target_pose_r[:, 3:], 
@@ -737,7 +821,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                                                                         #   shelf_pose[:, 3:],
                                                                         #   self.cfg.obst_list[:, 3:],
                                                                         #   self.gripper_pose_r[:, 3:],
-                                                                          T_ref_new[:, 3:])), 
+                                                                          T_ref_new[:, 3:],
+                                                                          orientations)), 
 
                                                 marker_indices=marker_indices)
 
@@ -960,7 +1045,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pcd.points = o3d.utility.Vector3dVector(pc_all)
 
 
-        o3d.visualization.draw_geometries([pcd])
+        # o3d.visualization.draw_geometries([pcd])
 
 
 
@@ -1579,14 +1664,49 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.dt = 0.01
 
         tgt = copy.deepcopy(self.target_pose_r)
+
         
         
+        # Illustrative values: adjust using your sphere visualization.
+        sphere_specs = [
+            # Base
+            {"frame": 0, "center": [0.0, 0.0, 0.08], "radius": self.cfg.radii[0]},
+
+            # Upper arm:
+            # Your DH a[1] is negative, so positive local X from
+            # frame 2 points back toward the preceding joint.
+            {"frame": 2, "center": [0.08, 0.0, 0.0], "radius": self.cfg.radii[1]},
+            {"frame": 2, "center": [0.20, 0.0, 0.0], "radius": self.cfg.radii[2]},
+            {"frame": 2, "center": [0.33, 0.0, 0.0], "radius": self.cfg.radii[3]},
+
+            # Forearm
+            {"frame": 3, "center": [0.07, 0.0, 0.0], "radius": self.cfg.radii[4]},
+            {"frame": 3, "center": [0.19, 0.0, 0.0], "radius": self.cfg.radii[5]},
+            {"frame": 3, "center": [0.31, 0.0, 0.0], "radius": self.cfg.radii[6]},
+
+            # Wrist
+            {"frame": 4, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[7]},
+            {"frame": 5, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[8]},
+            {"frame": 6, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[9]},
+
+            # Tool: offsets are relative to the TCP, including T_tool.
+            {"frame": "tcp", "center": [0.0, 0.0, -0.10], "radius": self.cfg.radii[10]},
+            {"frame": "tcp", "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[11]},
+        ]
+
         self.controller = drop_NMPC_setup(
-            ini=self.scene.articulations[self.cfg.keys[self.cfg.robot]].data.joint_pos[0, self._robot_joints_idx].cpu().numpy(),
-            ref=tgt.squeeze(0).cpu().numpy().tolist(),
+            ini=(
+                self.scene.articulations[self.cfg.keys[self.cfg.robot]]
+                .data.joint_pos[0, self._robot_joints_idx]
+                .detach().cpu().numpy()
+            ),
+            ref=tgt.squeeze(0).detach().cpu().numpy().tolist(),
             dt=self.dt,
             horizon=30,
+            sphere_specs=sphere_specs,
         )
+
+
 
         self.max_steps=1000
         self.control_dt=self.dt

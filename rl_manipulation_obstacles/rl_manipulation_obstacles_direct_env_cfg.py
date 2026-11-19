@@ -175,6 +175,14 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos = [-1, -0.11711,  0.05]),
     )
 
+
+
+    radii = [0.09, 
+             0.08, 0.08, 0.08,
+             0.07, 0.07, 0.07,
+             0.075, 0.07, 0.07,
+             0.07, 0.06]
+
     
     # Markers
     marker_cfg: VisualizationMarkersCfg = VisualizationMarkersCfg(
@@ -300,6 +308,93 @@ class RLManipulationObstaclesDirectCfg(DirectRLEnvCfg):
                 scale=(0.1, 0.1, 0.1),
                 visible = debug_markers
             ),
+
+
+            "shpere_1": sim_utils.SphereCfg(
+                radius=radii[0],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_2": sim_utils.SphereCfg(
+                radius=radii[1],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_3": sim_utils.SphereCfg(
+                radius=radii[2],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_4": sim_utils.SphereCfg(
+                radius=radii[3],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_5": sim_utils.SphereCfg(
+                radius=radii[4],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_6": sim_utils.SphereCfg(
+                radius=radii[5],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_7": sim_utils.SphereCfg(
+                radius=radii[6],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_8": sim_utils.SphereCfg(
+                radius=radii[7],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_9": sim_utils.SphereCfg(
+                radius=radii[8],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_10": sim_utils.SphereCfg(
+                radius=radii[9],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_11": sim_utils.SphereCfg(
+                radius=radii[10],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+            "shpere_12": sim_utils.SphereCfg(
+                radius=radii[11],
+                visible=debug_markers,
+                visual_material=sim_utils.PreviewSurfaceCfg(
+                    diffuse_color=(1.0, 0.0, 0.0)
+                ),
+            ),
+
             
         }
     )
