@@ -39,6 +39,8 @@ def drop_NMPC_setup(
     du_weights=None,
     T_tool=None,
     sphere_specs=None,
+    n_obstacle_points=1024,
+    collision_margin=0.02
 ):
     """
     Cartesian pose-tracking NMPC for a UR5e.
@@ -239,6 +241,29 @@ def drop_NMPC_setup(
         )
     )
 
+    # --------------------------------------------------
+    # Point-cloud collision constraints
+    # --------------------------------------------------
+
+    if sphere_specs is None or len(sphere_specs) == 0:
+        raise ValueError("Collision avoidance requires sphere_specs.")
+
+    if n_obstacle_points < 1:
+        raise ValueError("n_obstacle_points must be positive.")
+
+    if not np.isfinite(collision_margin) or collision_margin < 0:
+        raise ValueError("collision_margin must be finite and nonnegative.")
+
+    # One obstacle point per column. Updated before each solve.
+    obstacle_points = opti.parameter(3, n_obstacle_points)
+
+    # Deterministic clearance; can be updated without rebuilding.
+    clearance_margin = opti.parameter()
+    opti.set_value(clearance_margin, collision_margin)
+
+    # Fixed sphere centers must be checked numerically before each solve.
+    fixed_sphere_indices = set()
+
     # Initial state is the measured joint configuration.
     opti.subject_to(X[:, 0] == q_measured)
 
@@ -279,6 +304,37 @@ def drop_NMPC_setup(
         # Accumulate stage cost
         J += J_pose + J_velocity + J_smooth
 
+
+        # Clearance restrictions
+        centers_k, radii = ur5e_collision_spheres(
+            X[:, k],
+            sphere_specs,
+            T_tool=T_tool,
+        )
+
+        for j in range(len(sphere_specs)):
+
+            center_j = centers_k[:, j]
+
+            # A fixed center cannot be moved by the optimizer.
+            if not ca.depends_on(center_j, ca.vec(X)):
+                fixed_sphere_indices.add(j)
+                continue
+
+            delta = (
+                ca.repmat(center_j, 1, n_obstacle_points)
+                - obstacle_points
+            )
+
+            squared_distances = ca.sum1(delta * delta)
+            required_distance = radii[j] + clearance_margin
+
+            opti.subject_to(
+                ca.vec(squared_distances)
+                >= required_distance**2
+            )
+
+
         # Joint-space discrete dynamics
         opti.subject_to(
             X[:, k + 1] == X[:, k] + dt * U[:, k]
@@ -311,6 +367,15 @@ def drop_NMPC_setup(
     ])
 
     J += J_terminal
+
+
+
+        
+
+    print(
+        "Spheres requiring numerical clearance checks:",
+        sorted(fixed_sphere_indices),
+    )
 
     # --------------------------------------------------
     # 8. Objective and solver
@@ -414,6 +479,10 @@ def drop_NMPC_setup(
         "link_positions": link_positions_fn,
         "sphere_centers": sphere_centers_fn,
         "sphere_radii": sphere_radii,
+
+        "obstacle_points": obstacle_points,
+        "clearance_margin": clearance_margin,
+        "n_obstacle_points": n_obstacle_points,
     }
 
 

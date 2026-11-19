@@ -592,6 +592,27 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             T_ref_new,
         )
 
+        
+        pc = self.pc_all
+
+        if isinstance(pc, torch.Tensor):
+            pc = pc.detach().cpu().numpy()
+
+        # Extract XYZ if the cloud also contains RGB or other features.
+        points = np.asarray(pc[:, :3], dtype=np.float64).T
+
+        expected_shape = self.controller["obstacle_points"].shape
+        if points.shape != expected_shape:
+            # raise ValueError(
+            #     f"Obstacle points must have shape {expected_shape}, "
+            #     f"but received {points.shape}"
+            # )
+            points = np.zeros((self.cfg.pc_size, 3)).T
+
+        self.opti.set_value(
+            self.controller["obstacle_points"],
+            ca.DM(points),
+        )
 
         # ------------------------------------------
         # 3. Warm-start the optimization
@@ -642,6 +663,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
                 f"orientation error={orientation_error:.4f} rad | "
                 f"solve={solve_time * 1000:.1f} ms"
             )
+        print("Iterations: ", solution.stats()["iter_count"])
         
         print("---------------")
 
@@ -1009,6 +1031,40 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         pc_ext = depth_to_pointcloud(self.camera_ext, intrinsics_ext[0, 0], intrinsics_ext[1, 1], intrinsics_ext[0, 2], intrinsics_ext[1, 2])
         pc_front = depth_to_pointcloud(self.camera_front, intrinsics_front[0, 0], intrinsics_front[1, 1], intrinsics_front[0, 2], intrinsics_front[1, 2])
 
+        init_bb = time.time()
+        object_bbox_min, object_bbox_max, robot_bbox_min, robot_bbox_max, object_points, robot_points = self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0)        
+        
+        if object_bbox_min is not None and object_bbox_max is not None:
+            # Convert bounds to tensors on the same device and with the same dtype as pc_w
+            obj_min = torch.as_tensor(object_bbox_min, device=pc_w.device, dtype=pc_w.dtype).reshape(1, 3)
+            obj_max = torch.as_tensor(object_bbox_max, device=pc_w.device, dtype=pc_w.dtype).reshape(1, 3)
+
+            # True for points inside or on the object bounding box
+            inside_object = ((pc_w[:, :3] >= obj_min) & (pc_w[:, :3] <= obj_max)).all(dim=1)
+
+            # Remove those points
+            pc_w_filtered = pc_w[:, :3][~inside_object]
+
+            print(pc_w[:, :3].shape, "->", pc_w_filtered.shape)
+            pc_w = pc_w_filtered
+
+        if robot_bbox_min is not None and robot_bbox_max is not None:
+            # Convert bounds to tensors on the same device and with the same dtype as pc_w
+            obj_min = torch.as_tensor(robot_bbox_min, device=pc_w.device, dtype=pc_w.dtype).reshape(1, 3)
+            obj_max = torch.as_tensor(robot_bbox_max, device=pc_w.device, dtype=pc_w.dtype).reshape(1, 3)
+
+            # True for points inside or on the robot bounding box
+            inside_robot = ((pc_w[:, :3] >= obj_min) & (pc_w[:, :3] <= obj_max)).all(dim=1)
+
+            # Remove those points
+            pc_w_filtered = pc_w[:, :3][~inside_robot]
+
+            print(pc_w[:, :3].shape, "->", pc_w_filtered.shape)
+            pc_w = pc_w_filtered
+
+        print("---- BB object and robot: ", time.time() - init_bb)
+
+
 
         # camera_w_pos = self.scene.sensors["camera"].data.pos_w
         # camera_w_quat = self.scene.sensors["camera"].data.quat_w_world
@@ -1031,25 +1087,26 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
 
         
         # XYZ coordinates: (N, 3)
-        pc_all = torch.cat(
+        self.pc_all = torch.cat(
             (self.pc_w[:, :3],
             self.pc_ext[:, :3],
             self.pc_front[:, :3]), dim=0)
+        
+        self.pc_all = self.pc_w[:, :3]
 
-        pc_all = preprocess_pointcloud(pc_all)
+        self.pc_all = preprocess_pointcloud(self.pc_all.squeeze(0), pc_size=self.cfg.pc_size)
 
-        pc_all = pc_all.detach().cpu().numpy()
+        self.pc_all = self.pc_all.detach().cpu().numpy()
 
 
         pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pc_all)
+        pcd.points = o3d.utility.Vector3dVector(self.pc_all)
 
 
         # o3d.visualization.draw_geometries([pcd])
 
 
 
-        object_bbox_min, object_bbox_max, robot_bbox_min, robot_bbox_max, object_points, robot_points = self.get_3d_bboxes_from_instances(self.scene.sensors["camera"], 0)
         object_bbox_min_ext, object_bbox_max_ext, robot_bbox_min_ext, robot_bbox_max_ext, object_points_ext, robot_points_ext = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext"], 0)
         object_bbox_min_front, object_bbox_max_front, robot_bbox_min_front, robot_bbox_max_front, object_points_front, robot_points_front = self.get_3d_bboxes_from_instances(self.scene.sensors["camera_ext_2"], 0)
 
@@ -1670,27 +1727,27 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # Illustrative values: adjust using your sphere visualization.
         sphere_specs = [
             # Base
-            {"frame": 0, "center": [0.0, 0.0, 0.08], "radius": self.cfg.radii[0]},
+            # {"frame": 0, "center": [0.0, 0.0, 0.08], "radius": self.cfg.radii[0]},
 
             # Upper arm:
             # Your DH a[1] is negative, so positive local X from
             # frame 2 points back toward the preceding joint.
             {"frame": 2, "center": [0.08, 0.0, 0.0], "radius": self.cfg.radii[1]},
-            {"frame": 2, "center": [0.20, 0.0, 0.0], "radius": self.cfg.radii[2]},
+            # {"frame": 2, "center": [0.20, 0.0, 0.0], "radius": self.cfg.radii[2]},
             {"frame": 2, "center": [0.33, 0.0, 0.0], "radius": self.cfg.radii[3]},
 
             # Forearm
             {"frame": 3, "center": [0.07, 0.0, 0.0], "radius": self.cfg.radii[4]},
-            {"frame": 3, "center": [0.19, 0.0, 0.0], "radius": self.cfg.radii[5]},
+            # {"frame": 3, "center": [0.19, 0.0, 0.0], "radius": self.cfg.radii[5]},
             {"frame": 3, "center": [0.31, 0.0, 0.0], "radius": self.cfg.radii[6]},
 
             # Wrist
-            {"frame": 4, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[7]},
+            # {"frame": 4, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[7]},
             {"frame": 5, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[8]},
-            {"frame": 6, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[9]},
+            # {"frame": 6, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[9]},
 
             # Tool: offsets are relative to the TCP, including T_tool.
-            {"frame": "tcp", "center": [0.0, 0.0, -0.10], "radius": self.cfg.radii[10]},
+            # {"frame": "tcp", "center": [0.0, 0.0, -0.10], "radius": self.cfg.radii[10]},
             {"frame": "tcp", "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[11]},
         ]
 
@@ -1704,6 +1761,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             dt=self.dt,
             horizon=30,
             sphere_specs=sphere_specs,
+            n_obstacle_points=self.cfg.pc_size
         )
 
 

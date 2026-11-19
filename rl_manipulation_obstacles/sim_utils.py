@@ -102,18 +102,20 @@ def farthest_point_sampling_BERT(xyz, npoint):
     return torch.gather(xyz, dim=1, index=centroids.unsqueeze(-1).expand(-1, -1, C))
 
 
-def preprocess_pointcloud(pc):
+def preprocess_pointcloud(pc, pc_size):
     """
     pc: (N, 3) [x,y,z]
     """
 
     pc = pc[pc[:, 2] > 0.0125]
     pc = pc[pc[:, 0] > -0.8]
+    pc = pc[pc[:, 0] < 0.2]
 
     # pc = pc[pc[:, 0] < 0.1]
     # pc = pc[pc[:, 1] > -0.5]
-
-    # Farthest point sampling
-    pc = farthest_point_sampling_BERT(pc.unsqueeze(0), 1024).squeeze(0)
+    
+    if pc.shape[0] > 0:
+        # Farthest point sampling
+        pc = farthest_point_sampling_BERT(pc.unsqueeze(0), pc_size).squeeze(0)
 
     return pc
