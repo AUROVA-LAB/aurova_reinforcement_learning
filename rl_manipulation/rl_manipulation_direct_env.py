@@ -778,23 +778,23 @@ class RLManipulationDirect(DirectRLEnv):
         # action_pose = self.normalize(action_pose)
 
         # COMENTADO 3
-        actions += self.identity
-        action_pose = self.exp(actions)
-        action_pose = self.normalize(action_pose)
-        action_pose = self.mul_operator(self.pose_group_r, action_pose)
-        action_pose = self.normalize(action_pose)
+        # actions += self.identity
+        # action_pose = self.exp(actions)
+        # action_pose = self.normalize(action_pose)
+        # action_pose = self.mul_operator(self.pose_group_r, action_pose)
+        # action_pose = self.normalize(action_pose)
 
         # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
         # action_pose = self.normalize(action_pose)
 
         # COMENTADO 4
-        # action_pose = self.exp_dist(actions)
-        # pose_lab = self.convert_to_Lab(self.pose_group_r)
-        # action_pose = self.mul_operator_dist(self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:]), action_pose)
-        # action_pose = self.normalize_dist(action_pose)
+        action_pose = self.exp_dist(actions, so3=False)
+        pose_lab = self.convert_to_Lab(self.pose_group_r)
+        action_pose = self.mul_operator_dist(self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:]), action_pose)
+        action_pose = self.normalize_dist(action_pose)
         
         # Convert to IsaacLab representation (translation, quaternion)
-        action_pose_lab = self.convert_to_Lab(action_pose)
+        action_pose_lab = self.convert_to_Lab_dist(action_pose)
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(action_pose_lab)
@@ -916,30 +916,34 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Updates the poses of the robot's end effector and the object so they match
         self.update_new_poses()
+
+        target_lie = self.log(self.target_pose_r_group)
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel2.round(decimals = 3))
-        # self.my_obs = torch.cat((self.my_obs, obs), dim=0)
-        
+        # obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel2.round(decimals = 3))
+        obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, 
+                                       target_lie), dim = -1).round(decimals=3))
+
+                
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3]  /= 0.43    # TQ norel 0.31 # DQ+ norel # 1.56# MAT norel: 1.0 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
-        obs[:, 3:]  /= 1.0    # TQ norel 1.0 # DQ+ norel # 0.44# MAT norel: 1.0 # DQ norel: 1.47   # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
+        obs[:, :3]  /= 3.127   # TQ norel 0.31 # DQ+ norel # 1.56  # MAT norel: 3.127 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
+        obs[:, 3:6]  /= 1.317  # TQ norel 1.0  # DQ+ norel # 0.44  # MAT norel: 1.317 # DQ norel: 1.47  # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
 
-        # obs[:, 6:9] /= # TQ norel 0.984 # DQ+ norel # 1.56# MAT norel:0.87 # DQ norel: 1.56 # T+Q: 0.554 # DQ, MAT: 1.25
-        # obs[:, 9:]  /= # TQ norel 0.7 # DQ+ norel # 0.44# MAT norel:0.87 # DQ norel: 0.35  # T+Q: 0.384 # DQ, MAT: 0.74
+        obs[:, 6:9] /= 3.127   # MAT norel:3.127
+        obs[:, 9:]  /= 1.167   # MAT norel:1.167
 
-        # self.max_obs_rot = max(self.max_obs_rot, obs[:, :3].max().item())
-        # self.max_obs_pos = max(self.max_obs_pos, obs[:, 3:].max().item())
+        # self.max_obs_rot = max(self.max_obs_rot, obs[:, 6:3+6].max().item())
+        # self.max_obs_pos = max(self.max_obs_pos, obs[:, 3+6:6+6].max().item())
 
-        # self.min_obs_rot = min(self.min_obs_rot, obs[:, :3].min().item())
-        # self.min_obs_pos = min(self.min_obs_pos, obs[:, 3:].min().item())
+        # self.min_obs_rot = min(self.min_obs_rot, obs[:, 6:3+6].min().item())
+        # self.min_obs_pos = min(self.min_obs_pos, obs[:, 3+6:6+6].min().item())
 
         # print("MAX ROT: ", self.max_obs_rot)
         # print("MAX POS: ", self.max_obs_pos)
         # print("MIN ROT: ", self.min_obs_rot)
         # print("MIN POS: ", self.min_obs_pos)
         # print("-----------")
-        # print(obs)
+        
 
         # Builds the dictionary
         observations = {"policy": obs}
