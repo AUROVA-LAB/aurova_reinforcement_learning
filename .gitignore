@@ -5,3 +5,4 @@ ycb_aux/
 wandb/
 *.png
 *.pth
+*.txt
