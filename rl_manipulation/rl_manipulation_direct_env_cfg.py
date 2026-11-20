@@ -41,11 +41,11 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
     
-    representation = DQ
+    representation = QUAT
     mapping = 0
     size = sizes[int(mapping != 0)][representation]
     size_group = sizes[0][representation]
-    distance = 1
+    distance = 0
     se3_dist = True
 
     # Scalings for each action
@@ -71,7 +71,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
 
     # --- Action / observation space ---
     action_space = gym.spaces.Box(-1.0, 1.0, (6,), dtype=np.float32)             # Number of actions per environment (overridden)
-    observation_space = 8*2       # Number of observations per environment (overridden)
+    observation_space = 7*2       # Number of observations per environment (overridden)
     state_space = observation_space
 
     num_envs = 1                # Number of environments by default (overriden)

@@ -926,17 +926,17 @@ class RLManipulationDirect(DirectRLEnv):
 
                 
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :4] /= 1.0      # TQ norel 0.31 # DQ+ norel # 1.0   # T+so3: 3.2  # MAT norel: 3.127 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
-        obs[:, 4:8] /= 0.364   # TQ norel 1.0  # DQ+ norel # 0.364 # T+so3: 0.83 # MAT norel: 1.317 # DQ norel: 1.47  # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
+        obs[:, :3] /= 0.851      # TQ norel 0.851 # DQ+ norel # 1.0   # T+so3: 3.2  # MAT norel: 3.127 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
+        obs[:, 3:7] /= 1.0   # TQ norel 1.0  # DQ+ norel # 0.364 # T+so3: 0.83 # MAT norel: 1.317 # DQ norel: 1.47  # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
 
-        obs[:, 8:12] /= 1.0    # MAT norel:3.127  # T+so3: 3.1  # DQ: 1.0
-        obs[:, 12:]  /= 0.43   # MAT norel:1.167  # T+so3: 0.7  # DQ: 0.43
+        obs[:, 7:10] /= 0.7    # TQ norel: 0.7  # MAT norel:3.127  # T+so3: 3.1  # DQ: 1.0
+        obs[:, 10:]  /= 0.43   # TQ norel: 1.0  # MAT norel:1.167  # T+so3: 0.7  # DQ: 0.43
 
-        # self.max_obs_rot = max(self.max_obs_rot, obs[:, 8:4+8].max().item())
-        # self.max_obs_pos = max(self.max_obs_pos, obs[:, 8+4:8+8].max().item())
+        # self.max_obs_rot = max(self.max_obs_rot, obs[:, 7:3+7].max().item())
+        # self.max_obs_pos = max(self.max_obs_pos, obs[:, 7+3:7+7].max().item())
 
-        # self.min_obs_rot = min(self.min_obs_rot, obs[:, 8:4+8].min().item())
-        # self.min_obs_pos = min(self.min_obs_pos, obs[:, 8+4:8+8].min().item())
+        # self.min_obs_rot = min(self.min_obs_rot, obs[:, 7:3+7].min().item())
+        # self.min_obs_pos = min(self.min_obs_pos, obs[:, 7+3:7+7].min().item())
 
         # print("MAX ROT: ", self.max_obs_rot)
         # print("MAX POS: ", self.max_obs_pos)
