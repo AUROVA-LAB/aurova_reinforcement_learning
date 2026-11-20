@@ -898,17 +898,17 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.debug_target_pose_w = self.scene.rigid_objects["object"].data.body_state_w[:, 0, 0:7]
 
 
-        # alpha = atan((self.debug_target_pose_w[0 ,1].item() - self.debug_robot_ee_pose_w[0, 1].item()) / (self.debug_target_pose_w[0 ,0].item() - self.debug_robot_ee_pose_w[0, 0].item()))
-        # rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec((alpha) * np.array([0, 0, 1]))).as_quat()]).to(self.device)
-        # w = rot_negAlpha_yz[:, 3].clone().unsqueeze(0)
-        # xyz = rot_negAlpha_yz[:, :3].clone()
-        # rot_negAlpha_yz = torch.cat((w,xyz), dim=-1)
+        alpha = atan((self.debug_target_pose_w[0 ,1].item() - self.debug_robot_ee_pose_w[0, 1].item()) / (self.debug_target_pose_w[0 ,0].item() - self.debug_robot_ee_pose_w[0, 0].item()))
+        rot_negAlpha_yz = torch.tensor([(Rotation.from_rotvec((alpha) * np.array([0, 0, 1]))).as_quat()]).to(self.device)
+        w = rot_negAlpha_yz[:, 3].clone().unsqueeze(0)
+        xyz = rot_negAlpha_yz[:, :3].clone()
+        rot_negAlpha_yz = torch.cat((w,xyz), dim=-1)
 
 
 
-        # corrected_ref = combine_frame_transforms(t01 = self.debug_target_pose_w[:, :3], q01 = self.debug_target_pose_w[:, 3:],
-        #                                         t12 = torch.zeros(1,3).to(self.device), q12 = rot_negAlpha_yz)
-        # self.debug_target_pose_w = torch.cat(corrected_ref ,dim = -1).float()
+        corrected_ref = combine_frame_transforms(t01 = self.debug_target_pose_w[:, :3], q01 = self.debug_target_pose_w[:, 3:],
+                                                t12 = torch.zeros(1,3).to(self.device), q12 = rot_negAlpha_yz)
+        self.debug_target_pose_w = torch.cat(corrected_ref ,dim = -1).float()
 
 
 
@@ -1718,7 +1718,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses() 
 
 
-        self.dt = 0.01
+        self.dt = 0.02
 
         tgt = copy.deepcopy(self.target_pose_r)
 
@@ -1732,14 +1732,14 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # Upper arm:
             # Your DH a[1] is negative, so positive local X from
             # frame 2 points back toward the preceding joint.
-            {"frame": 2, "center": [0.08, 0.0, 0.0], "radius": self.cfg.radii[1]},
+            # {"frame": 2, "center": [0.08, 0.0, 0.0], "radius": self.cfg.radii[1]},
             # {"frame": 2, "center": [0.20, 0.0, 0.0], "radius": self.cfg.radii[2]},
-            {"frame": 2, "center": [0.33, 0.0, 0.0], "radius": self.cfg.radii[3]},
+            # {"frame": 2, "center": [0.33, 0.0, 0.0], "radius": self.cfg.radii[3]},
 
             # Forearm
             {"frame": 3, "center": [0.07, 0.0, 0.0], "radius": self.cfg.radii[4]},
             # {"frame": 3, "center": [0.19, 0.0, 0.0], "radius": self.cfg.radii[5]},
-            {"frame": 3, "center": [0.31, 0.0, 0.0], "radius": self.cfg.radii[6]},
+            {"frame": 3, "center": [0.21, 0.0, 0.0], "radius": self.cfg.radii[6]},
 
             # Wrist
             # {"frame": 4, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[7]},
@@ -1759,7 +1759,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             ),
             ref=tgt.squeeze(0).detach().cpu().numpy().tolist(),
             dt=self.dt,
-            horizon=30,
+            horizon=60,
             sphere_specs=sphere_specs,
             n_obstacle_points=self.cfg.pc_size
         )
