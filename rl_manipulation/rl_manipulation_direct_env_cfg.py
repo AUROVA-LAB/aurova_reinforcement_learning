@@ -29,14 +29,15 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     
     # ---- Env variables ----
     decimation = 1              # Number of control action updates @ sim dt per policy dt.
-    episode_length_s = 3.0*3      # Length of the episode in seconds
-    max_steps = 130*3             # Maximum steps in an episode
+    episode_length_s = 3.0      # Length of the episode in seconds
+    max_steps = 130             # Maximum steps in an episode
    
     # --- Mapping configuration ---
     DQ = 0
     EULER = 1
     QUAT = 2
     MAT = 3
+
 
     # Size of the Lie algebra
     sizes = [[8, 6, 7, 16], [6]*4]
@@ -47,6 +48,7 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     size_group = sizes[0][representation]
     distance = 0
     se3_dist = True
+    mapping_names = ["DQ", "T+EULER", "T+Q", "SE3", "T+SO3"]
 
     # Scalings for each action
     # scalings = [[[0.01, 0.001], [0.01, 0.005], [0.01, 0.005]],
