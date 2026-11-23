@@ -1032,7 +1032,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached*0)
+        terminated = torch.logical_or(time_out, self.target_reached)
 
         # if terminated.item() or truncated.item():
 
