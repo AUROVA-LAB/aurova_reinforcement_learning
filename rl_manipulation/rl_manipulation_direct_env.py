@@ -30,6 +30,7 @@ from pathlib import Path
 from contextlib import redirect_stdout
 from pathlib import Path
 
+import pickle
 
 
 # Class for the Bimanual Direct Environment
@@ -926,8 +927,8 @@ class RLManipulationDirect(DirectRLEnv):
 
                 
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, self.target_pose_r_lie), dim = -1))
-        obs[:, :3] /= 0.851      # TQ norel 0.851 # DQ+ norel # 1.0   # T+so3: 3.2  # MAT norel: 3.127 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
-        obs[:, 3:] /= 1.0   # TQ norel 1.0  # DQ+ norel # 0.364 # T+so3: 0.83 # MAT norel: 1.317 # DQ norel: 1.47  # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
+        obs[:, :3] /= 1.64    # TQ norel 0.851 # DQ+ norel # 1.0   # T+so3: 3.2  # MAT norel: 3.127 # DQ norel: 2.42  # T+Q: 0.43 # DQ: 1.0 , T+SO3: 1.57 MATNEW: 1.64 # DQ+: 0.74
+        obs[:, 3:] /= 0.43    # TQ norel 1.0  # DQ+ norel # 0.364 # T+so3: 0.83 # MAT norel: 1.317 # DQ norel: 1.47  # T+Q: 1.0  # DQ:  1.0, T+SO3: 0.4 MATNEW: 0.43 # DQ+: 0.24
 
         # obs[:, 7:10] /= 0.7    # TQ norel: 0.7  # MAT norel:3.127  # T+so3: 3.1  # DQ: 1.0
         # obs[:, 10:]  /= 0.43   # TQ norel: 1.0  # MAT norel:1.167  # T+so3: 0.7  # DQ: 0.43
@@ -1029,7 +1030,7 @@ class RLManipulationDirect(DirectRLEnv):
 
         # Truncated and terminated variables
         truncated = out_of_bounds
-        terminated = torch.logical_or(time_out, self.target_reached)
+        terminated = torch.logical_or(time_out, self.target_reached*0)
 
         # if terminated.item() or truncated.item():
 
@@ -1043,6 +1044,27 @@ class RLManipulationDirect(DirectRLEnv):
         #     print(self.my_obs)
         #     torch.save(self.my_obs, "evol_TQ2.pth")
         #     raise
+
+        if self.cfg.test:
+            self.trajectory.append(self.debug_robot_ee_pose_w)
+            
+            if terminated.item() or truncated.item():
+                my_res_dict = {}
+                my_res_dict["success"] = self.target_reached
+                my_res_dict["end_pose"] = self.debug_robot_ee_pose_w
+                my_res_dict["tgt_pose"] = self.target_pose_r
+                
+                my_res_dict["obs_map"] = [self.log, self.exp]
+                my_res_dict["obs_conversions"] = [self.convert_to_group, self.convert_to_Lab]
+
+                my_res_dict["action_map"] = [self.log, self.exp]
+                my_res_dict["action_conversions"] = [self.convert_to_group, self.convert_to_Lab]
+
+                my_res_dict["trajectory"] = self.trajectory
+
+                path = "/workspace/isaacLab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation"
+                with open(os.path.join(path, 'SE3-SE3.pickle'), 'wb') as handle:
+                    pickle.dump(my_res_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 
@@ -1178,4 +1200,4 @@ class RLManipulationDirect(DirectRLEnv):
         self.my_obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel)
 
 
-        
+        self.trajectory = []
