@@ -240,6 +240,8 @@ class RLManipulationDirectCfg(DirectRLEnvCfg):
     # Bonus for reaching the target
     bonus_tgt_reached = 100
 
+    test = False
+
 
 # Function to update the variables in the configuration class
 #    using new information in the BimanualDirect class and new number of environments
