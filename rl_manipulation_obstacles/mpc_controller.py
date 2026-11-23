@@ -307,7 +307,7 @@ def drop_NMPC_setup(
 
         # Clearance restrictions
         centers_k, radii = ur5e_collision_spheres(
-            X[:, k],
+            X[:, k+1],
             sphere_specs,
             T_tool=T_tool,
         )
