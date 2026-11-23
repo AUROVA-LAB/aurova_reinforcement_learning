@@ -624,9 +624,20 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         # ------------------------------------------
         # 4. Solve NMPC
         # ------------------------------------------
+
         solve_start = time.perf_counter()
 
-        solution = self.opti.solve()
+        try:
+            solution = self.opti.solve()
+
+        except RuntimeError:
+            stats = self.opti.stats()
+
+            print("NMPC status:", stats.get("return_status"))
+            print("Iterations:", stats.get("iter_count"))
+
+            self.opti.debug.show_infeasibilities(1e-5)
+            raise
 
         solve_time = time.perf_counter() - solve_start
 
@@ -1718,7 +1729,7 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
         self.update_new_poses() 
 
 
-        self.dt = 0.02
+        self.dt = 0.01
 
         tgt = copy.deepcopy(self.target_pose_r)
 
@@ -1737,13 +1748,13 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             # {"frame": 2, "center": [0.33, 0.0, 0.0], "radius": self.cfg.radii[3]},
 
             # Forearm
-            {"frame": 3, "center": [0.07, 0.0, 0.0], "radius": self.cfg.radii[4]},
+            # {"frame": 3, "center": [0.07, 0.0, 0.0], "radius": self.cfg.radii[4]},
             # {"frame": 3, "center": [0.19, 0.0, 0.0], "radius": self.cfg.radii[5]},
-            {"frame": 3, "center": [0.21, 0.0, 0.0], "radius": self.cfg.radii[6]},
+            # {"frame": 3, "center": [0.21, 0.0, 0.0], "radius": self.cfg.radii[6]},
 
             # Wrist
             # {"frame": 4, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[7]},
-            {"frame": 5, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[8]},
+            # {"frame": 5, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[8]},
             # {"frame": 6, "center": [0.0, 0.0, 0.0], "radius": self.cfg.radii[9]},
 
             # Tool: offsets are relative to the TCP, including T_tool.
@@ -1761,7 +1772,8 @@ class RLManipulationObstaclesDirect(DirectRLEnv):
             dt=self.dt,
             horizon=60,
             sphere_specs=sphere_specs,
-            n_obstacle_points=self.cfg.pc_size
+            n_obstacle_points=self.cfg.pc_size,
+            collision_margin=0.03
         )
 
 
