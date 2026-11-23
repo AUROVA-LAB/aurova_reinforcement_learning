@@ -180,6 +180,8 @@ class RLManipulationDirect(DirectRLEnv):
 
         self.actions_ee = torch.zeros(6).to(self.device).repeat(self.num_envs, 1).float()
 
+        self.episode_count = 0
+
 
         # # Para T+Q que recibe [traslación, cuaternión wxyz]:
         # action_adapter = self.adapter_dq_log8
@@ -777,6 +779,7 @@ class RLManipulationDirect(DirectRLEnv):
         # action_pose = self.exp(actions)
         # action_pose = self.mul_operator(self.pose_group_r, action_pose)
         # action_pose = self.normalize(action_pose)
+        # action_pose_lab = self.convert_to_Lab(action_pose)
 
         # COMENTADO 3
         # actions += self.identity
@@ -784,18 +787,16 @@ class RLManipulationDirect(DirectRLEnv):
         # action_pose = self.normalize(action_pose)
         # action_pose = self.mul_operator(self.pose_group_r, action_pose)
         # action_pose = self.normalize(action_pose)
+        # action_pose_lab = self.convert_to_Lab(action_pose)
 
-        # action_pose = self.exp(self.robot_rot_ee_pose_r_lie + actions)
-        # action_pose = self.normalize(action_pose)
 
         # COMENTADO 4
-        action_pose = self.exp_dist(actions, so3=False)
+        action_pose = self.exp_dist(actions, so3=True)
         pose_lab = self.convert_to_Lab(self.pose_group_r)
         action_pose = self.mul_operator_dist(self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:]), action_pose)
         action_pose = self.normalize_dist(action_pose)
-        
-        # Convert to IsaacLab representation (translation, quaternion)
         action_pose_lab = self.convert_to_Lab_dist(action_pose)
+        
 
         # Set the command for the IKDifferentialController
         self.controller.set_command(action_pose_lab)
@@ -891,7 +892,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator_dist(target_group_se3, pose_group_se3)
-        self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff)
+        self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff, so3 = False)
 
 
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
@@ -921,7 +922,8 @@ class RLManipulationDirect(DirectRLEnv):
         target_lie = self.log(self.target_pose_r_group)
         
         # Builds the tensor with all the observations in a single row tensor (N, m)
-        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel2.round(decimals = 3))
+        obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel.round(decimals = 3))
+        # obs = copy.deepcopy(self.robot_rot_ee_pose_r_lie_rel2.round(decimals = 3))
         # obs = copy.deepcopy(torch.cat((self.robot_rot_ee_pose_r_lie, 
         #                                target_lie), dim = -1).round(decimals=3))
 
@@ -1048,22 +1050,35 @@ class RLManipulationDirect(DirectRLEnv):
         if self.cfg.test:
             self.trajectory.append(self.debug_robot_ee_pose_w)
             
+            if self.target_reached.item() and not self.is_tgt_reached:
+                self.is_tgt_reached = True
+                self.step_at_reached = copy.deepcopy(self.episode_length_buf)
+            
             if terminated.item() or truncated.item():
                 my_res_dict = {}
                 my_res_dict["success"] = self.target_reached
                 my_res_dict["end_pose"] = self.debug_robot_ee_pose_w
                 my_res_dict["tgt_pose"] = self.target_pose_r
                 
-                my_res_dict["obs_map"] = [self.log, self.exp]
-                my_res_dict["obs_conversions"] = [self.convert_to_group, self.convert_to_Lab]
+                my_res_dict["obs_map"] = [self.log_dist, self.exp_dist]
+                my_res_dict["obs_conversions"] = [self.to_group_dist, self.convert_to_Lab_dist]
 
                 my_res_dict["action_map"] = [self.log, self.exp]
                 my_res_dict["action_conversions"] = [self.convert_to_group, self.convert_to_Lab]
 
                 my_res_dict["trajectory"] = self.trajectory
 
-                path = "/workspace/isaacLab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation"
-                with open(os.path.join(path, 'SE3-SE3.pickle'), 'wb') as handle:
+                my_res_dict["threshold"] = self.cfg.distance_thres
+                my_res_dict["step_reach"] = self.step_at_reached
+
+                name = self.cfg.mapping_names[self.cfg.representation]
+                name += str(1)
+
+                path = "/workspace/isaaclab/source/isaaclab_tasks/isaaclab_tasks/manager_based/aurova_reinforcement_learning/rl_manipulation/exp3/v2/" + name
+
+                print("--- Episode: ", self.episode_count)
+ 
+                with open(os.path.join(path, str(self.episode_count) + '.pickle'), 'wb') as handle:
                     pickle.dump(my_res_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
@@ -1151,6 +1166,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Reset method from DirectRLEnv
         super()._reset_idx(env_ids)
 
+        self.episode_count = self.episode_count + 1
         # Reset the count
         self.count = 0
 
@@ -1201,3 +1217,5 @@ class RLManipulationDirect(DirectRLEnv):
 
 
         self.trajectory = []
+        self.is_tgt_reached = False
+        self.step_at_reached = 0 

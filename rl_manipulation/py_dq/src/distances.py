@@ -53,7 +53,7 @@ def geodesic_dist(x1: torch.Tensor, x2: torch.Tensor, log_fc = None, diff_fc = N
         - distance: [B]: geodesic distance between both sets
     """
 
-    log_diff = log_fc(diff_fc(x1, x2))
+    log_diff = log_fc(diff_fc(x1, x2), so3=False)
 
     log_diff[:, :3] /= 1.66
     log_diff[:, 3:] /= 0.415

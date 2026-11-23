@@ -73,7 +73,7 @@ def main():
                 # Step the environemnt
                 obs, rew, terminated, truncated, info = env.step(torch.tensor(action))
                 
-                print(rew)       
+                # print(rew)       
                     
 
     env.close()
