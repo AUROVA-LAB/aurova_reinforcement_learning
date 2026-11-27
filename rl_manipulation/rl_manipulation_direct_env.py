@@ -792,7 +792,10 @@ class RLManipulationDirect(DirectRLEnv):
 
         # COMENTADO 4
         self.saved_actions.append(actions)
-        action_pose = self.exp_dist(actions, so3=True)
+        action_pose = self.exp_dist(actions, so3=False)
+
+        action_pose.view(-1,4,4)[:, :3, 3] /= 2.5
+        
         pose_lab = self.convert_to_Lab(self.pose_group_r)
         action_pose = self.mul_operator_dist(self.to_group_dist(t = pose_lab[:, :3], r = pose_lab[:, 3:]), action_pose)
         action_pose = self.normalize_dist(action_pose)
@@ -893,7 +896,7 @@ class RLManipulationDirect(DirectRLEnv):
         # Transform to the Lie algebra
         self.robot_rot_ee_pose_r_lie = self.log(self.pose_group_r)
         diff = self.diff_operator_dist(target_group_se3, pose_group_se3)
-        self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff, so3 = True)
+        self.robot_rot_ee_pose_r_lie_rel = self.log_dist(diff, so3 = False)
 
 
         diff = self.diff_operator(self.target_pose_r_group, self.pose_group_r)
