@@ -8,3 +8,6 @@ wandb/
 *.pth
 *.txt
 *.pickle
+*.pdf
+*.png
+*.csv
